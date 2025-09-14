@@ -17,6 +17,7 @@ def select_prob_threshold(
     spread_series: Optional[pd.Series] = None,
     spread_scale: float = 0.0,
     slippage_bps: float = 0.0,
+    long_only: bool = False,
 ) -> Tuple[float, Dict]:
     """
     Search probability threshold p* maximizing PnL/Sharpe on provided series.
@@ -40,6 +41,7 @@ def select_prob_threshold(
             spread_series=spread_series,
             spread_scale=spread_scale,
             slippage_bps=slippage_bps,
+            long_only=long_only,
         )
         rep = summary_stats(eq)
         val = rep["final_equity"] if criterion == "final_equity" else rep["sharpe"]
@@ -55,5 +57,6 @@ def select_prob_threshold(
         "cost_bps": float(cost_bps),
         "spread_scale": float(spread_scale),
         "slippage_bps": float(slippage_bps),
+        "long_only": bool(long_only),
     })
     return best_thr, best_report

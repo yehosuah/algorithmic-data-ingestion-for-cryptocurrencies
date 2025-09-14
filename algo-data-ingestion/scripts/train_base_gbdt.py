@@ -33,6 +33,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--spread-scale", type=float, default=0.0, help="Scale factor applied to spread_col for additional costs")
     ap.add_argument("--early-stopping-rounds", type=int, default=50)
     ap.add_argument("--fold-scheme", choices=["even", "calendar_month"], default="even")
+    ap.add_argument("--long-only", action="store_true", help="Use long-only trading (no shorts) when selecting thresholds and computing equity")
     args = ap.parse_args(argv)
 
     df = load_parquet_dataset(args.data)
@@ -85,6 +86,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         spread_series=spread_series,
         spread_scale=args.spread_scale,
         slippage_bps=args.slippage_bps,
+        long_only=bool(args.long_only),
     )
 
     # Additional fold-level metrics

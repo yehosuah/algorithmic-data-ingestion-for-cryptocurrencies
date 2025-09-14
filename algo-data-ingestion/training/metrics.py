@@ -13,6 +13,7 @@ def equity_curve(
     spread_series: Optional[pd.Series] = None,
     spread_scale: float = 0.0,
     slippage_bps: float = 0.0,
+    long_only: bool = False,
 ) -> pd.DataFrame:
     """
     Simple thresholded strategy:
@@ -25,8 +26,11 @@ def equity_curve(
     thr = float(threshold)
 
     pos = np.zeros_like(proba)
-    pos[proba >= thr] = 1
-    pos[proba <= 1.0 - thr] = -1
+    if long_only:
+        pos[proba >= thr] = 1
+    else:
+        pos[proba >= thr] = 1
+        pos[proba <= 1.0 - thr] = -1
 
     pos_lag = np.roll(pos, 1)
     pos_lag[0] = 0
