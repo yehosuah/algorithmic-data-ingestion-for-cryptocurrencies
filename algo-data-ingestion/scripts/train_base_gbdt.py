@@ -3,11 +3,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Optional, List, Dict
 
 import numpy as np
 import pandas as pd
+
+# Ensure project root on sys.path
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from training.data import load_parquet_dataset, ensure_labels
 from training.walkforward import time_folds

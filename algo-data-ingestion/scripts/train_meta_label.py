@@ -4,6 +4,8 @@ import argparse
 import json
 from pathlib import Path
 from typing import Optional, List
+import os
+import sys
 
 import joblib
 import numpy as np
@@ -12,13 +14,15 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from training.data import load_parquet_dataset, ensure_labels
 from training.meta import triple_barrier_events, rolling_vol
 from training.thresholds import select_prob_threshold
 from training.model import extract_features_labels
 from training.metrics import equity_curve, summary_stats
 
-from scripts.train_blender import load_base_predictor, predict_base, load_tcn_predictor, predict_tcn
+from training.infer import load_base_predictor, predict_base, load_tcn_predictor, predict_tcn
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -103,4 +107,3 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
