@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import Optional, Callable
+from typing import Optional, Callable, Any
 import datetime
 import pandas as pd
-from tenacity import retry, stop_after_attempt, wait_exponential
-
+from app.common.async_infra import retry_httpx
+import httpx
 # Optional: kept for future streaming scenarios; not required for async adapters below
 import tweepy
 
@@ -30,7 +30,7 @@ class SocialClient:
     Notes:
     - Converted to async: callers must now `await` methods.
     - Removed blocking `ratelimit` and event-loop `.run_until_complete` calls.
-    - Tenacity retries remain with exponential backoff.
+    - Retries standardized via retry_httpx (Tenacity under the hood) with jittered exponential backoff.
     """
 
     def __init__(
@@ -42,7 +42,9 @@ class SocialClient:
         reddit_client_id: Optional[str] = None,
         reddit_client_secret: Optional[str] = None,
         reddit_user_agent: Optional[str] = None,
+        http: Optional[Any] = None,
     ) -> None:
+        self.http = http
         self.twitter_api = None
         if all([consumer_key, consumer_secret, access_token, access_token_secret]):
             auth = tweepy.OAuth1UserHandler(
@@ -72,7 +74,11 @@ class SocialClient:
         """Lifecycle symmetry; nothing to close yet."""
         return None
 
-    @retry(reraise=True, stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5))
+    def set_http(self, http: Any) -> None:
+        """Update the injected HTTP client (DI from FastAPI lifespan)."""
+        self.http = http
+
+    @retry_httpx(max_attempts=5)
     async def fetch_tweets(
         self,
         query: str,
@@ -89,16 +95,25 @@ class SocialClient:
                 now = datetime.datetime.utcnow()
                 since = now - datetime.timedelta(days=1)
                 until = now
-            df = await sentiment_adapter.fetch_twitter_sentiment(query, since, until, limit)
+            if self.http is not None:
+                try:
+                    df = await sentiment_adapter.fetch_twitter_sentiment(query, since, until, limit, http=self.http)
+                except TypeError:
+                    df = await sentiment_adapter.fetch_twitter_sentiment(query, since, until, limit)
+            else:
+                df = await sentiment_adapter.fetch_twitter_sentiment(query, since, until, limit)
             return df if isinstance(df, pd.DataFrame) else _empty_twitter_df()
-        except Exception:
+        except Exception as e:
+            # Let retry_httpx handle network/transient errors; keep "never-raise" for others
+            if isinstance(e, httpx.HTTPError):
+                raise
             return _empty_twitter_df()
 
     async def stream_tweets(self, handle_update: Callable[[dict], None]):
         """Placeholder for streaming tweets (not implemented)."""
         raise NotImplementedError("Streaming tweets is not implemented.")
 
-    @retry(reraise=True, stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5))
+    @retry_httpx(max_attempts=5)
     async def fetch_reddit(
         self,
         subreddit: str,
@@ -111,16 +126,31 @@ class SocialClient:
         Returns a DataFrame with columns: ts, author, title, selftext, score, num_comments.
         """
         try:
-            # If a class-based adapter is required elsewhere, check and fallback cleanly
             if self.reddit_adapter is None:
-                df = await reddit_adapter.fetch_reddit(subreddit, since, until, limit)
+                if self.http is not None:
+                    try:
+                        df = await reddit_adapter.fetch_reddit(subreddit, since, until, limit, http=self.http)
+                    except TypeError:
+                        df = await reddit_adapter.fetch_reddit(subreddit, since, until, limit)
+                else:
+                    df = await reddit_adapter.fetch_reddit(subreddit, since, until, limit)
             else:
+                # If a class-based adapter exists in your project and supports http injection, propagate it
+                try:
+                    if hasattr(self.reddit_adapter, "set_http"):
+                        self.reddit_adapter.set_http(self.http)
+                    elif hasattr(self.reddit_adapter, "http"):
+                        setattr(self.reddit_adapter, "http", self.http)
+                except Exception:
+                    pass
                 df = await reddit_adapter.fetch_reddit(subreddit, since, until, limit)
             return df if isinstance(df, pd.DataFrame) else _empty_reddit_df()
-        except Exception:
+        except Exception as e:
+            if isinstance(e, httpx.HTTPError):
+                raise
             return _empty_reddit_df()
 
-    @retry(reraise=True, stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=5))
+    @retry_httpx(max_attempts=5)
     async def fetch_reddit_api(
         self,
         subreddit: str,
@@ -134,11 +164,26 @@ class SocialClient:
         """
         try:
             if self.reddit_adapter is None:
-                df = await reddit_adapter.fetch_reddit_api(subreddit, since, until, limit)
+                if self.http is not None:
+                    try:
+                        df = await reddit_adapter.fetch_reddit_api(subreddit, since, until, limit, http=self.http)
+                    except TypeError:
+                        df = await reddit_adapter.fetch_reddit_api(subreddit, since, until, limit)
+                else:
+                    df = await reddit_adapter.fetch_reddit_api(subreddit, since, until, limit)
             else:
+                try:
+                    if hasattr(self.reddit_adapter, "set_http"):
+                        self.reddit_adapter.set_http(self.http)
+                    elif hasattr(self.reddit_adapter, "http"):
+                        setattr(self.reddit_adapter, "http", self.http)
+                except Exception:
+                    pass
                 df = await reddit_adapter.fetch_reddit_api(subreddit, since, until, limit)
             return df if isinstance(df, pd.DataFrame) else _empty_reddit_df()
-        except Exception:
+        except Exception as e:
+            if isinstance(e, httpx.HTTPError):
+                raise
             return _empty_reddit_df()
 
     async def stream_reddit(self, handle_update: Callable[[dict], None]):

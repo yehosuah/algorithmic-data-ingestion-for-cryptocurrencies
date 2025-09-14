@@ -17,7 +17,7 @@ services:
     build:
       context: .
       args:
-        INSTALL_ML: 0
+        INSTALL_ML: 1
     # If you publish a built image later, you can replace the above with:
     # image: algo-data-ingestion:latest
     env_file:
@@ -28,7 +28,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - FEATURE_NAMESPACE=features
       - FEATURE_TTL_SEC=3600
-      - ML_SENTIMENT_ENABLED=0
+      - ML_SENTIMENT_ENABLED=1
       - SENTIMENT_MODEL_ID=distilbert/distilbert-base-uncased-finetuned-sst-2-english
       - ML_MAX_WORKERS=4
       - HF_HOME=/app/.cache/huggingface

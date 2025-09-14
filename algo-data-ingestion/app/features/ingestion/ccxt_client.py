@@ -4,6 +4,7 @@ from datetime import datetime
 import inspect
 import pandas as pd
 from tenacity import retry, stop_after_attempt, wait_exponential
+from app.common.async_infra import retry_httpx
 
 from app.adapters.ccxt_adapter import CCXTAdapter
 
@@ -23,16 +24,43 @@ class CCXTClient:
     RATE_LIMIT_CALLS = RATE_LIMIT_CALLS
     RATE_LIMIT_PERIOD = RATE_LIMIT_PERIOD
 
-    def __init__(self, exchange_name: Optional[str] = None, api_key: Optional[str] = None, secret: Optional[str] = None):
+    def __init__(
+        self,
+        exchange_name: Optional[str] = None,
+        api_key: Optional[str] = None,
+        secret: Optional[str] = None,
+        http: Optional[Any] = None,
+    ):
         """
         Initialize the CCXTClient by wrapping the CCXTAdapter.
         Note: adapter creds handled internally if supported; we keep signature for future.
         """
+        # Injected shared HTTP client (DI from FastAPI lifespan); optional for adapters that support it
+        self.http = http
         if exchange_name:
-            # Preserve existing adapter construction to avoid signature drift
-            self.adapter = CCXTAdapter(exchange_name)
+            try:
+                # Prefer to pass the shared http client if the adapter supports it
+                sig = inspect.signature(CCXTAdapter)
+                if "http" in sig.parameters:
+                    self.adapter = CCXTAdapter(exchange_name, http=http)
+                else:
+                    self.adapter = CCXTAdapter(exchange_name)
+            except Exception:
+                # Fallback: construct with minimal args
+                self.adapter = CCXTAdapter(exchange_name)
         else:
             self.adapter = None
+    def set_http(self, http: Any) -> None:
+        """Update the injected HTTP client and propagate to adapter if possible."""
+        self.http = http
+        if self.adapter is None:
+            return
+        # Try common patterns: setter method, attribute, or no-op
+        setter = getattr(self.adapter, "set_http", None)
+        if callable(setter):
+            setter(http)
+        elif hasattr(self.adapter, "http"):
+            setattr(self.adapter, "http", http)
 
     async def aclose(self) -> None:
         """Attempt to gracefully close underlying adapter resources."""
@@ -49,7 +77,7 @@ class CCXTClient:
     # Async API methods
     # -----------------
 
-    @retry(reraise=True, stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10))
+    @retry_httpx(max_attempts=5)
     async def fetch_historical(
         self,
         symbol: str,
@@ -67,7 +95,7 @@ class CCXTClient:
             return pd.DataFrame()
         return await self.adapter.fetch_ohlcv(symbol, timeframe, since, limit)
 
-    @retry(reraise=True, stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10))
+    @retry_httpx(max_attempts=5)
     async def fetch_orderbook(self, symbol: str, limit: int = 100) -> pd.DataFrame:
         """
         Fetch current order book snapshot for a symbol.
@@ -83,7 +111,7 @@ class CCXTClient:
             return
         await self.adapter.watch_ticker(symbol, handle_update)
 
-    @retry(reraise=True, stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10))
+    @retry_httpx(max_attempts=5)
     async def stream_ticker(self, symbol: str, handle_update: Callable[[Dict[str, Any]], None]):
         """
         Stream live ticker updates via WebSocket. Calls handle_update per item.
@@ -92,21 +120,21 @@ class CCXTClient:
             return
         await self.adapter.watch_ticker(symbol, handle_update)
 
-    @retry(reraise=True, stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10))
+    @retry_httpx(max_attempts=5)
     async def list_symbols(self) -> List[str]:
         """Return list of symbols available on the exchange."""
         if self.adapter is None:
             return []
         return await self.adapter.list_symbols()
 
-    @retry(reraise=True, stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10))
+    @retry_httpx(max_attempts=5)
     async def get_ticker(self, symbol: str) -> Dict[str, Any]:
         """Fetch a one-off ticker snapshot via REST."""
         if self.adapter is None:
             return {}
         return await self.adapter.fetch_ticker(symbol)
 
-    @retry(reraise=True, stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=1, max=10))
+    @retry_httpx(max_attempts=5)
     async def fetch_balance(self) -> Dict[str, Any]:
         """Fetch account balances (if API keys provided)."""
         if self.adapter is None:

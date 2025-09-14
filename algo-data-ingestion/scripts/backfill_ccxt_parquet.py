@@ -14,6 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app.adapters.ccxt_adapter import CCXTAdapter
 from app.ingestion_service.utils import write_to_parquet
 from app.ingestion_service.config import settings
+from app.common.time_norm import add_dt_partition
 
 
 def _to_epoch_ms(dt_s: str) -> int:
@@ -55,8 +56,16 @@ async def run(exchange: str, symbol: str, timeframe: str, start_ms: int, end_ms:
                 since += step_ms
                 await asyncio.sleep(sleep_sec)
                 continue
-            path = write_to_parquet(df, settings.MARKET_PATH, {"exchange": exchange, "symbol": symbol})
-            written_rows += len(df)
+            # Ensure single-day writes to satisfy writer invariant (one dt per write)
+            df2 = df.copy()
+            add_dt_partition(df2, ts_col="timestamp")
+            unique_dt = sorted([d for d in df2["dt"].dropna().unique().tolist() if d])
+            for d in unique_dt:
+                day_df = df2[df2["dt"] == d].copy()
+                if day_df.empty:
+                    continue
+                write_to_parquet(day_df, settings.MARKET_PATH, {"exchange": exchange, "symbol": symbol})
+                written_rows += len(day_df)
             # advance since to last + 1 step
             last_ts_ms = int(df['timestamp'].max().value // 1_000_000)
             since = max(since + 1, last_ts_ms + _tf_seconds(timeframe) * 1000)
@@ -92,4 +101,3 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

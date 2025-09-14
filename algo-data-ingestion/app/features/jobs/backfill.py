@@ -88,7 +88,7 @@ async def build_and_write_market_features(
     if feats is None or feats.empty:
         return 0
 
-    payload_cols = [c for c in ["ret1", "rsi_14", "hl_spread", "oi_obv"] if c in feats.columns]
+    payload_cols = [c for c in ["ret_1", "rsi_14", "hl_spread", "oi_obv"] if c in feats.columns]
     items: List[Dict[str, Any]] = []
     for _, r in feats.iterrows():
         payload = {c: r[c] for c in payload_cols if pd.notna(r[c])}
