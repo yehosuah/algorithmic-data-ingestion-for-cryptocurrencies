@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
+import warnings
 
 import joblib
 import numpy as np
@@ -45,7 +46,7 @@ def train_xgb(
     model = xgb.XGBClassifier(**params)
     if X_val is not None and y_val is not None and len(X_val) > 0:
         try:
-            # xgboost < 2.0 supports early_stopping_rounds in fit
+            # Try legacy early_stopping_rounds
             model.fit(
                 X.values, y.values,
                 eval_set=[(X_val.values, y_val.values)],
@@ -53,14 +54,19 @@ def train_xgb(
                 early_stopping_rounds=early_stopping_rounds,
             )
         except TypeError:
-            # xgboost >= 2.0 uses callbacks API for early stopping
-            cb = [xgb.callback.EarlyStopping(rounds=early_stopping_rounds, save_best=True)]
-            model.fit(
-                X.values, y.values,
-                eval_set=[(X_val.values, y_val.values)],
-                verbose=False,
-                callbacks=cb,
-            )
+            try:
+                # Try new callbacks API
+                cb = [xgb.callback.EarlyStopping(rounds=early_stopping_rounds, save_best=True)]
+                model.fit(
+                    X.values, y.values,
+                    eval_set=[(X_val.values, y_val.values)],
+                    verbose=False,
+                    callbacks=cb,
+                )
+            except TypeError:
+                # Fallback: no early stopping
+                warnings.warn("XGBoost fit() does not accept early stopping args; proceeding without early stopping.")
+                model.fit(X.values, y.values)
     else:
         model.fit(X.values, y.values)
     return model
