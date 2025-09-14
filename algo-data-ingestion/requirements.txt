@@ -57,3 +57,7 @@ ratelimit>=2.2.1
 
 # --- Testing/dev utilities ---
 fakeredis>=2.21.0
+
+scikit-learn>=1.4
+xgboost>=2.0
+joblib>=1.3

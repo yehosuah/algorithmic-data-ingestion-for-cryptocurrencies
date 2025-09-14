@@ -466,7 +466,9 @@ python scripts/build_market_dataset.py \
   --exchange binance \
   --symbol BTC/USDT \
   --timeframe 1m \
-  --out datasets/market_btcusdt_1m.parquet
+  --start-date 2025-01-01 \
+  --end-date 2025-12-31 \
+  --out datasets/market_btcusdt_1m_2025.parquet
 ```
 This reads Parquet under `MARKET_PATH`, computes our standard market features, and adds labels (next‑bar return and direction).
 

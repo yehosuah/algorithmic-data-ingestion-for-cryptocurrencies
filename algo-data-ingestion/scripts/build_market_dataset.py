@@ -92,6 +92,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = ap.parse_args(argv)
 
     raw = load_ohlcv(args.exchange, args.symbol, timeframe=args.timeframe)
+    # De-duplicate on timestamp to avoid accidental double-writes across partitions
+    if not raw.empty and 'timestamp' in raw.columns:
+        raw = raw.sort_values('timestamp').drop_duplicates(subset=['timestamp'], keep='last')
     if args.start_date:
         raw = raw[raw['timestamp'] >= pd.to_datetime(args.start_date, utc=True)]
     if args.end_date:

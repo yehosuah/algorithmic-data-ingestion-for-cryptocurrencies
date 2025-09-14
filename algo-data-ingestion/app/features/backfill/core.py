@@ -62,7 +62,7 @@ async def backfill_market(
             files_scanned += 1
             continue
 
-        payload_cols = [c for c in ("ret1", "rsi_14", "hl_spread", "oi_obv") if c in feats.columns]
+        payload_cols = [c for c in ("ret_1", "rsi_14", "hl_spread", "oi_obv") if c in feats.columns]
         items: List[dict] = []
         for _, r in feats.iterrows():
             payload = {c: float(r[c]) for c in payload_cols if pd.notna(r[c])}

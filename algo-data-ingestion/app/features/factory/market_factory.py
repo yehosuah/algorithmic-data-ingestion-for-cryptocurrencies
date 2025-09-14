@@ -52,13 +52,33 @@ def _ema(x: pd.Series, span: int) -> pd.Series:
     return x.ewm(span=span, adjust=False).mean()
 
 def _rsi(close: pd.Series, period: int = 14) -> pd.Series:
+    """
+    RSI with robust handling of zero-loss/zero-gain windows.
+
+    - First `period-1` values are NaN (warm-up).
+    - If avg_loss == 0 and avg_gain > 0 => RSI = 100 (strong uptrend window)
+    - If avg_gain == 0 and avg_loss > 0 => RSI = 0   (strong downtrend window)
+    - If both zero (flat window) => RSI = 50
+    """
     delta = close.diff()
-    up = np.where(delta > 0, delta, 0.0)
-    down = np.where(delta < 0, -delta, 0.0)
-    roll_up = pd.Series(up, index=close.index).rolling(period).mean()
-    roll_down = pd.Series(down, index=close.index).rolling(period).mean()
-    rs = roll_up / (roll_down.replace(0, np.nan))
-    rsi = 100 - (100 / (1 + rs))
+    gains = delta.clip(lower=0.0)
+    losses = (-delta).clip(lower=0.0)
+
+    avg_gain = gains.rolling(period, min_periods=period).mean()
+    avg_loss = losses.rolling(period, min_periods=period).mean()
+
+    # Base RS with NaNs where avg_loss == 0; we'll replace below using masks
+    rs = avg_gain / avg_loss.replace(0.0, np.nan)
+    rsi = 100.0 - (100.0 / (1.0 + rs))
+
+    # Masks for edge cases
+    cond_up = (avg_loss == 0.0) & (avg_gain > 0.0)
+    cond_down = (avg_gain == 0.0) & (avg_loss > 0.0)
+    cond_flat = (avg_gain == 0.0) & (avg_loss == 0.0)
+
+    rsi = rsi.mask(cond_up, 100.0)
+    rsi = rsi.mask(cond_down, 0.0)
+    rsi = rsi.mask(cond_flat, 50.0)
     return rsi
 
 def _obv(close: pd.Series, volume: pd.Series) -> pd.Series:

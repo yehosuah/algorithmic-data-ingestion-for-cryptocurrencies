@@ -97,14 +97,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--include-reddit", action="store_true")
     ap.add_argument("--include-rss", action="store_true")
     ap.add_argument("--out", default="datasets/training_matrix.parquet")
+    ap.add_argument("--start-date", default=None, help="Optional ISO date to filter from")
+    ap.add_argument("--end-date", default=None, help="Optional ISO date to filter to")
     args = ap.parse_args(argv)
 
     # Market
-    mkt = load_market(args.exchange, args.symbol, timeframe=args.timeframe)
+    mkt = load_market(args.exchange, args.symbol)
     for col, val in (("symbol", args.symbol), ("exchange", args.exchange), ("timeframe", args.timeframe)):
         if col not in mkt.columns:
             mkt[col] = val
+    mkt["timestamp"] = pd.to_datetime(mkt["timestamp"], utc=True)
+    mkt = mkt.sort_values("timestamp").drop_duplicates(subset=["timestamp"], keep="last")
     feats = build_market_features(mkt)
+    feats["timestamp"] = pd.to_datetime(feats["timestamp"], utc=True)
+    if args.start_date:
+        feats = feats[feats["timestamp"] >= pd.to_datetime(args.start_date, utc=True)]
+    if args.end_date:
+        feats = feats[feats["timestamp"] <= pd.to_datetime(args.end_date, utc=True)]
     base = feats.merge(mkt[["timestamp", "close"]], on="timestamp", how="left")
 
     # Aggregates
@@ -128,6 +137,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             else:
                 r["ts"] = pd.to_datetime(r.get("timestamp"), utc=True)
             r_agg = resample_agg(r.rename(columns={"ts": "timestamp"}), "timestamp", args.timeframe, ["id" if "id" in r.columns else "title"])
+            # enforce tz-aware and optional window
+            r_agg["timestamp"] = pd.to_datetime(r_agg["timestamp"], utc=True)
+            if args.start_date:
+                r_agg = r_agg[r_agg["timestamp"] >= pd.to_datetime(args.start_date, utc=True)]
+            if args.end_date:
+                r_agg = r_agg[r_agg["timestamp"] <= pd.to_datetime(args.end_date, utc=True)]
             r_agg.columns = ["timestamp", "reddit_sent_mean", "reddit_count"]
             agg_frames.append(r_agg)
 
@@ -149,6 +164,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             if "sentiment_score" not in n.columns:
                 n["sentiment_score"] = 0.0
             n_agg = resample_agg(n.rename(columns={"published_at": "timestamp"}), "timestamp", args.timeframe, ["id"])
+            # enforce tz-aware and optional window
+            n_agg["timestamp"] = pd.to_datetime(n_agg["timestamp"], utc=True)
+            if args.start_date:
+                n_agg = n_agg[n_agg["timestamp"] >= pd.to_datetime(args.start_date, utc=True)]
+            if args.end_date:
+                n_agg = n_agg[n_agg["timestamp"] <= pd.to_datetime(args.end_date, utc=True)]
             n_agg.columns = ["timestamp", "rss_sent_mean", "rss_count"]
             agg_frames.append(n_agg)
 
