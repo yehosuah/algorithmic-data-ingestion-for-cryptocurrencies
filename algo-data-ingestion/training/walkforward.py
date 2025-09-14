@@ -19,7 +19,8 @@ def time_folds(
     n = len(df)
 
     if scheme == "calendar_month":
-        months = ts.dt.to_period("M").astype(str)
+        # Drop tz to avoid pandas warning, month boundaries unaffected
+        months = ts.dt.tz_localize(None).to_period("M").astype(str)
         df = df.assign(_month=months)
         unique_months = list(dict.fromkeys(df["_month"].tolist()))  # preserve order
         # Use last n_folds months as validation folds if specified; otherwise all but the first

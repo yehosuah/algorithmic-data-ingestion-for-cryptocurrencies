@@ -44,12 +44,23 @@ def train_xgb(
         }
     model = xgb.XGBClassifier(**params)
     if X_val is not None and y_val is not None and len(X_val) > 0:
-        model.fit(
-            X.values, y.values,
-            eval_set=[(X_val.values, y_val.values)],
-            verbose=False,
-            early_stopping_rounds=early_stopping_rounds,
-        )
+        try:
+            # xgboost < 2.0 supports early_stopping_rounds in fit
+            model.fit(
+                X.values, y.values,
+                eval_set=[(X_val.values, y_val.values)],
+                verbose=False,
+                early_stopping_rounds=early_stopping_rounds,
+            )
+        except TypeError:
+            # xgboost >= 2.0 uses callbacks API for early stopping
+            cb = [xgb.callback.EarlyStopping(rounds=early_stopping_rounds, save_best=True)]
+            model.fit(
+                X.values, y.values,
+                eval_set=[(X_val.values, y_val.values)],
+                verbose=False,
+                callbacks=cb,
+            )
     else:
         model.fit(X.values, y.values)
     return model
