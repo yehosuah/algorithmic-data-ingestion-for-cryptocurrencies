@@ -1,0 +1,24 @@
+{
+  "selected_threshold": 0.55,
+  "criterion": "final_equity",
+  "cost_bps": 5.0,
+  "spread_scale": 0.0,
+  "slippage_bps": 0.0,
+  "long_only": true,
+  "min_hold_bars": 5,
+  "min_total_turnover": 4.0,
+  "max_total_turnover": 80.0,
+  "oof_count": 715368,
+  "oof_auc": 0.999994853018906,
+  "gate_fraction": 0.5817369521700719,
+  "max_spread": 0.0006,
+  "max_spread_z": 1.0,
+  "diagnostic_final_equity": {
+    "0.55": 1000000.0,
+    "0.6": 1000000.0,
+    "0.65": 1000000.0,
+    "0.7": 1000000.0,
+    "0.75": 1000000.0,
+    "0.8": 1000000.0
+  }
+}

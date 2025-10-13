@@ -1,0 +1,110 @@
+{
+  "model_path": "tcn.pt",
+  "calibrator_path": "tcn_calibrator.joblib",
+  "preprocess_path": "tcn_preproc.joblib",
+  "threshold": {
+    "value": 0.5750000000000001,
+    "path": "threshold.json"
+  },
+  "report_path": "report.json",
+  "gates": {
+    "spread_column": "hl_spread",
+    "prob_column": "tcn_prob",
+    "training": {
+      "hl_spread_max": 0.00065,
+      "hl_spread_z_max": 0.85,
+      "rvol20_max": 0.0002,
+      "prob_gate_min": null,
+      "min_hold_bars": 5,
+      "long_only": false
+    },
+    "inference": {
+      "hl_spread_max": 0.0005,
+      "hl_spread_z_max": -0.6,
+      "rvol20_max": 4e-05,
+      "prob_gate_min": 0.85,
+      "min_hold_bars": 10,
+      "long_only": false
+    }
+  },
+  "metadata": {
+    "model_type": "tiny_tcn",
+    "calibrated": true,
+    "window": 192,
+    "kernel_size": 3,
+    "channels": [
+      48,
+      48
+    ],
+    "fold_logits_path": "fold_logits.parquet",
+    "prob_sigma_guardrail": {
+      "threshold": 0.03,
+      "months_below_threshold": [
+        "2024-06",
+        "2024-07",
+        "2024-08",
+        "2024-09",
+        "2024-10",
+        "2024-11",
+        "2024-12",
+        "2025-01",
+        "2025-02",
+        "2025-03",
+        "2025-04",
+        "2025-05",
+        "2025-06",
+        "2025-07",
+        "2025-08",
+        "2025-09"
+      ]
+    },
+    "validation_prob_std_by_month": {
+      "2024-06": 0.023932464947696408,
+      "2024-07": 0.024895704033425465,
+      "2024-08": 0.02063416989235041,
+      "2024-09": 0.02058499686051558,
+      "2024-10": 0.020722830413649036,
+      "2024-11": 0.01430828042977099,
+      "2024-12": 0.012179883525182723,
+      "2025-01": 0.01889699374979811,
+      "2025-02": 0.011007786395574547,
+      "2025-03": 0.012252167745268135,
+      "2025-04": 0.020905496837117326,
+      "2025-05": 0.024959979381210563,
+      "2025-06": 0.027769647986211045,
+      "2025-07": 0.024426491663984782,
+      "2025-08": 0.025171087389232585,
+      "2025-09": 0.025634200326147952
+    }
+  },
+  "alerts": {
+    "max_drawdown": {
+      "threshold": 0.12,
+      "observed": 0.08467911148194263,
+      "metric": "max_drawdown",
+      "severity": "info",
+      "description": "Alert if walk-forward max_drawdown exceeds 12%."
+    },
+    "prob_sigma_guardrail": {
+      "threshold": 0.03,
+      "months_below_threshold": [
+        "2024-06",
+        "2024-07",
+        "2024-08",
+        "2024-09",
+        "2024-10",
+        "2024-11",
+        "2024-12",
+        "2025-01",
+        "2025-02",
+        "2025-03",
+        "2025-04",
+        "2025-05",
+        "2025-06",
+        "2025-07",
+        "2025-08",
+        "2025-09"
+      ]
+    }
+  }
+}

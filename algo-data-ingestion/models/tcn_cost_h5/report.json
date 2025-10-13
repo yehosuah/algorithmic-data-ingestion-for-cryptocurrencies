@@ -1,0 +1,29 @@
+{
+  "mean_pnl": -3.78328621864071e-08,
+  "std_pnl": 6.066313128275212e-06,
+  "sharpe": -3.7568676103952052,
+  "max_drawdown": 0.003018027937647383,
+  "final_equity": 0.9972960097464708,
+  "avg_turnover": 8.387619873067353e-05,
+  "total_turnover": 6.0,
+  "selected_threshold": 0.8,
+  "criterion": "final_equity",
+  "cost_bps": 5.0,
+  "spread_scale": 0.0,
+  "slippage_bps": 0.0,
+  "long_only": true,
+  "min_hold_bars": 3,
+  "min_total_turnover": 4.0,
+  "oof_count": 71534,
+  "gate_fraction": 0.7934967987250818,
+  "max_spread": 0.0006,
+  "max_spread_z": 1.0,
+  "diagnostic_final_equity": {
+    "0.55": 0.6908754882812103,
+    "0.58": 0.8435269469965636,
+    "0.6": 0.8435269469965636,
+    "0.62": 0.920969714964374,
+    "0.65": 0.920969714964374,
+    "0.7": 0.9680100466508202
+  }
+}

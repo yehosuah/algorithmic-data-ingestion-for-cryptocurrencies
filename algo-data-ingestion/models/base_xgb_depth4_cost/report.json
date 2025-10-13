@@ -1,0 +1,17 @@
+{
+  "mean_pnl": -4.888687355227482e-08,
+  "std_pnl": 2.0094611320769835e-05,
+  "sharpe": -1.4655281674654477,
+  "max_drawdown": 0.03981310577542563,
+  "final_equity": 0.9630720471315425,
+  "avg_turnover": 7.566951210125102e-05,
+  "total_turnover": 58.0,
+  "selected_threshold": 0.905,
+  "criterion": "final_equity",
+  "cost_bps": 5.0,
+  "spread_scale": 0.0,
+  "slippage_bps": 0.0,
+  "long_only": false,
+  "oof_count": 766491,
+  "oof_auc": 0.5347132759789093
+}

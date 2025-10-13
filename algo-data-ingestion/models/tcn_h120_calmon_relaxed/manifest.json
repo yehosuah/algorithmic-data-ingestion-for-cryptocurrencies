@@ -1,0 +1,147 @@
+{
+  "model_path": "tcn.pt",
+  "calibrator_path": "tcn_calibrator.joblib",
+  "preprocess_path": "tcn_preproc.joblib",
+  "threshold": {
+    "value": 0.675,
+    "path": "threshold.json"
+  },
+  "report_path": "report.json",
+  "gates": {
+    "spread_column": "hl_spread",
+    "prob_column": "tcn_prob",
+    "training": {
+      "hl_spread_max": null,
+      "hl_spread_z_max": 0.25,
+      "rvol20_max": 0.0002,
+      "prob_gate_min": null,
+      "min_hold_bars": 5,
+      "long_only": false
+    },
+    "inference": {
+      "hl_spread_max": 0.0005,
+      "hl_spread_z_max": -0.6,
+      "rvol20_max": 4e-05,
+      "prob_gate_min": 0.85,
+      "min_hold_bars": 10,
+      "long_only": false
+    }
+  },
+  "metadata": {
+    "model_type": "tiny_tcn",
+    "calibrated": true,
+    "window": 192,
+    "kernel_size": 3,
+    "channels": [
+      48,
+      48
+    ],
+    "fold_logits_path": "fold_logits.parquet",
+    "prob_sigma_guardrail": {
+      "threshold": 0.03,
+      "months_below_threshold": []
+    },
+    "validation_prob_std_by_month": {
+      "2025-06": 0.12141130234724855,
+      "2025-07": 0.16143569203156327,
+      "2025-08": 0.1694285541697272,
+      "2025-09": 0.16282823722499218
+    },
+    "selected_horizon": 180,
+    "selected_variant_equity": 1.652558546996457,
+    "horizon_variants": {
+      "60": {
+        "model_dir": "models/tcn_h60_calmon_relaxed",
+        "report_path": "models/tcn_h60_calmon_relaxed/report.json",
+        "fold_logits_path": "models/tcn_h60_calmon_relaxed/fold_logits.parquet",
+        "final_equity": 1.1766552670262183,
+        "total_turnover": 42.0,
+        "max_drawdown": 0.01732809162676141,
+        "threshold": 0.6000000000000001,
+        "gate_fraction": 0.1186372745490982,
+        "variance_guardrail": {
+          "threshold": 0.03,
+          "months_below_threshold": []
+        },
+        "selected": false
+      },
+      "120": {
+        "model_dir": "models/tcn_h120_calmon_relaxed",
+        "report_path": "models/tcn_h120_calmon_relaxed/report.json",
+        "fold_logits_path": "models/tcn_h120_calmon_relaxed/fold_logits.parquet",
+        "final_equity": 1.187587816873793,
+        "total_turnover": 54.0,
+        "max_drawdown": 0.10113249357344656,
+        "threshold": 0.675,
+        "gate_fraction": 0.11748195669607057,
+        "variance_guardrail": {
+          "threshold": 0.03,
+          "months_below_threshold": []
+        },
+        "selected": false
+      },
+      "180": {
+        "model_dir": "models/tcn_h180_calmon_relaxed",
+        "report_path": "models/tcn_h180_calmon_relaxed/report.json",
+        "fold_logits_path": "models/tcn_h180_calmon_relaxed/fold_logits.parquet",
+        "final_equity": 1.652558546996457,
+        "total_turnover": 46.0,
+        "max_drawdown": 0.07371274452047527,
+        "threshold": 0.55,
+        "gate_fraction": 0.11432009626955475,
+        "variance_guardrail": {
+          "threshold": 0.03,
+          "months_below_threshold": []
+        },
+        "selected": true
+      }
+    }
+  },
+  "horizon_variants": {
+    "60": {
+      "model_dir": "models/tcn_h60_calmon_relaxed",
+      "report_path": "models/tcn_h60_calmon_relaxed/report.json",
+      "fold_logits_path": "models/tcn_h60_calmon_relaxed/fold_logits.parquet",
+      "final_equity": 1.1766552670262183,
+      "total_turnover": 42.0,
+      "max_drawdown": 0.01732809162676141,
+      "threshold": 0.6000000000000001,
+      "gate_fraction": 0.1186372745490982,
+      "variance_guardrail": {
+        "threshold": 0.03,
+        "months_below_threshold": []
+      },
+      "selected": false
+    },
+    "120": {
+      "model_dir": "models/tcn_h120_calmon_relaxed",
+      "report_path": "models/tcn_h120_calmon_relaxed/report.json",
+      "fold_logits_path": "models/tcn_h120_calmon_relaxed/fold_logits.parquet",
+      "final_equity": 1.187587816873793,
+      "total_turnover": 54.0,
+      "max_drawdown": 0.10113249357344656,
+      "threshold": 0.675,
+      "gate_fraction": 0.11748195669607057,
+      "variance_guardrail": {
+        "threshold": 0.03,
+        "months_below_threshold": []
+      },
+      "selected": false
+    },
+    "180": {
+      "model_dir": "models/tcn_h180_calmon_relaxed",
+      "report_path": "models/tcn_h180_calmon_relaxed/report.json",
+      "fold_logits_path": "models/tcn_h180_calmon_relaxed/fold_logits.parquet",
+      "final_equity": 1.652558546996457,
+      "total_turnover": 46.0,
+      "max_drawdown": 0.07371274452047527,
+      "threshold": 0.55,
+      "gate_fraction": 0.11432009626955475,
+      "variance_guardrail": {
+        "threshold": 0.03,
+        "months_below_threshold": []
+      },
+      "selected": true
+    }
+  }
+}

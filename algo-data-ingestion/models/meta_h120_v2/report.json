@@ -1,0 +1,14 @@
+{
+  "mean_pnl": 0.0,
+  "std_pnl": 1e-12,
+  "sharpe": 0.0,
+  "max_drawdown": 0.0,
+  "final_equity": 1.0,
+  "avg_turnover": 0.0,
+  "total_turnover": 0.0,
+  "meta_threshold": 0.5,
+  "pt_mult": 1.5,
+  "sl_mult": 2.0,
+  "max_hold": 180,
+  "label_pos_frac": 0.5398445092322643
+}

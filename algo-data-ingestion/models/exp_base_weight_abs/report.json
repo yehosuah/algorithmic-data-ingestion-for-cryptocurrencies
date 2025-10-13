@@ -1,0 +1,32 @@
+{
+  "mean_pnl": 0.0,
+  "std_pnl": 1e-12,
+  "sharpe": 0.0,
+  "max_drawdown": 0.0,
+  "final_equity": 1.0,
+  "avg_turnover": 0.0,
+  "total_turnover": 0.0,
+  "selected_threshold": 0.7000000000000001,
+  "criterion": "final_equity",
+  "cost_bps": 5.0,
+  "spread_scale": 0.0,
+  "slippage_bps": 0.0,
+  "long_only": false,
+  "min_hold_bars": 1,
+  "oof_count": 766491,
+  "oof_auc": 0.5224182548528671,
+  "gate_fraction": 0.7701238501169616,
+  "max_spread": 0.001,
+  "max_spread_z": 1.5,
+  "sample_weight_scheme": "abs_return",
+  "diagnostic_final_equity": {
+    "0.6": 0.01301621307578577,
+    "0.65": 0.6010597025017548,
+    "0.7": 1.0,
+    "0.75": 1.0,
+    "0.8": 1.0,
+    "0.85": 1.0,
+    "0.9": 1.0,
+    "0.95": 1.0
+  }
+}

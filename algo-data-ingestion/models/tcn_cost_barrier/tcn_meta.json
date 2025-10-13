@@ -1,0 +1,9 @@
+{
+  "window": 48,
+  "kernel_size": 3,
+  "channels": [
+    48,
+    48
+  ],
+  "dropout": 0.05
+}

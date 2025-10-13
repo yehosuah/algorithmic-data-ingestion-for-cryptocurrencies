@@ -1,0 +1,20 @@
+{
+  "window": 192,
+  "kernel_size": 3,
+  "channels": [
+    48,
+    48
+  ],
+  "dropout": 0.1,
+  "fold_logits_path": "fold_logits.parquet",
+  "prob_sigma_guardrail": {
+    "threshold": 0.03,
+    "months_below_threshold": []
+  },
+  "validation_prob_std_by_month": {
+    "2025-06": 0.12141130234724855,
+    "2025-07": 0.16143569203156327,
+    "2025-08": 0.1694285541697272,
+    "2025-09": 0.16282823722499218
+  }
+}
