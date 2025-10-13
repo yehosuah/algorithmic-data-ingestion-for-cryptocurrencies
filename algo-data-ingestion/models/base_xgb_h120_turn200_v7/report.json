@@ -1,0 +1,50 @@
+{
+  "mean_pnl": 6.134249303474795e-07,
+  "std_pnl": 4.548149741331012e-05,
+  "sharpe": 8.12471590288302,
+  "max_drawdown": 0.01068790895826277,
+  "final_equity": 1.5496714396128626,
+  "avg_turnover": 9.786158457477744e-05,
+  "total_turnover": 70.0,
+  "selected_threshold": 0.7,
+  "criterion": "final_equity",
+  "cost_bps": 5.0,
+  "spread_scale": 0.0,
+  "slippage_bps": 0.0,
+  "long_only": true,
+  "min_hold_bars": 10,
+  "min_total_turnover": 4.0,
+  "max_total_turnover": 200.0,
+  "oof_count": 715296,
+  "oof_auc": 0.9999928666557312,
+  "gate_fraction": 0.0001887330559656422,
+  "max_spread": 0.0005,
+  "max_spread_z": -0.5,
+  "max_rvol20": 5e-05,
+  "diagnostic_final_equity": {
+    "0.7": {
+      "final_equity": 1.5496714396128626,
+      "total_turnover": 70.0
+    },
+    "0.75": {
+      "final_equity": 1.5496714396128626,
+      "total_turnover": 70.0
+    },
+    "0.8": {
+      "final_equity": 1.5496714396128626,
+      "total_turnover": 70.0
+    },
+    "0.85": {
+      "final_equity": 1.5496714396128626,
+      "total_turnover": 70.0
+    },
+    "0.9": {
+      "final_equity": 1.5496714396128626,
+      "total_turnover": 70.0
+    },
+    "0.95": {
+      "final_equity": 1.5496714396128626,
+      "total_turnover": 70.0
+    }
+  }
+}

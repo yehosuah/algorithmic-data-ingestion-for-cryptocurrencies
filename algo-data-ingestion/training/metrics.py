@@ -13,6 +13,9 @@ def equity_curve(
     spread_series: Optional[pd.Series] = None,
     spread_scale: float = 0.0,
     slippage_bps: float = 0.0,
+    long_only: bool = False,
+    gate_mask: Optional[pd.Series] = None,
+    min_hold_bars: int = 1,
 ) -> pd.DataFrame:
     """
     Simple thresholded strategy:
@@ -24,9 +27,44 @@ def equity_curve(
     ret = ret_next.astype(float).values
     thr = float(threshold)
 
-    pos = np.zeros_like(proba)
-    pos[proba >= thr] = 1
-    pos[proba <= 1.0 - thr] = -1
+    signal = np.zeros_like(proba)
+    if long_only:
+        signal[proba >= thr] = 1
+    else:
+        signal[proba >= thr] = 1
+        signal[proba <= 1.0 - thr] = -1
+
+    if gate_mask is not None:
+        try:
+            gm = gate_mask.astype(bool).to_numpy()
+        except AttributeError:
+            gm = np.asarray(gate_mask, dtype=bool)
+        if len(gm) != len(signal):
+            if len(gm) > len(signal):
+                gm = gm[-len(signal):]
+            else:
+                gm = np.concatenate([gm, np.zeros(len(signal) - len(gm), dtype=bool)])
+        signal = signal.copy()
+        signal[~gm] = 0
+
+    current = 0
+    hold_remaining = 0
+    min_hold = int(max(1, min_hold_bars))
+    pos = np.zeros_like(signal)
+    for i in range(len(signal)):
+        target = signal[i]
+        if current == 0:
+            if target != 0:
+                current = target
+                hold_remaining = min_hold - 1
+        else:
+            if hold_remaining > 0:
+                hold_remaining -= 1
+            else:
+                if target != current:
+                    current = target
+                    hold_remaining = min_hold - 1 if current != 0 else 0
+        pos[i] = current
 
     pos_lag = np.roll(pos, 1)
     pos_lag[0] = 0
@@ -50,7 +88,11 @@ def equity_curve(
     cost = base_cost + spread_cost
 
     pnl = pos_lag * ret - cost
-    eq = np.cumprod(1.0 + pnl)
+    pnl = np.clip(pnl, -0.95, 10.0)
+    log_equity = np.cumsum(np.log1p(pnl))
+    log_equity = np.clip(log_equity, -50.0, 1.5)
+    eq = np.exp(log_equity)
+    eq = np.clip(eq, 1e-6, 1e6)
 
     return pd.DataFrame({
         "pos": pos,

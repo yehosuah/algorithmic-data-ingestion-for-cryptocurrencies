@@ -26,6 +26,7 @@ def sliding_windows(
     series_cols: Optional[Sequence[str]] = None,
     y_col: str = "y_dir",
     standardize_per_window: bool = True,
+    stride: int = 1,
 ) -> Tuple[np.ndarray, np.ndarray, pd.Series, List[str], StandardScaler | None]:
     """
     Build a 3D tensor (N, C, L) for TCN/CNN models from sequential features.
@@ -42,11 +43,18 @@ def sliding_windows(
         default_cols = [
             "ret_1", "logret_1", "rvol_5", "rvol_20", "macd", "macd_signal_9", "rsi_14", "hl_spread", "oi_obv",
         ]
+        if "base_prob" in df.columns:
+            default_cols.append("base_prob")
         series_cols = [c for c in default_cols if c in df.columns]
         if not series_cols:
             raise ValueError("No suitable series columns found in dataset for TCN windows")
 
-    vals = df[series_cols].astype(float).values
+    series_df = df[series_cols].astype(float).replace([np.inf, -np.inf], np.nan)
+    # Forward/backward fill to handle rolling-feature warmups; fall back to zeros if still missing
+    series_df = series_df.ffill().bfill().fillna(0.0)
+    vals = series_df.values
+    if not np.isfinite(vals).all():
+        raise ValueError("Series columns contain non-finite values after preprocessing; inspect dataset")
     y = df[y_col].astype(int).values if y_col in df.columns else None
     ts = pd.to_datetime(df["timestamp"], utc=True) if "timestamp" in df.columns else pd.Series(index=df.index, data=pd.NaT)
 
@@ -61,22 +69,34 @@ def sliding_windows(
     n, c = vals.shape
     if n < window + 1:
         raise ValueError(f"Not enough rows for window={window}")
+    if stride < 1:
+        raise ValueError("stride must be >= 1")
 
     # Build windows with stride 1
     L = window
-    N = n - L
+    starts = list(range(0, n - L, stride))
+    N = len(starts)
     X = np.empty((N, c, L), dtype=np.float32)
-    for i in range(N):
-        seg = vals[i:i+L, :].T  # (C, L)
+    y_buf: List[int] = []
+    ts_buf: List[pd.Timestamp] = []
+    for idx, start in enumerate(starts):
+        seg = vals[start:start+L, :].T  # (C, L)
         if standardize_per_window:
             # Per-window standardization for stability (channel-wise)
             m = seg.mean(axis=1, keepdims=True)
             s = seg.std(axis=1, keepdims=True) + 1e-6
             seg = (seg - m) / s
-        X[i] = seg
+        X[idx] = seg
+        if y is not None:
+            y_buf.append(int(y[start + L]))
+        if len(ts):
+            ts_buf.append(ts.iloc[start + L])
 
-    y_out = y[L:] if y is not None else np.array([], dtype=np.int64)
-    ts_out = ts.iloc[L:] if len(ts) else pd.Series(dtype="datetime64[ns, UTC]")
+    y_out = np.array(y_buf, dtype=np.int64) if y is not None else np.array([], dtype=np.int64)
+    if ts_buf:
+        ts_out = pd.Series(ts_buf, dtype="datetime64[ns, UTC]")
+    else:
+        ts_out = pd.Series(dtype="datetime64[ns, UTC]")
     return X, y_out.astype(np.int64), ts_out.reset_index(drop=True), list(series_cols), scaler
 
 
@@ -102,4 +122,3 @@ def ensure_labels(df: pd.DataFrame) -> pd.DataFrame:
     if "timestamp" in out.columns:
         out = out.iloc[:-1].copy()  # drop last unlabeled row
     return out
-

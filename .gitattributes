@@ -1,0 +1,1 @@
+algo-data-ingestion/datasets/*.parquet filter=lfs diff=lfs merge=lfs -text

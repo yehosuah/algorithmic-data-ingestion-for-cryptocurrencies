@@ -1,0 +1,25 @@
+{
+  "selected_threshold": 0.55,
+  "criterion": "final_equity",
+  "cost_bps": 5.0,
+  "spread_scale": 0.0,
+  "slippage_bps": 0.0,
+  "long_only": true,
+  "min_hold_bars": 10,
+  "min_total_turnover": 4.0,
+  "max_total_turnover": 200.0,
+  "oof_count": 715296,
+  "oof_auc": 0.9999928699537534,
+  "gate_fraction": 0.6578675121907573,
+  "max_spread": 0.0008,
+  "max_spread_z": 0.8,
+  "diagnostic_final_equity": {
+    "0.55": Infinity,
+    "0.6": Infinity,
+    "0.65": Infinity,
+    "0.7": Infinity,
+    "0.75": Infinity,
+    "0.8": Infinity,
+    "0.85": Infinity
+  }
+}

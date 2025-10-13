@@ -4,6 +4,8 @@ import argparse
 import json
 from pathlib import Path
 from typing import Optional, List
+import os
+import sys
 
 import joblib
 import numpy as np
@@ -12,13 +14,15 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from training.data import load_parquet_dataset, ensure_labels
 from training.meta import triple_barrier_events, rolling_vol
 from training.thresholds import select_prob_threshold
 from training.model import extract_features_labels
 from training.metrics import equity_curve, summary_stats
 
-from scripts.train_blender import load_base_predictor, predict_base, load_tcn_predictor, predict_tcn
+from training.infer import load_base_predictor, predict_base, load_tcn_predictor, predict_tcn
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -32,6 +36,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--max-hold", type=int, default=60)
     ap.add_argument("--primary-prob-column", default="base_prob", help="Column to apply masking against (base_prob or tcn_prob or blender_prob if available)")
     ap.add_argument("--cost-bps", type=float, default=5.0)
+    ap.add_argument("--tcn-stride", type=int, default=30, help="Stride used when generating TCN probabilities for meta-label dataset")
     args = ap.parse_args(argv)
 
     df = load_parquet_dataset(args.data)
@@ -44,13 +49,30 @@ def main(argv: Optional[List[str]] = None) -> int:
     df["base_prob"] = predict_base(df, calib_base, feat_cols).values
 
     model_tcn, calib_tcn, series_cols, scaler, window = load_tcn_predictor(Path(args.tcn_dir))
-    tcn_df = predict_tcn(df, model_tcn, calib_tcn, series_cols, scaler, window)
+    tcn_df = predict_tcn(
+        df,
+        model_tcn,
+        calib_tcn,
+        series_cols,
+        scaler,
+        window,
+        stride=max(1, int(args.tcn_stride)),
+    )
     df = df.merge(tcn_df, on="timestamp", how="left")
 
     # Triple barrier labels
-    vol = rolling_vol(np.log(df["close"].astype(float)).diff())
-    events = triple_barrier_events(df["close"], pt_mult=args.pt_mult, sl_mult=args.sl_mult, max_hold=args.max_hold, vol=vol)
-    lab = events["label"].reindex(pd.to_datetime(df["timestamp"], utc=True)).fillna(method="ffill").fillna(0).astype(int)
+    df_ts = df.set_index("timestamp")
+    close = df_ts["close"].astype(float)
+    logret = np.log(close).diff()
+    vol = rolling_vol(logret)
+    events = triple_barrier_events(
+        close,
+        pt_mult=args.pt_mult,
+        sl_mult=args.sl_mult,
+        max_hold=args.max_hold,
+        vol=vol,
+    )
+    lab = events["label"].reindex(df_ts.index).ffill().fillna(0).astype(int)
 
     # Meta features
     candidate_cols = [
@@ -103,4 +125,3 @@ def main(argv: Optional[List[str]] = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
