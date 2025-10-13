@@ -1,10 +1,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Dict, Optional, Callable
 
 import joblib
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -99,6 +100,7 @@ def train_tcn(
     dropout: float = 0.05,
     config: TrainConfig = TrainConfig(),
     device: Optional[str] = None,
+    progress_cb: Optional[Callable[[int, float], None]] = None,
 ) -> Tuple[TinyTCN, np.ndarray, Optional[np.ndarray]]:
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     model = TinyTCN(X.shape[1], channels=channels, kernel_size=kernel_size, dropout=dropout).to(device)
@@ -132,8 +134,12 @@ def train_tcn(
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()
             total += float(loss.detach().cpu().item()) * len(yb)
-        # optional early-stopping by val loss could be added here
-        _ = total / max(1, len(y))
+        avg_loss = total / max(1, len(y))
+        if progress_cb is not None:
+            try:
+                progress_cb(epoch + 1, float(avg_loss))
+            except Exception:
+                pass
 
     model.eval()
     with torch.no_grad():
@@ -156,7 +162,16 @@ def calibrate_logits(logits: np.ndarray, y: np.ndarray, method: str = "isotonic"
     return calib
 
 
-def save_tcn(out_dir: Path, model: TinyTCN, scaler, calib: Optional[CalibratedClassifierCV], used_cols, meta: Optional[dict] = None):
+def save_tcn(
+    out_dir: Path,
+    model: TinyTCN,
+    scaler,
+    calib: Optional[CalibratedClassifierCV],
+    used_cols,
+    meta: Optional[dict] = None,
+    *,
+    fold_logits: Optional[pd.DataFrame] = None,
+) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     # Torch model
     torch.save(model.state_dict(), out_dir / "tcn.pt")
@@ -166,3 +181,8 @@ def save_tcn(out_dir: Path, model: TinyTCN, scaler, calib: Optional[CalibratedCl
         joblib.dump(calib, out_dir / "tcn_calibrator.joblib")
     if meta is not None:
         (out_dir / "tcn_meta.json").write_text(__import__("json").dumps(meta, indent=2))
+    if fold_logits is not None and len(fold_logits):
+        df_logits = pd.DataFrame(fold_logits).copy()
+        if "timestamp" in df_logits.columns:
+            df_logits["timestamp"] = pd.to_datetime(df_logits["timestamp"], utc=True)
+        df_logits.to_parquet(out_dir / "fold_logits.parquet", index=False)

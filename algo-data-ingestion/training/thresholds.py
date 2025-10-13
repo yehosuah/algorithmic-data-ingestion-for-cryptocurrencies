@@ -18,6 +18,10 @@ def select_prob_threshold(
     spread_scale: float = 0.0,
     slippage_bps: float = 0.0,
     long_only: bool = False,
+    gate_mask: Optional[pd.Series] = None,
+    min_hold_bars: int = 1,
+    min_total_turnover: float = 0.0,
+    max_total_turnover: Optional[float] = None,
 ) -> Tuple[float, Dict]:
     """
     Search probability threshold p* maximizing PnL/Sharpe on provided series.
@@ -26,7 +30,10 @@ def select_prob_threshold(
     - `criterion` in {"final_equity", "sharpe"}.
     """
     if grid is None:
-        grid = np.linspace(0.55, 0.80, 14)
+        grid = np.concatenate([
+            np.linspace(0.55, 0.90, 15),
+            np.linspace(0.905, 0.995, 10),
+        ])
 
     best_thr = float(grid[0])
     best_val = -np.inf
@@ -42,8 +49,14 @@ def select_prob_threshold(
             spread_scale=spread_scale,
             slippage_bps=slippage_bps,
             long_only=long_only,
+            gate_mask=gate_mask,
+            min_hold_bars=min_hold_bars,
         )
         rep = summary_stats(eq)
+        if rep.get("total_turnover", 0.0) < float(min_total_turnover):
+            continue
+        if max_total_turnover is not None and rep.get("total_turnover", 0.0) > float(max_total_turnover):
+            continue
         val = rep["final_equity"] if criterion == "final_equity" else rep["sharpe"]
         if val > best_val:
             best_val = val
@@ -58,5 +71,8 @@ def select_prob_threshold(
         "spread_scale": float(spread_scale),
         "slippage_bps": float(slippage_bps),
         "long_only": bool(long_only),
+        "min_hold_bars": int(max(1, min_hold_bars)),
+        "min_total_turnover": float(min_total_turnover),
+        "max_total_turnover": float(max_total_turnover) if max_total_turnover is not None else None,
     })
     return best_thr, best_report

@@ -2,7 +2,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
-import warnings
 
 import joblib
 import numpy as np
@@ -31,44 +30,36 @@ def train_xgb(
     X_val: Optional[pd.DataFrame] = None,
     y_val: Optional[pd.Series] = None,
     early_stopping_rounds: int = 50,
+    sample_weight: Optional[np.ndarray] = None,
 ) -> xgb.XGBClassifier:
+    default_params = {
+        "n_estimators": 500,
+        "max_depth": 5,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "objective": "binary:logistic",
+        "tree_method": "hist",
+        "eval_metric": "logloss",
+    }
     if params is None:
-        params = {
-            "n_estimators": 500,
-            "max_depth": 5,
-            "learning_rate": 0.05,
-            "subsample": 0.8,
-            "colsample_bytree": 0.8,
-            "objective": "binary:logistic",
-            "tree_method": "hist",
-            "eval_metric": "logloss",
-        }
-    model = xgb.XGBClassifier(**params)
-    if X_val is not None and y_val is not None and len(X_val) > 0:
-        try:
-            # Try legacy early_stopping_rounds
-            model.fit(
-                X.values, y.values,
-                eval_set=[(X_val.values, y_val.values)],
-                verbose=False,
-                early_stopping_rounds=early_stopping_rounds,
-            )
-        except TypeError:
-            try:
-                # Try new callbacks API
-                cb = [xgb.callback.EarlyStopping(rounds=early_stopping_rounds, save_best=True)]
-                model.fit(
-                    X.values, y.values,
-                    eval_set=[(X_val.values, y_val.values)],
-                    verbose=False,
-                    callbacks=cb,
-                )
-            except TypeError:
-                # Fallback: no early stopping
-                warnings.warn("XGBoost fit() does not accept early stopping args; proceeding without early stopping.")
-                model.fit(X.values, y.values)
+        params = default_params
     else:
-        model.fit(X.values, y.values)
+        cfg = default_params.copy()
+        cfg.update(params)
+        params = cfg
+
+    model = xgb.XGBClassifier(**params)
+    fit_kwargs: Dict = {"verbose": False}
+    if sample_weight is not None:
+        fit_kwargs["sample_weight"] = sample_weight
+
+    if X_val is not None and y_val is not None and len(X_val) > 0:
+        fit_kwargs["eval_set"] = [(X_val.values, y_val.values)]
+        if early_stopping_rounds and early_stopping_rounds > 0:
+            print("[XGB] Warning: early stopping not supported for current xgboost.sklearn wrapper; ignoring.")
+
+    model.fit(X.values, y.values, **fit_kwargs)
     return model
 
 
@@ -83,10 +74,29 @@ def predict_proba(model_or_calib, X: pd.DataFrame) -> np.ndarray:
     return p
 
 
-def save_artifacts(out_dir: Path, booster: xgb.XGBClassifier, calib: CalibratedClassifierCV, feat_cols: List[str], threshold: float, report: Dict) -> None:
+def save_artifacts(out_dir: Path, booster: xgb.XGBClassifier, calib: CalibratedClassifierCV | None, feat_cols: List[str], threshold: float, report: Dict, gate_config: Optional[Dict] = None) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     booster.get_booster().save_model(str(out_dir/"model.json"))
-    joblib.dump(calib, out_dir/"calibrator.joblib")
+    if calib is not None:
+        joblib.dump(calib, out_dir/"calibrator.joblib")
+    elif (out_dir/"calibrator.joblib").exists():
+        (out_dir/"calibrator.joblib").unlink()
     (out_dir/"feature_list.json").write_text(json.dumps(feat_cols))
     (out_dir/"threshold.json").write_text(json.dumps({"prob_threshold": threshold}))
     (out_dir/"report.json").write_text(json.dumps(report, indent=2))
+    manifest = {
+        "model_path": "model.json",
+        "calibrator_path": "calibrator.joblib" if calib is not None else None,
+        "feature_list_path": "feature_list.json",
+        "threshold": {
+            "value": float(threshold),
+            "path": "threshold.json",
+        },
+        "report_path": "report.json",
+        "gates": gate_config or {},
+        "metadata": {
+            "model_type": "xgboost_classifier",
+            "calibrated": bool(calib is not None),
+        },
+    }
+    (out_dir/"manifest.json").write_text(json.dumps(manifest, indent=2))

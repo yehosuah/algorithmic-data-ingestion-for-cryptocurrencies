@@ -31,6 +31,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--slippage-bps", type=float, default=0.0)
     ap.add_argument("--spread-col", default="hl_spread")
     ap.add_argument("--spread-scale", type=float, default=0.0)
+    ap.add_argument("--tcn-stride", type=int, default=30, help="Stride used when generating TCN predictions for blender dataset")
     args = ap.parse_args(argv)
 
     df = load_parquet_dataset(args.data)
@@ -41,13 +42,21 @@ def main(argv: Optional[List[str]] = None) -> int:
     # Base predictions over all rows
     calib_base, feat_cols = load_base_predictor(Path(args.base_dir))
     base_prob = predict_base(df, calib_base, feat_cols)
+    df["base_prob"] = base_prob.values
 
     # TCN predictions (will be shorter due to window)
     model_tcn, calib_tcn, series_cols, scaler, window = load_tcn_predictor(Path(args.tcn_dir))
-    tcn_df = predict_tcn(df, model_tcn, calib_tcn, series_cols, scaler, window)
+    tcn_df = predict_tcn(
+        df,
+        model_tcn,
+        calib_tcn,
+        series_cols,
+        scaler,
+        window,
+        stride=max(1, int(args.tcn_stride)),
+    )
 
     merged = df.copy()
-    merged["base_prob"] = base_prob.values
     merged = merged.merge(tcn_df, on="timestamp", how="left")
 
     # Keep rows where both prob and labels exist; drop NA tcn_prob for training blender
