@@ -33,6 +33,7 @@ def select_prob_threshold(
         grid = np.concatenate([
             np.linspace(0.55, 0.90, 15),
             np.linspace(0.905, 0.995, 10),
+            np.array([0.9975, 0.9985, 0.9990, 0.9995, 0.99975, 0.9999, 0.99995, 0.99999]),
         ])
 
     best_thr = float(grid[0])

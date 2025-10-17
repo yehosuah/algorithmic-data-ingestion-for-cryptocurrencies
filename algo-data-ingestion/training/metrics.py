@@ -111,6 +111,9 @@ def summary_stats(df: pd.DataFrame) -> Dict[str, float]:
     std = float(np.std(ret) + 1e-12)
     sharpe = mean / std * np.sqrt(252*24*60)  # rough annualization for 1m
     max_dd = float(np.max(np.maximum.accumulate(eq) - eq))
+    toggle_count = 0
+    if "turnover" in df.columns:
+        toggle_count = int(np.count_nonzero(df["turnover"].values > 0.0))
     return {
         "mean_pnl": mean,
         "std_pnl": std,
@@ -119,4 +122,5 @@ def summary_stats(df: pd.DataFrame) -> Dict[str, float]:
         "final_equity": float(eq[-1]) if len(eq) else 1.0,
         "avg_turnover": float(np.mean(df["turnover"])) if "turnover" in df.columns else 0.0,
         "total_turnover": float(np.sum(df["turnover"])) if "turnover" in df.columns else 0.0,
+        "toggle_count": toggle_count,
     }
