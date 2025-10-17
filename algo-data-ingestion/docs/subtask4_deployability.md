@@ -15,12 +15,14 @@
 ## Data Artifacts
 - Horizon-aware validation matrix rebuilt with augmented features and stored at `datasets/training_matrix_months_2025-08-09_full.parquet`.
   - Columns include the full tree feature bundle, `ret_next_120`, `base_prob`, and persisted `tcn_prob` for downstream scripts.
+- Year-wide blender matrix (ungated, RSS enriched) is now available at `datasets/blender_matrix_2024-09_to_2025-09_rss.parquet`.
+  - Provides `base_prob`, `tcn_prob`, engineered spreads, plus minute (`rss_count_minute`) and day-level (`rss_count`, `rss_has_signal`) RSS features for retraining stacked models.
 
 ## Environment Health
 - Virtualenv rebuilt with Python 3.11; key packages reinstalled (`torch 2.3.1`, `scikit-learn 1.5.2`, `xgboost 2.1.1`).
 - Numerical safeguards in `training/metrics.py` prevent equity blow-up during horizon evaluation.
 
 ## Outstanding Work
-1. Re-cut the validation matrix with richer RSS/Reddit coverage (current slice has sparse aggregates), then re-run blender/meta so the stacked model clears the ≥1.2 equity bar.
+1. Retrain blender/meta on the RSS-enriched matrix and confirm ≥1.2 equity with ≥20 toggles before promoting to deployable artifacts.
 2. Port the XGB gate (spread + rvol + prob masks) into inference tooling so live turnover stays within the 70-toggle envelope.
 3. Run forward validation on neighbouring months to confirm the symmetric TCN and gated XGB remain stable outside Aug–Sep 2025.

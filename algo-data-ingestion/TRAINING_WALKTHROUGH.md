@@ -55,7 +55,25 @@ Outputs in `artifacts/blender/`:
 - `threshold.json` (prob threshold for trade) 
 - `report.json` (PnL metrics on validation month)
 
-## 3) Inference (outline)
+## 3) Leak-Proof Evaluation (base_xgb & TCN)
+
+Use `scripts/run_oos_eval.py` to replay walk-forward evaluation with embargoed folds, aligned trade gates, and optional baseline comparisons. The script works for both the tree baseline and the TCN variants.
+
+```bash
+python3 scripts/run_oos_eval.py \
+  --family base_xgb \
+  --data datasets/market_btcusdt_1m_2024_2025.parquet \
+  --model-dir models/base_xgb_h120_calmon_spread0 \
+  --align-gates \
+  --save-oos models/base_xgb_h120_calmon_spread0/oos_eval_latest.parquet \
+  --baseline-oos models/base_xgb_h120_calmon_spread0/oos_eval_2025-09.parquet
+```
+
+- `--align-gates` copies the inference gate onto the training gate so the reported metrics match the live deployment rules.
+- `--baseline-oos` (optional) loads an existing snapshot and reports deltas (MAE on probabilities, gate mismatch rate, etc.) before accepting the new metrics. Omit this flag until you have a trusted snapshot on disk.
+- For TCN families swap `--family tcn` and provide the temporal parameters (e.g., `--window`, `--channels`, `--epochs`, `--stride`). Use `--save-fold-logits` if you want the per-fold TCN logits for further analysis.
+
+## 4) Inference (outline)
 
 During live serving:
 1. Read latest market features from the feature store (Redis) at time t.
@@ -64,7 +82,7 @@ During live serving:
 4. Compare to threshold; if `p >= p*` go long (or short for symmetric rule), otherwise flat.
 5. Apply position sizing and turnover rules.
 
-## 4) Notes
+## 5) Notes
 
 - Walk‑forward and embargo are used to avoid leakage.
 - Probability calibration is essential so thresholds reflect actual hit rate.

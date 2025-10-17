@@ -11,6 +11,10 @@ Cost baseline for every metric below: **5 bps** per side, zero extra spread sc
   - Bid/ask proxy (`hl_spread`) averages **6.85 bps** with 90th percentile 14.6 bps and 99th percentile 34.3 bps; pro desks typically target ≤3 bps, so our model must aggressively gate to stay inside cost budget.
   - `rvol_20` mean `5.66e-04`, 90th percentile `1.02e-03`, 99th percentile `2.06e-03`, mapping neatly onto the equity spikes we see in training folds.
   - Rolling 120-bar returns (to mirror the horizon) span `[-2.20 %, +2.19 %]` between the 1st and 99th percentiles, matching what high-frequency crypto desks describe as “liquidity shock” moves.
+- **Blender matrix (ungated, RSS-enriched)** – `datasets/blender_matrix_2024-09_to_2025-09_rss.parquet`
+  - 524 041 rows from 2024-09-13 ➜ 2025-09-11, carrying the full engineered market feature bundle plus `base_prob`, `tcn_prob`, and both minute- and day-level RSS aggregates.
+  - Minute-level RSS hits occur in **0.065 %** of bars (`rss_count_minute`), while day-averaged coverage flags news presence on **85 %** of days (`rss_has_signal`); sentiment means are forward-filled across each day to maintain continuity for the blender.
+  - Additional columns `rss_daily_count_total`, `rss_daily_count_avg`, and `rss_sent_mean` now give the logistic stack continuous inputs instead of sparse spikes, resolving the earlier “20 minute” coverage gap.
 - **Aug–Sep 2025 matrix** – `datasets/training_matrix_months_2025-08-09_full.parquet`
   - 61 798 bars (Aug 1 ➜ Sep 12) with augmented features + `ret_next_120`, persisted `base_prob` + `tcn_prob`, and RSS aggregates.
   - Minute volatility compresses (σ `4.49e-04`), skew -0.39, kurtosis 39.8 due to calmer summer trading; spreads tighten to **4.09 bps** on average (90th 8.57 bps, 99th 19.13 bps).
@@ -59,20 +63,20 @@ _Implication:_ the deployable gates dramatically compress the feature distributi
   3. Feed the refreshed TCN manifest into blender experiments to re-establish ranking power under the relaxed gate.
 
 ## Logistic Blender (Base + TCN + RSS)
-- **Artifacts**: `models/blender_h120` (early slice) and `models/blender_h120_v3` (latest RSS matrix).
-- **Configuration**: StandardScaler + LogisticRegression (balanced class weight) over features `[base_prob, tcn_prob, rss_count, rss_sent_mean, rvol_5, rvol_20]`.
-- **Metrics**
-  - `blender_h120/report.json`: `final_equity` 1.01, `total_turnover` 22 (healthy; derived from the wider relaxed gate distribution).
-  - `blender_h120_v3/report.json`: `final_equity` 0.9985, `total_turnover` 2, `selected_threshold` 0.875 (model refuses to trade once the 0.011 % live gate is applied).
+- **Working dataset**: `datasets/blender_matrix_2024-09_to_2025-09_rss.parquet` (year-long, ungated). Minute-level hits (`rss_count_minute`) fire in 0.065 % of bars, while day-averaged coverage (`rss_has_signal`) spans 85 % of trading days, giving the stack continuous RSS context alongside `base_prob`/`tcn_prob`.
+- **Legacy artifacts**: `models/blender_h120` (early slice) and `models/blender_h120_v3` (latest pre-refresh matrix).
+- **Legacy metrics (for reference)**
+  - `blender_h120/report.json`: `final_equity` 1.01, `total_turnover` 22 (relaxed gate distribution).
+  - `blender_h120_v3/report.json`: `final_equity` 0.9985, `total_turnover` 2, `selected_threshold` 0.875 (collapsed once the live gate is applied).
 - **Diagnosis**
-  - With the deployable base gate, `base_prob` becomes {0,1} and dominates the regression, so the blender either mirrors the base signal or shuts off entirely.
-  - RSS coverage (<0.12 % of bars) leaves the logistic model with almost no informative variance; coefficients collapse toward zero.
-  - `tcn_prob` brings minimal incremental signal because it is nearly constant on the gated slice.
+  - Legacy training runs used the gated Aug–Sep slice and saw binary `base_prob` and near-zero RSS coverage, so coefficients collapsed to zero.
+  - The refreshed blender matrix restores variance (day-level averages + minute spikes), but the logistic model has not been retrained on it yet; current artifacts therefore remain stale.
+  - `tcn_prob` still needs interaction features (`base_prob - tcn_prob`, momentum terms) to provide incremental lift once gating is reintroduced.
 - **Required changes before deployment**
-  1. **Rehydrate feature variance**: regenerate the blender dataset directly from year-wide inference outputs _before_ imposing the strict spread/vol filters, then apply the gate only during evaluation. This restores ranking information the logistic learner can exploit.
-  2. **Augment signals**: include meta-features such as `base_prob - tcn_prob`, `rss_sent_mean` lagged averages, and realized spread metrics to give the blender continuous inputs.
-  3. **Balance datasets temporally**: ensure training includes both quiet and volatile months so coefficients generalize when RSS bursts increase.
-  4. **Validate against high-turnover references**: compare the blended strategy to the raw minute feed (year-wide dataset) to guarantee it still clears ≥1.2 equity when the gate is relaxed for liquidity provision.
+  1. **Retrain on the RSS-enriched matrix**: rerun `scripts/train_blender.py --data datasets/blender_matrix_2024-09_to_2025-09_rss.parquet` and persist a new artifact that leverages both minute (`rss_count_minute`, `rss_sent_mean_minute`) and daily (`rss_count`, `rss_sent_mean`, `rss_has_signal`) features.
+  2. **Expand the feature space**: add probability interactions (`base_prob - tcn_prob`, rolling means), RSS momentum, and realized spread deltas so the logistic learner has continuous inputs post-gate.
+  3. **Re-evaluate gates and thresholds**: pick thresholds with the relaxed gate, then replay with the deployable gate to confirm ≥1.2 equity and ≥20 toggles before shipping.
+  4. **Document variance checks**: record RSS coverage stats alongside the retrained report so future runs can confirm the feed remains ≥5 % daily coverage.
 
 ## Meta-Labeling Status
 - `models/meta_h120_v2` trains after redefining triple-barrier events (max-hold 180, pt/sl 1.5×/2.0× volatility) but achieves `final_equity` 1.00 because primary signals are flat.

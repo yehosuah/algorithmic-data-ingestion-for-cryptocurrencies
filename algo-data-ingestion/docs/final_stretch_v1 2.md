@@ -1,6 +1,6 @@
 # Final Stretch – v1
 
-Last updated: 2025-10-06 00:45 UTC  
+Last updated: 2025-10-13 23:33 UTC  
 Scope: concrete, deployment-ready adjustments required to ship the H120 stack (XGB + TCN + Blender) into production.
 
 ## Shared Pre-Flight Checklist
@@ -36,10 +36,10 @@ Scope: concrete, deployment-ready adjustments required to ship the H120 stack (X
 
 ## Logistic Blender
 1. **Dataset rebuild**: ✅ `datasets/blender_matrix_2024-09_to_2025-09_rss.parquet` now holds the ungated year-wide matrix (market features + `base_prob`/`tcn_prob` + minute/day RSS aggregates, incl. `hl_spread_z`, `rvol_delta`).
-2. **Feature expansion**: add interaction terms (`base_prob - tcn_prob`, momentum of probabilities, lagged RSS sentiment) to avoid binary dominance.
-3. **Regularisation sweep**: evaluate `LogisticRegression` with elastic-net (`l1_ratio` sweep) and `CalibratedClassifierCV` to stabilise probabilities beyond the gated subset.
-4. **Turnover guard**: enforce `--max-total-turnover 200` when selecting thresholds; reject fits that collapse to ≤2 toggles (as in `blender_h120_v3`).
-5. **Social-signal audit**: monitor that daily RSS coverage (`rss_has_signal`) stays ≥80 % and minute spikes remain ≥0.05 %; otherwise fall back to the no-RSS feature set before fitting.
+2. **Feature expansion**: ✅ `build_blender_features` now derives `prob_diff`, probability momentum (`base_prob_mom_1`, `tcn_prob_mom_1`, `prob_diff_mom_1`), and 1-bar RSS lags before selecting candidates; fallback set persists to disk (`models/blender_h120_v4/blender_features.txt`).
+3. **Regularisation sweep**: ✅ Elastic-net sweep across `l1_ratio ∈ {0.15, 0.35, 0.55, 0.75, 0.90}` with `CalibratedClassifierCV (cv=5)`; best run (`l1_ratio=0.15`) delivered `final_equity 1.28`, `sharpe 13.6`, stored in `models/blender_h120_v4/report.json`.
+4. **Turnover guard**: ✅ Threshold search now enforces `max_total_turnover=200`, `min_toggle_count=2`, and long-only execution; selected threshold `0.99999` yields `total_turnover 86`, `toggle_count 86`, satisfying the guard.
+5. **Social-signal audit**: ✅ Audit reports `rss_has_signal` coverage 85.16 % but minute spikes 0 % on the TCN-aligned slice, so the run auto-fell back to the no-RSS feature set (flagged under `rss_audit` in the report for traceability).
 
 ## Meta-Label Gate
 - Postpone production release. Actionable once the blender re-acquires meaningful probability gradients on the ungated matrix.
