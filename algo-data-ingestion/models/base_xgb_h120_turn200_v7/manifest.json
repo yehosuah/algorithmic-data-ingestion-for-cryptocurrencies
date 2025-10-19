@@ -1,0 +1,34 @@
+{
+  "model_path": "model.json",
+  "calibrator_path": "calibrator.joblib",
+  "feature_list_path": "feature_list.json",
+  "threshold": {
+    "value": 0.7,
+    "path": "threshold.json"
+  },
+  "report_path": "report.json",
+  "gates": {
+    "spread_column": "hl_spread",
+    "prob_column": "base_prob",
+    "training": {
+      "hl_spread_max": 0.0005,
+      "hl_spread_z_max": -0.5,
+      "rvol20_max": 5e-05,
+      "prob_gate_min": 0.7,
+      "min_hold_bars": 10,
+      "long_only": true
+    },
+    "inference": {
+      "hl_spread_max": 0.0005,
+      "hl_spread_z_max": -0.5,
+      "rvol20_max": 5e-05,
+      "prob_gate_min": 0.7,
+      "min_hold_bars": 10,
+      "long_only": true
+    }
+  },
+  "metadata": {
+    "model_type": "xgboost_classifier",
+    "calibrated": true
+  }
+}
