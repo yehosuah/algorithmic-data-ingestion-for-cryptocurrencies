@@ -1,5 +1,7 @@
 # Sanity Checks and Optional Improvements
 
+_Last updated: 2025-10-21 02:50 UTC_
+
 This document summarizes quick validation steps for a 2‑week backfill (market + RSS) and tracks optional improvements to reference during iteration.
 
 ## 2‑Week Backfill (Market + RSS)
@@ -61,13 +63,13 @@ python scripts/build_training_matrix.py \
 Data & Features
 - Multi‑symbol, multi‑timeframe coverage (BTC/USDT, ETH/USDT; 1m + 5m).
 - Extend feature set (higher‑order returns, regime features, realized volatility variants, microstructure if L2 is added).
-- Social/news: add Twitter (requires keys) and better RSS sources; aggregate features with decaying windows; sentiments via opt‑in ML.
+- Social/news: expand RSS sources and add Twitter keys; ensure minute spikes stay ≥5e-4 so the blender’s RSS audit passes (`scripts/build_blender_matrix.py` emits coverage stats).
 - On‑chain: add Glassnode metrics (with keys), align to bar closes.
 
 ML & Evaluation
 - Walk‑forward cross‑validation across multiple windows, purging and embargoing data.
 - Model zoo: gradient boosting, calibrated probabilities, monotonic constraints, temporal ensembling.
-- PnL‑centric validation: transaction costs, slippage models, position sizing; drawdown/Sharpe.
+- PnL‑centric validation with the relaxed gate artifacts (`models/base_xgb_h120_calmon_spread0`, `models/tcn_h120_calmon_relaxed`, `models/blender_h120_v6`); regression-test via `scripts/report_shortlist.py`.
 - Experiment tracking (MLflow/W&B) and reproducible pipelines.
 
 Serving & Ops

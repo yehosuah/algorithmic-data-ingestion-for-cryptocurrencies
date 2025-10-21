@@ -1,5 +1,7 @@
 # Algo Data Ingestion (Docker App)
 
+_Last updated: 2025-10-21 02:50 UTC_
+
 End-to-end ingestion for **market**, **on-chain**, **social**, and **news** data with a Redis feature store, admin backfills/TTL sweeps, a scheduler, and monitoring (Prometheus + Grafana).
 
 - **API:** FastAPI (`ingestion-api`)
@@ -492,6 +494,14 @@ This merges market features with aggregated counts and mean sentiment for RSS/Re
 Notes
 - Scripts read from the data lake paths configured in env (local or S3/GCS). For S3/GCS, ensure credentials/env are set as described above.
 - The training matrix script expects that some RSS or Reddit Parquet exists; you can generate it via the `rss_to_parquet.py` script or schedule ingest jobs.
+
+## Modeling Snapshot (Oct 2025)
+
+- `scripts/build_blender_matrix.py` now produces the year-wide matrix `datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet` with intraday/day RSS features, probability momentum (`prob_diff*`), and spread-aware regime columns aligned to the relaxed training gates.
+- Refreshed TCN suite (`models/tcn_h{60,120,180}_calmon_relaxed`) clears 5 bps costs with relaxed training gates; `tcn_h120_calmon_relaxed` reports `final_equity 1.33`, `total_turnover 180`, and persists fold logits for downstream recalibration.
+- Horizon-120 XGB baseline (`models/base_xgb_h120_calmon_spread0`) keeps `final_equity 4.48` under the relaxed gate while the deployable inference mask (`prob ≥ 0.85`, tight spread/rvol caps) remains encoded in the manifest.
+- `training/blender.py` + `blender_h120_v6` introduce an elastic-net logistic stack (711 toggles, `final_equity 1.84`) that leans on the richer RSS signals; reports carry RSS coverage audits so operations can fall back gracefully when feeds drop.
+- `training/reporting.ensure_kpi_schema` and `scripts/report_shortlist.py` standardise KPI fields and emit `models/report_shortlist.json`, making it easy to bubble up deployable candidates without manual report diffing.
 
 ---
 

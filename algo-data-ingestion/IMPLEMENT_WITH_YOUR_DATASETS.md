@@ -1,46 +1,45 @@
 # Walkthrough: Implement with Your Datasets
 
-This document captures the end-to-end implementation plan using your datasets. It is actionable and aligned with the repository’s current structure and scripts.
+_Last updated: 2025-10-21 02:50 UTC_
 
-Datasets
-- Training (market-only): `datasets/market_btcusdt_1m_2024_2025.parquet`
-- Validation (market+RSS): `datasets/training_matrix_months_2025-08-09.parquet`
+This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your own instruments once you have equivalent market + RSS coverage.
 
-Step 1: Preprocess
-- Ensure timestamp UTC and unique per bar (already enforced in our dataset builders).
-- For TCN, construct a sliding window tensor from the market dataset (e.g., last 32 bar deltas/returns; standardize per window).
-- For labels: use `y_dir`; optionally create higher-confidence labels (e.g., `|ret_next| > threshold` for positives) to train the meta-filter later.
+## Reference Artifacts
+- Market history: `datasets/market_btcusdt_1m_2024_2025.parquet`
+- RSS-enriched blender matrix: `datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet`
+- Baseline models: `models/base_xgb_h120_calmon_spread0`, `models/tcn_h120_calmon_relaxed`
 
-Step 2: Base Learner (GBDT)
-- Train XGBoost classifier on market features (no RSS) with walk-forward CV across 2024→2025 windows.
-- Calibrate predictions (Isotonic/Platt) on the backtest folds.
-- Save: base model + probability calibrator + feature list + chosen probability threshold.
+## Step 1 – Feature Engineering
+1. **Market dataset**: reuse `scripts/build_market_dataset.py` to generate your symbol’s feature parquet (ensures consistent `ret_next` and `y_dir` labels).
+2. **RSS aggregation**: ingest feeds via `scripts/rss_to_parquet.py` (or your own collectors). The blender builder depends on daily coverage ≥80 % and minute spike share ≥5e-4.
+3. **Blender matrix**: run `scripts/build_blender_matrix.py`, pointing `--base-dir` / `--tcn-dir` at the calibrated models to backfill probabilities and engineered RSS features.
 
-Step 3: Temporal Edge (Tiny TCN)
-- Inputs: short window (e.g., 32) of returns/ohlcv deltas; target `y_dir`.
-- Keep small (1–2 residual blocks, kernel size 3–5) to avoid overfit.
-- Calibrate outputs (map to probabilities).
-- Save: TCN model + scaler + calibrator + chosen threshold.
+## Step 2 – Base Learner
+- Train with relaxed gate defaults:
+  ```bash
+  python scripts/train_base_gbdt.py \
+    --data <your_market_dataset.parquet> \
+    --out models/base_xgb_h120_calmon_spread0_yoursymbol \
+    --fold-scheme calendar_month --n-folds 6 \
+    --cost-bps 5 --max-spread-z 0.25 --max-rvol20 2e-4
+  ```
+- Validate the RSS audit and monthly diagnostics in `report.json`, then review deployable gates within the generated manifest.
 
-Step 4: Combine (Stack/Blend)
-- Build a blender dataset on the validation month:
-  - Features: `base_prob`, `tcn_prob`, `rss_count`, `rss_sent_mean`, and regime features (e.g., `rvol_20`).
-  - Target: `y_dir` for the month.
-- Train a logistic blender (or shallow tree).
-- Threshold selection: choose `p*` that maximizes PnL with costs on the validation period.
+## Step 3 – Temporal Model
+- Clone the TCN run with horizon tuned to your strategy (120 bars by default). Adjust `--window`, `--channels`, and `--stride` to match volatility profile while keeping turnover ≤200.
+- Store the manifest + fold logits to allow recalibration without retraining from scratch.
 
-Step 5: Meta‑Labeling Filter (optional but recommended)
-- Generate events via triple‑barrier (profit‑taking, stop‑loss, time barrier).
-- Train logistic meta‑model to predict event success conditioned on base signals and TCN features.
-- Use meta‑prob to mask low‑quality trades before applying thresholds.
+## Step 4 – Blender / Ensemble
+- Feed the RSS-enriched matrix into `scripts/train_blender.py` with an elastic-net sweep. Confirm:
+  - RSS audit `passed = true`
+  - Threshold respects turnover guardrails
+  - `report.json` lists meaningful feature weights (probability momentum, RSS spikes, regime features)
 
-Step 6: Risk & Execution
-- Volatility targeting: position size `s = k / recent_vol` (cap max size).
-- Dynamic threshold: `p* = c0 + alpha × (spread/vol)` to avoid trading when costs are high.
-- Turnover constraint: suppress flips within N minutes; apply small hysteresis between enter/exit thresholds.
+## Step 5 – Meta Filter (optional)
+- Once the base + TCN + blender produce non-degenerate probabilities on your data, experiment with `scripts/train_meta_label.py`.
+- Adjust the triple-barrier params to your instrument’s volatility; require ≥1.2 final equity and ≥20 toggles before promoting the meta gate.
 
-Step 7: Live Path (staged)
-- Feature store: read latest features from Redis; compute TCN inputs from recent history buffer.
-- Apply base + TCN; optional meta‑filter; blender; threshold to trade.
-- If RSS present live, feed RSS features; else fallback to base stack (blender should handle NaN/zero gracefully).
-
+## Step 6 – Deployment Readiness
+- Use `scripts/report_shortlist.py` to summarise candidates.
+- Replay live coverage with the manifest gates (`live_gate_coverage.csv` pattern) and integrate the gating logic into your inference stack.
+- Monitor RSS coverage and probability variance to trigger fallbacks if data quality dips below thresholds captured in the reports.

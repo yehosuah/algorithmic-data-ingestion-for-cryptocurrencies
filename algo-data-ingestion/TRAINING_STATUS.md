@@ -1,90 +1,38 @@
 # Model Training Status (XGB · TCN · Blender)
 
-_Last updated: 2025-10-06 00:45 UTC_
+_Last updated: 2025-10-21 02:50 UTC_
 
-Cost baseline for every metric below: **5 bps** per side, zero extra spread scaling unless explicitly stated.
+## Quick Status
+- **Base XGB (Calmon relaxed gate)** – `models/base_xgb_h120_calmon_spread0` holds `final_equity 4.48`, Sharpe 108, and 3.6 k toggles under the relaxed training mask (`hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2e-4`). The manifest persists the deployable inference gate (`hl_spread ≤ 0.0005`, `hl_spread_z ≤ -0.6`, `rvol_20 ≤ 4e-5`, `prob ≥ 0.85`, `min_hold = 10`) and monthly coverage, keeping live activation inside the <0.02 % envelope.
+- **TCN suite (Calmon relaxed)** – refreshed horizons clear 5 bps costs:  
+  `tcn_h60` → `final_equity 1.05`, 67 toggles; `tcn_h120` → `final_equity 1.33`, 180 toggles; `tcn_h180` → `final_equity 1.19`, 48 toggles. All share the relaxed training mask and the inference gate mirrored from the base model.
+- **Logistic blender (elastic-net)** – `models/blender_h120_v6` trains on the new RSS-enriched matrix and delivers `final_equity 1.84`, Sharpe 28.7, and 711 toggles at threshold 0.95. Reports now include RSS coverage audits and feature inventories so ops can verify signal health.
 
 ## Data Landscape
-- **Year-wide minute feed** – `datasets/market_btcusdt_1m_2024_2025.parquet`
-  - 894 240 bars covering 2024-01-01 ➜ 2025-09-12.
-  - Minute returns: mean `1.37e-06`, σ `7.02e-04`, skew -0.47, kurtosis 53.9 ⇒ far heavier tails than a Gaussian (expected in high-volume BTC venues).
-  - Bid/ask proxy (`hl_spread`) averages **6.85 bps** with 90th percentile 14.6 bps and 99th percentile 34.3 bps; pro desks typically target ≤3 bps, so our model must aggressively gate to stay inside cost budget.
-  - `rvol_20` mean `5.66e-04`, 90th percentile `1.02e-03`, 99th percentile `2.06e-03`, mapping neatly onto the equity spikes we see in training folds.
-  - Rolling 120-bar returns (to mirror the horizon) span `[-2.20 %, +2.19 %]` between the 1st and 99th percentiles, matching what high-frequency crypto desks describe as “liquidity shock” moves.
-- **Blender matrix (ungated, RSS-enriched)** – `datasets/blender_matrix_2024-09_to_2025-09_rss.parquet`
-  - 524 041 rows from 2024-09-13 ➜ 2025-09-11, carrying the full engineered market feature bundle plus `base_prob`, `tcn_prob`, and both minute- and day-level RSS aggregates.
-  - Minute-level RSS hits occur in **0.065 %** of bars (`rss_count_minute`), while day-averaged coverage flags news presence on **85 %** of days (`rss_has_signal`); sentiment means are forward-filled across each day to maintain continuity for the blender.
-  - Additional columns `rss_daily_count_total`, `rss_daily_count_avg`, and `rss_sent_mean` now give the logistic stack continuous inputs instead of sparse spikes, resolving the earlier “20 minute” coverage gap.
-- **Aug–Sep 2025 matrix** – `datasets/training_matrix_months_2025-08-09_full.parquet`
-  - 61 798 bars (Aug 1 ➜ Sep 12) with augmented features + `ret_next_120`, persisted `base_prob` + `tcn_prob`, and RSS aggregates.
-  - Minute volatility compresses (σ `4.49e-04`), skew -0.39, kurtosis 39.8 due to calmer summer trading; spreads tighten to **4.09 bps** on average (90th 8.57 bps, 99th 19.13 bps).
-  - Horizon-120 label stats: mean `2.34e-05`, σ `4.81e-03`, skew +0.44, kurtosis 8.55, with 1st/99th percentiles `[-1.45 %, +1.33 %]`. Compared to the year-wide feed, tail risk is halved, which explains why long-hold models overstate Sharpe on this slice.
-  - `base_prob` is nearly binary (`q25=0`, `q50=1`, σ≈0.499) because the deployable gate zeroes most bars; within the relaxed training gate (see below) the mean softens to 0.53 with σ≈0.50.
-  - `tcn_prob` retains limited dynamic range (σ≈0.027, `q0.9≈0.56`); correlation with `ret_next_120` ≈ **-0.007** once the live gate is applied, signalling the stacking dead-end.
-  - Social liquidity remains a rounding error: RSS hits in only 0.11 % of minutes (mean sentiment -0.10 when present), so the two-month slice is materially poorer than full-year community feeds used by benchmark crypto-arb desks.
-- **Gate coverage comparison**
-  - Live deployable gate (`hl_spread ≤ 0.0005`, `hl_spread_z ≤ -0.6`, `rvol_20 ≤ 4e-5`, `base_prob ≥ 0.85`) now stays within the ±2× coverage envelope: year-wide activation averages **0.0035 %**, peaking at **0.0179 %** in Jul‑2025 and dropping to zero during the quietest months (see `models/base_xgb_h120_calmon_spread0/live_gate_coverage.csv`).
-  - Relaxed training gate (`hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2e-4`, no prob gate) still captures **11.36 %** of the Aug–Sep slice and restores `tcn_prob` variance (σ≈0.021) without inviting the full 6 bps average spread regime.
+- **Year-wide minute feed** – `datasets/market_btcusdt_1m_2024_2025.parquet`, 894 240 bars from 2024-01-01 ➜ 2025-09-12. Spread stats align with the relaxed training gate (avg `hl_spread` 6.8 bps, q99 34 bps).
+- **Blender matrix (RSS enriched)** – `datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet`, 542 760 rows (2024-09-13 ➜ 2025-09-11). `base_prob_mean` 0.515, `tcn_prob_mean` 0.585 over the gated subset, and RSS spikes cover 0.025 % of minutes with 82.5 % daily coverage (see `...rss_latest_stats.json`).
+- **Gate coverage replay** – `models/base_xgb_h120_calmon_spread0/live_gate_coverage.csv` confirms the deployable mask fires in the 0.0004 %–0.0179 % band per month (≤1.63× the historical baseline), satisfying turnover constraints for live deployment.
 
-_Implication:_ the deployable gates dramatically compress the feature distribution seen by stacked models. Any downstream learner must cope with binary-like base scores and tiny RSS coverage; otherwise it overfits to noise. Re-validating on the full year feed is mandatory before production.
+## Horizon-120 XGBoost
+- CLI defaults in `scripts/train_base_gbdt.py` now align with the calmon relaxed profile (`--max-spread-z 0.25`, `--max-rvol20 2e-4`, no probability filter) while persisting the deployable gate inside the manifest. Diagnostic output captures calendar-month metrics, RSS audits, and threshold grids.
+- Spread stress tests (`spread_scale` ∈ {0, 0.05, 0.1, 0.2}) retain 4.48 equity with identical turnover, showing robustness to 20 % cost inflation.
+- `training/reporting.ensure_kpi_schema` normalises KPI payloads, and `scripts/report_shortlist.py` curates `models/report_shortlist.json` so reviewers can spot deployable variants without manual diffing.
 
-## Horizon-120 XGBoost Classifier
-- **Artifacts**: `models/base_xgb_h120_calmon_spread0` (primary), plus cost sweeps at `{0.05, 0.1, 0.2}` spread scaling.
-- **Configuration highlights**: depth 6, 1200 trees, auto `scale_pos_weight`, 6 calendar‑month folds with 60-minute embargo. Training gate: `hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2e-4`, no probability filter. Deployable gate (persisted in every manifest): `hl_spread ≤ 0.0005`, `hl_spread_z ≤ -0.6`, `rvol_20 ≤ 4e-5`, `prob ≥ 0.85`, `min_hold_bars = 10`, long-only.
-- **Out-of-fold metrics (relaxed gate)**:
-  - `final_equity` **4.48**
-  - `sharpe` **108.9** (under the relaxed training gate)
-  - `total_turnover` **3.7 k** (gate fraction 9.47 % over 237 k labeled bars)
-  - `oof_auc` 0.999996
-- **Live coverage checks**
-  - Manifest-level replay confirms monthly activation stays within the 0–1.63× band relative to the 0.011 % baseline (Jul‑2025 tops out at 0.0179 %; several months record zero fires).
-- **What’s working**
-  - Relaxing training gate restored probability variance, enabling the 6-fold calendar split to produce stable thresholds.
-  - Gate configs and manifests are now exported alongside every run; inference utilities digest them via `training.infer.load_gate_config`.
-  - Cost sweeps (spread_scale 0→0.2) keep final equity at 4.48 with unchanged turnover, demonstrating robustness to wider spreads.
-- **Follow-ons**
-  1. Fold-level diagnostics are in place; next step is to backfill inference replays over higher-spread months (Nov‑2024, Apr‑2025) to validate live gate stability.
-  2. Downstream adapters/tests consume the manifest gate; integration tests should assert the boolean mask before order generation.
-  3. Update monitoring thresholds to match the tighter gate (spread z ≤ -0.6, prob ≥ 0.85) so drift alerts trigger correctly.
+## TCN Suite
+- `scripts/train_tcn.py` refresh adds fold logit persistence, stride control, and the relaxed gate defaults. Each manifest references `fold_logits.parquet`, the monthly probability σ table, and the shared inference gate.
+- **Key metrics** (`cost_bps=5`, relaxed training gate):
+  - `models/tcn_h60_calmon_relaxed`: final_equity **1.054**, Sharpe 16.6, total_turnover 67, selected_threshold 0.55.
+  - `models/tcn_h120_calmon_relaxed`: final_equity **1.331**, Sharpe 24.9, total_turnover 180, selected_threshold 0.65.
+  - `models/tcn_h180_calmon_relaxed`: final_equity **1.190**, Sharpe 29.6, total_turnover 48, selected_threshold 0.575.
+- `models/oos_replay_summary.json` and `models/tcn_gate_replay_summary.json` document training-vs-inference gate behaviour for audit trails; live gates remain intentionally sparse (coverage ≤0.0008 %).
 
-## Horizon-120 Temporal Convolutional Network
-- **Artifact**: `models/tcn_h120_calmon_relaxed` (calendar-month folds, relaxed gate).
-- **Architecture**: TinyTCN with two 48-channel residual blocks, 192-bar windows, stride 60, dropout 0.1, AdamW (`class_weight=2.0`), base probabilities appended as an extra channel.
-- **Out-of-fold metrics** (`report.json`):
-  - `final_equity` **1.36** with **78** toggles (`threshold = 0.65`, long/short)
-  - `sharpe` 69.3 under the relaxed training gate (`hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2e-4`)
-  - `gate_fraction` 0.117 (training gate), manifest mirrors the XGB live gate (`hl_spread ≤ 0.0005`, `hl_spread_z ≤ -0.6`, `rvol_20 ≤ 4e-5`, `prob ≥ 0.85`)
-- **Progress**
-  - TCN save routine now emits `manifest.json` with gate config + metadata, keeping deployment parity with the base model.
-  - Training defaults match the relaxed gate, preventing probability collapse prior to gating.
-- **Next steps**
-  1. Repeat the run with stride 30 and horizon sweep {60, 180} (turnover cap 200) once compute budget allows.
-  2. Persist per-fold logits to unblock calibrator refresh (pending update to `training/tcn_model.py`).
-  3. Feed the refreshed TCN manifest into blender experiments to re-establish ranking power under the relaxed gate.
+## Blender & Meta Label
+- `scripts/build_blender_matrix.py` now builds the RSS-enriched matrix with intraday spike features, exponential decays, probability momentum, and ensures label continuity. Outputs include a JSON summary and leverage `settings.FSSPEC_STORAGE_OPTIONS` for remote stores.
+- `scripts/train_blender.py` consumes the matrix, standardises features, and runs an elastic-net sweep (`l1_ratio` grid). `models/blender_h120_v6` demonstrates that once RSS spikes are engineered into continuous signals the logistic stack can operate with 711 toggles while keeping the 5 bps cost budget.
+- `scripts/train_meta_label.py` benefits from the shared relaxed gate yet still lacks a stable decision surface—the current meta artifacts remain placeholders until the blender/base probabilities regain dynamic range on forward months.
 
-## Logistic Blender (Base + TCN + RSS)
-- **Working dataset**: `datasets/blender_matrix_2024-09_to_2025-09_rss.parquet` (year-long, ungated). Minute-level hits (`rss_count_minute`) fire in 0.065 % of bars, while day-averaged coverage (`rss_has_signal`) spans 85 % of trading days, giving the stack continuous RSS context alongside `base_prob`/`tcn_prob`.
-- **Legacy artifacts**: `models/blender_h120` (early slice) and `models/blender_h120_v3` (latest pre-refresh matrix).
-- **Legacy metrics (for reference)**
-  - `blender_h120/report.json`: `final_equity` 1.01, `total_turnover` 22 (relaxed gate distribution).
-  - `blender_h120_v3/report.json`: `final_equity` 0.9985, `total_turnover` 2, `selected_threshold` 0.875 (collapsed once the live gate is applied).
-- **Diagnosis**
-  - Legacy training runs used the gated Aug–Sep slice and saw binary `base_prob` and near-zero RSS coverage, so coefficients collapsed to zero.
-  - The refreshed blender matrix restores variance (day-level averages + minute spikes), but the logistic model has not been retrained on it yet; current artifacts therefore remain stale.
-  - `tcn_prob` still needs interaction features (`base_prob - tcn_prob`, momentum terms) to provide incremental lift once gating is reintroduced.
-- **Required changes before deployment**
-  1. **Retrain on the RSS-enriched matrix**: rerun `scripts/train_blender.py --data datasets/blender_matrix_2024-09_to_2025-09_rss.parquet` and persist a new artifact that leverages both minute (`rss_count_minute`, `rss_sent_mean_minute`) and daily (`rss_count`, `rss_sent_mean`, `rss_has_signal`) features.
-  2. **Expand the feature space**: add probability interactions (`base_prob - tcn_prob`, rolling means), RSS momentum, and realized spread deltas so the logistic learner has continuous inputs post-gate.
-  3. **Re-evaluate gates and thresholds**: pick thresholds with the relaxed gate, then replay with the deployable gate to confirm ≥1.2 equity and ≥20 toggles before shipping.
-  4. **Document variance checks**: record RSS coverage stats alongside the retrained report so future runs can confirm the feed remains ≥5 % daily coverage.
-
-## Meta-Labeling Status
-- `models/meta_h120_v2` trains after redefining triple-barrier events (max-hold 180, pt/sl 1.5×/2.0× volatility) but achieves `final_equity` 1.00 because primary signals are flat.
-- `models/meta_h120_v3` fails when filtering for complete RSS/Twitter fields (single-class data).
-- **Action**: defer meta-label deployment until base + TCN regain probability gradients on a broader slice; otherwise the meta gate adds no information.
-
-## Deployment Checklist (Current Gaps)
-1. **Gate Consistency** – Mirror the spread/vol/prob filters from `models/base_xgb_h120_turn200_v7/report.json` and `models/tcn_cost_h120_turn200_ls/report.json` inside `training/infer.py` and any live adapters.
-2. **Probability Diagnostics** – Store per-fold probability histograms and ROC curves for all future runs to catch degeneracy before stacking.
-3. **Data Refresh Cadence** – Rebuild the August–September matrix monthly, but cross-check against the full-year quant feed to ensure we are not overfitting to one liquidity regime.
-4. **Social Feed Enrichment** – Expand RSS/Twitter sourcing (coverage >5 % target) or drop the feature family entirely until coverage meets minimum viable density.
+## Operational Follow-Ups
+1. Extend validation to Oct–Nov 2025 to confirm the relaxed training gate and the inference mask maintain equity >1.2 across regimes.
+2. Integrate the manifest gates (spread/rvol/prob/min-hold) into live scoring paths and add regression tests that replay `report.json` outputs through the inference adapters.
+3. Monitor RSS coverage using the audit block; auto-fallback to a no-RSS feature set if `minute_spike_share < 5e-4` to prevent the blender from overfitting sparse spikes.
+4. Revisit meta-label training only after a longer blended matrix is available; otherwise focus on hardening the base + TCN ensemble now that both exceed post-cost profitability.

@@ -1,54 +1,41 @@
-# Subtask 3 – Blender Refresh
+# Subtask 3 – Elastic-Net Blender Refresh
+
+_Last updated: 2025-10-21 02:50 UTC_
 
 ## Goal
-Train a logistic blender combining the horizon-120 base model and tightened TCN outputs (plus RSS features) with 5 bps transaction costs.
+Train an elastic-net logistic blender that combines Calmon relaxed base and TCN probabilities with RSS spike features, clearing 5 bps transaction costs while maintaining actionable turnover.
 
 ## Workflow
-1. Generate base and TCN probabilities on `datasets/training_matrix_months_2025-08-09.parquet` using the refreshed models (`models/base_xgb_h120_turn200`, `models/tcn_cost_h120_turn200`).
-2. Feed the merged dataset into `training.blender.train_blender` to learn a logistic regression with standardized features.
+1. Build the RSS-enriched blender matrix using `scripts/build_blender_matrix.py` (intraday RSS spikes, probability momentum, relaxed gate masks).
+2. Run `scripts/train_blender.py` with elastic-net sweep and turnover guards.
+3. Review RSS audit (`passed=true`) and feature inventory before promoting the artifact.
 
 ## Command
-Executed manually (due to long runtime) via:
 ```bash
-.venv/bin/python - <<'PY'
-from pathlib import Path
-import pandas as pd
-from training.data import load_parquet_dataset, ensure_labels
-from training.feature_eng import augment_market_features
-from training.infer import load_base_predictor, predict_base, load_tcn_predictor, predict_tcn
-from training.blender import train_blender, save_blender
-
-matrix_path = Path('datasets/training_matrix_months_2025-08-09.parquet')
-base_dir = Path('models/base_xgb_h120_turn200')
-tcn_dir = Path('models/tcn_cost_h120_turn200')
-out_dir = Path('models/blender_h120')
-
-# load + enrich
-df = load_parquet_dataset(matrix_path)
-df = ensure_labels(df)
-df = augment_market_features(df)
-df = df.sort_values('timestamp').reset_index(drop=True)
-
-calib_base, feat_cols = load_base_predictor(base_dir)
-df['base_prob'] = predict_base(df, calib_base, feat_cols).values
-
-model_tcn, calib_tcn, series_cols, scaler, window = load_tcn_predictor(tcn_dir)
-tcn_df = predict_tcn(df, model_tcn, calib_tcn, series_cols, scaler, window)
-merged = df.merge(tcn_df, on='timestamp', how='left').dropna(subset=['base_prob','tcn_prob','y_dir','ret_next']).reset_index(drop=True)
-
-pipe, thr, rep, cols = train_blender(merged, cost_bps=5.0)
-save_blender(out_dir, pipe, cols, thr, rep)
-print({'threshold': thr, 'report': rep, 'features': cols})
-PY
+python scripts/train_blender.py \
+  --matrix datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet \
+  --base-dir models/base_xgb_h120_calmon_spread0 \
+  --tcn-dir models/tcn_h120_calmon_relaxed \
+  --out models/blender_h120_v6 \
+  --cost-bps 5 --tcn-stride 30 \
+  --max-total-turnover 10000 --min-toggle-count 2 \
+  --l1-ratio-grid 0.15 0.35 0.55 0.75 0.9
 ```
 
-## Result (`models/blender_h120/report.json`)
-- `final_equity`: **1.0119**
-- `sharpe`: ~1.74
-- `total_turnover`: 22 (long/short symmetric)
-- `selected_threshold`: 0.675
-- Features used: `['base_prob', 'tcn_prob', 'rss_count', 'rss_sent_mean', 'rvol_5', 'rvol_20']`
+## Result (`models/blender_h120_v6/report.json`)
+- `final_equity`: **1.837**
+- `sharpe`: 28.7
+- `total_turnover`: 711
+- `selected_threshold`: 0.95
+- RSS audit: daily coverage 0.825, minute spike share 0.254 (pass, indicator `rss_spike_presence`)
+- RSS gate applied: `rss_spike_decay_fast ≥ 0.08` (share ≈0.021)
 
 ## Notes
-- Running the packaged script timed out; the manual invocation reproduces equivalent logic but avoids re-running TCN predictions on every call.
-- Future improvement: persist `tcn_prob` alongside the training matrix to keep the official CLI responsive.
+- Feature set includes probability momentum (`prob_diff`, `*_mom_1`), RSS spike windows, and volatility deltas. The manifest lists candidate features for transparency.
+- Training pipeline now leverages KPI schema normalization (`training/reporting.ensure_kpi_schema`) so reports align with base/TCN outputs.
+- The matrix stats JSON (`..._rss_latest_stats.json`) provides sanity checks on probability distributions and RSS coverage before fitting.
+
+## Next Steps
+1. Replay Oct–Nov 2025 to confirm equity ≥1.2 and turnover within ±25 % of 711 toggles.
+2. Integrate RSS audit thresholds into monitoring; automatically switch to a no-RSS fallback when coverage dips below requirements.
+3. Document feature preprocessing in inference code to mirror StandardScaler + selected columns from the manifest.

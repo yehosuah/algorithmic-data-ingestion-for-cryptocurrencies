@@ -1,5 +1,7 @@
 # Subtask 1 – TCN Turnover Tightening
 
+_Last updated: 2025-10-21 02:50 UTC_
+
 ## Goal
 Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity > 1.0 (5 bps costs).
 
@@ -11,29 +13,32 @@ Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity
 ```bash
 .venv/bin/python scripts/train_tcn.py \
   --data datasets/market_btcusdt_1m_2024_2025.parquet \
-  --out models/tcn_cost_h120_turn200 \
-  --window 192 --stride 30 --channels 48,48 \
-  --epochs 6 --batch-size 512 --lr 5e-4 \
+  --out models/tcn_h120_calmon_relaxed \
+  --window 192 --stride 30 --channels 64,64 \
+  --epochs 10 --batch-size 256 --lr 5e-4 \
   --dropout 0.1 --weight-decay 1e-5 \
   --class-weight 2.0 \
-  --n-folds 3 --embargo-minutes 60 \
-  --cost-bps 5 --spread-scale 0 \
-  --max-spread 0.0006 --max-spread-z 0.8 \
-  --long-only --min-hold-bars 5 \
+  --n-folds 4 --embargo-minutes 60 \
+  --cost-bps 5 --max-spread-z 0.25 --max-rvol20 2e-4 \
   --min-total-turnover 4 --max-total-turnover 200 \
+  --min-hold-bars 5 --long-only 0 \
   --threshold-criterion final_equity \
-  --base-dir models/base_xgb_tuned_features_cost \
+  --base-dir models/base_xgb_h120_calmon_spread0 \
   --horizon 120 \
-  --diagnostic-thresholds 0.55,0.6,0.65,0.7,0.75,0.8
+  --diagnostic-thresholds 0.55,0.6,0.65,0.675,0.7
 ```
 
-## Result (`models/tcn_cost_h120_turn200/report.json`)
-- `final_equity`: **1.0046**
-- `sharpe`: 4.18
-- `total_turnover`: 8 trades (within ≤200 target)
-- `selected_threshold`: 0.675
-- Gate coverage: 0.812 (`hl_spread ≤ 0.6 bps`, `hl_spread_z ≤ 0.8`)
+## Result (`models/tcn_h120_calmon_relaxed/report.json`)
+- `final_equity`: **1.331**
+- `sharpe`: 24.9
+- `total_turnover`: 180 (≤200 target)
+- `selected_threshold`: 0.65
+- Gate coverage (training): 0.0896 under the relaxed mask (`hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2e-4`); deployable inference gate mirrors the base manifest (`hl_spread ≤ 0.0005`, `hl_spread_z ≤ -0.6`, `rvol_20 ≤ 4e-5`, `prob ≥ 0.85`, `min_hold 10`).
 
 ## Notes
-- Added `--max-total-turnover` support plus equity clipping (see `training/metrics.py`) to prevent exploding equity curves.
-- Warnings about older calibrators persist until we retrain the base XGB model with the rebuilt environment (handled in Subtask 2).
+- Per-fold logits persist (`fold_logits.parquet`), enabling recalibration without rerunning the network.
+- Probability σ guardrail stays above 0.03 across validation months, avoiding the collapse seen with earlier tight gates.
+
+## Next Steps
+- Replay Oct–Nov 2025 with the deployable gate to confirm turnover remains under the live budget.
+- Evaluate horizon 60 and 180 siblings for ensemble coverage; document selection criteria alongside manifests.

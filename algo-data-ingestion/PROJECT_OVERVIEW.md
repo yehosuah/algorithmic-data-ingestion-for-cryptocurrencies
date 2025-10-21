@@ -1,14 +1,14 @@
 # Algo Data Ingestion – Comprehensive Project Dossier
 
-_Last updated: 2025-09-29 02:05 UTC_
+_Last updated: 2025-10-21 02:50 UTC_
 
 ---
 
 ## 1. Executive Summary
 - **Mission**: Deliver an end-to-end ingestion and modeling platform that converts high-frequency market, social, and news data into actionable trading signals and deploys them through a monitored production stack.
 - **Scope**: Covers data acquisition (API ingest, backfills), feature engineering, supervised learning (XGBoost baseline, Temporal Convolutional Networks), ensemble/meta-label strategies, backtesting & diagnostics, and deployment readiness (FastAPI service, Redis store, scheduler, monitoring).
-- **Current State**: Data pipelines and infrastructure are operational. Core models are trained but fail to clear realistic cost thresholds. Focus is on improving per-model profitability before stacking and meta-labeling.
-- **Immediate Goal**: Achieve post-cost positive equity (>1.0) for both the XGB baseline and TCN models on out-of-fold evaluations with 5 bps transaction costs. Once achieved, proceed to blender and meta-label training.
+- **Current State**: Data pipelines and infrastructure are operational. The relaxed-gate Horizon-120 XGB (`final_equity 4.48`) and the Calmon TCN suite (`final_equity 1.05–1.33`) now clear 5 bps costs, and the elastic-net blender (`final_equity 1.84`) leverages RSS spike features. Meta-labeling remains exploratory pending longer validation windows.
+- **Immediate Goal**: Harden deployment by mirroring manifest gates in live inference, extending validation into late 2025, and deciding whether to ship with the blender-only stack or add a calibrated meta filter once probability spread stabilises.
 
 ---
 
@@ -58,7 +58,8 @@ _Last updated: 2025-09-29 02:05 UTC_
 
 ### 4.2 Curation
 - `scripts/build_market_dataset.py`: Reads market parquet partitions, merges engineered features, and produces labeled dataset (timestamp-aligned, with `ret_next`, `y_dir`).
-- `scripts/build_training_matrix.py`: Combines market dataset with aggregated RSS/Reddit features, creating matrices for blender/meta-label training.
+- `scripts/build_training_matrix.py`: Legacy helper that combines market features with coarse RSS aggregates for focused validation windows.
+- `scripts/build_blender_matrix.py`: Generates the year-wide RSS-enriched matrix with intraday spike features, probability momentum (`prob_diff`, `*_mom_1`), relaxed-gate masks, and summary stats (`..._rss_latest_stats.json`).
 
 ### 4.3 Sanity Checks
 - `scripts/sanity_check_two_weeks.py`: Orchestrated run that backfills market data, builds datasets, and ensures RSS pipeline completeness for a two-week window.
@@ -94,28 +95,28 @@ _Last updated: 2025-09-29 02:05 UTC_
 - Ensures no leakage between training and validation folds.
 
 ### 6.2 Baseline XGBoost (`scripts/train_base_gbdt.py` / `training/model.py`)
-- Configurable via CLI for hyperparameters, costs, spread adjustments, long-only toggles.
-- Implements isotonic calibration (`sklearn.calibration.CalibratedClassifierCV`).
-- Persists artifacts: booster JSON, calibrator joblib, feature list, threshold, evaluation report.
-- Current default parameters (post-tuning) around depth 6, 1200 estimators, `scale_pos_weight` auto-calculated.
-- Logging improvements include auto class-weight detection and parameter override echoing.
-- CLI exposes calendar-based folds (`--fold-scheme`), cost knobs (`--spread-scale`, `--slippage-bps`), and optional `--long-only` gating for post-training evaluation.
+- CLI defaults mirror the relaxed Calmon gate (`--max-spread-z 0.25`, `--max-rvol20 2e-4`, no probability filter) while manifests persist the deployable inference mask (`hl_spread ≤ 0.0005`, `hl_spread_z ≤ -0.6`, `rvol_20 ≤ 4e-5`, `prob ≥ 0.85`, `min_hold 10`).
+- Reports (`report.json`) capture calendar-month diagnostics, spread stress tests (`spread_scale` grid), and RSS coverage audits; KPI payloads are normalised through `training/reporting.ensure_kpi_schema`.
+- Artifacts include booster JSON, calibrator, feature list, threshold, manifest, and gate coverage replay CSV. Current relaxed run: `final_equity 4.48`, Sharpe 108, `gate_fraction 9.4 %` on the 2024–2025 feed.
+- `scripts/report_shortlist.py` surfaces deployable candidates by scanning reports and enforcing equity/turnover/RSS criteria, helping reviewers validate the baseline alongside TCN/blender outputs.
 
 ### 6.3 Temporal Convolutional Network (`scripts/train_tcn.py` / `training/tcn_model.py`)
-- Custom TinyTCN with residual TemporalBlock layers, dropout, adaptive pooling, and fully connected head.
-- Training config (epochs, lr, batch size, weight decay, class weighting) + optional progress callbacks for epoch logging.
-- Sliding window generation uses stride to reduce sample count for long histories.
-- Outputs: PyTorch state dict (`tcn.pt`), preprocessing bundle (`tcn_preproc.joblib`), calibrator (`tcn_calibrator.joblib`), metadata, threshold, report.
-- CLI parameters include `--stride`, `--series-cols`, `--fold-scheme`, and class weighting to tune sample coverage vs compute.
+- TinyTCN architecture with residual TemporalBlocks, dropout, and adaptive pooling; stride-aware window builder reduces sample counts for long horizons.
+- Outputs include `tcn.pt`, scaler/preprocess bundle, calibrator, manifest, threshold, `fold_logits.parquet`, and monthly probability σ diagnostics.
+- Relaxed Calmon runs yield post-cost profitability:
+  - `tcn_h60_calmon_relaxed`: `final_equity 1.054`, 67 toggles, Sharpe 16.6, threshold 0.55.
+  - `tcn_h120_calmon_relaxed`: `final_equity 1.331`, 180 toggles, Sharpe 24.9, threshold 0.65.
+  - `tcn_h180_calmon_relaxed`: `final_equity 1.190`, 48 toggles, Sharpe 29.6, threshold 0.575.
+- `models/oos_replay_summary.json` and `models/tcn_gate_replay_summary.json` log gate behaviour for audit, ensuring live inference adheres to the deployable mask.
 
 ### 6.4 Blender (`scripts/train_blender.py` / `training/blender.py`)
-- Logistic regression pipeline on features `[base_prob, tcn_prob, rss_count, rss_sent_mean, reddit_count, reddit_sent_mean, rvol_*]`.
-- Currently on hold until base models exceed cost thresholds.
+- Elastic-net logistic regression (StandardScaler + LogisticRegressionCV) over probability momentum, RSS spike features, and regime fields from the blender matrix.
+- Threshold search enforces turnover guards and records RSS audits. `models/blender_h120_v6` hits `final_equity 1.84`, Sharpe 28.7, 711 toggles at threshold 0.95 with an RSS spike gate share of ~2 %.
+- Feature inventories and RSS coverage stats live alongside manifests so ops knows when to fall back to no-RSS feature sets.
 
 ### 6.5 Meta-Label (`scripts/train_meta_label.py` / `training/meta.py`)
-- Triple-barrier event labeling (`pt_mult`, `sl_mult`, `max_hold`).
-- Logistic meta model filters trades, evaluating threshold grids to mask predictions below confidence.
-- Artifacts: `meta_model.joblib`, feature list, threshold, report.
+- Triple-barrier labeling with flexible volatility targets feeds a logistic meta filter. The refreshed script supports the relaxed gate defaults, stride control, and shares KPI schema with the rest of the stack.
+- Current attempts remain exploratory (probability collapse on narrow validation windows); production rollout is gated on extending the blender matrix and recovering dynamic range before fitting.
 
 ### 6.6 Inference Utilities (`training/infer.py`)
 - Loads base XGB/TCN artifacts, applies consistent preprocessing (feature alignment, scaler/standardization) for scoring pipelines.
@@ -124,22 +125,21 @@ _Last updated: 2025-09-29 02:05 UTC_
 
 ## 7. Experimental Ledger
 ### 7.1 XGBoost Experiments
-- **Baseline (No Augment)**: Negative equity under costs, moderate OOF AUC (~0.53–0.54).
-- **Augmented Features (`models/base_xgb_tuned_features_*`)**:
-  - Zero-cost equity >1.15 (profitable), but 5 bps cost reduces to ~0.95.
-- **Depth 4, Regularized (`models/base_xgb_depth4_cost`)**:
-  - Slight improvement in threshold (0.905) and drawdown; still sub-1 equity.
-- **Spread-aware penalties**:
-  - Using `hl_spread_z` with large scaling (0.5) resulted in catastrophic losses (final equity ≈ 0) because z-score magnitudes convert to enormous effective costs.
+- **Calmon relaxed (current)** – `models/base_xgb_h120_calmon_spread0` retrained on the 2024–2025 feed delivers `final_equity 4.48`, `gate_fraction 9.4 %`, and Sharpe 108 after costs. Monthly diagnostics confirm stability and expose the coverage replay used for live gating.
+- **Cost stress (`spread_scale` sweep)** – Variants `{0.0, 0.05, 0.1, 0.2}` preserve the same equity/turnover envelope, demonstrating resilience to 20 % spread inflation.
+- **Gate replay** – `live_gate_coverage.csv` keeps the deployable mask within ±1.63× of the baseline coverage, ensuring turnover budgets hold when the strict inference gate is enforced.
 
 ### 7.2 TCN Experiments
-- **Baseline (stride 1)**: Training too slow, epoch loss stuck near 0.693, calibration failed due to NaNs.
-- **Improved pipeline**: Added feature augmentation, stride parameter, and class weighting.
-- **Stride 5, 48-length windows (`models/tcn_tuned*`)**: Achieved positive zero-cost equity (1.02) but negative after costs. OOF count reduced to ~153k windows.
+- **Relaxed Calmon suite** – Horizons 60/120/180 all clear 5 bps costs with tight turnover guards (≤200 toggles). Probability variance guardrails remain above the 0.03 threshold, signalling healthy calibration after loosening training gates.
+- **OOS gate audits** – `models/oos_replay_summary.json` and `tcn_gate_replay_summary.json` document how the inference mask collapses coverage (<0.001 %), informing live expectations and highlighting that retraining can focus on the relaxed gate while keeping deployable safety nets.
 
-### 7.3 Diagnostics
-- Probability threshold grid script (Step 3) shows equity climbs gradually and plateaus near 0.9 thresholds, confirming the need to lower costs or improve signal quality.
-- Spread statistics: `hl_spread` averages ≈0.00068; `hl_spread_z` averages ≈0.79 (95% ~1.99). Cost scaling must respect these magnitudes.
+### 7.3 Blender Experiments
+- **v5 (baseline)** – First elastic-net attempt showed modest gains but relied on sparse RSS spikes, limiting deployment appetite.
+- **v6 (current)** – With the expanded matrix (`build_blender_matrix.py` intraday features + probability momentum) the logistic stack reached `final_equity 1.84`, Sharpe 28.7, 711 toggles. `rss_audit` passes with daily coverage 82.5 % and minute spike share 0.254, triggering the internal RSS gate mask recorded in the manifest.
+
+### 7.4 Diagnostics & Tooling
+- `training/reporting.ensure_kpi_schema` standardises KPI payloads; `scripts/report_shortlist.py` ranks deployable models (base, TCN, blender) under consistent criteria.
+- Threshold diagnostics (`diagnostic_final_equity`) and RSS audits are embedded across all reports to make regression testing and CI validation straightforward.
 
 ---
 
@@ -166,94 +166,77 @@ _Last updated: 2025-09-29 02:05 UTC_
 ## 10. Risk & Mitigation
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Models fail to beat transaction costs | Strategy unusable in production | Enhance features, adjust cost modeling, explore alternate targets (classification/regression), and incorporate gating/meta filters. |
-| Cost modeling mis-specified (e.g., spread scaling) | Wildly inaccurate performance estimates | Use realistic spread metrics (raw ratios), cap penalties, perform scenario analysis. |
-| Overfitting due to calibration & narrow threshold bands | False sense of profitability | Expand threshold grid, evaluate per-fold metrics, add validation months, run out-of-sample tests. |
-| Lack of extensive testing | Regression risk before deployment | Expand unit/integration tests around new feature engineering and modeling code. |
-| Live data drift | Model underperformance post-deployment | Incorporate monitoring dashboards, drift detectors, and periodic retraining workflows. |
+| Deployable gate drift (prob/vol/spread masks) | Turnover explodes or drops to zero in production | Replay `live_gate_coverage.csv` each retrain, mirror predicates in inference adapters, alert on coverage outside ±2× historical band. |
+| RSS coverage collapse | Blender loses signal, equity regresses | Track `rss_audit minute_spike_share` and fall back to the no-RSS feature set when coverage <5e-4; expand feed roster and monitoring. |
+| Probability variance collapse | Thresholds become unstable; blender/meta stack unusable | Enforce the `prob_sigma_guardrail` and halt deployment if monthly σ <0.03; re-run relaxed gate retrains or adjust stride/windows. |
+| Artifact/config skew between training and live | Live scoring diverges from reports | Consume manifests for feature lists + gate configs, add regression tests that pipe historical data through inference adapters, and version control manifests. |
+| Large binary artifacts bloating repo | Slow CI and clone times | Use Git LFS or artifact storage for heavy parquet/torch files once deployment pipeline is in place; prune outdated experiment folders. |
 
 ---
 
 ## 11. Backlog & Action Items
-### 11.1 Modeling
-- [ ] XGB: Continue hyperparameter sweeps, tune `scale_pos_weight`, try alternative objectives (`binary:logitraw` + calibration).
-- [ ] XGB: Implement trade gating based on `hl_spread_z`/vol regime before thresholding.
-- [ ] TCN: Increase channels/windows, experiment with dilation patterns, incorporate dropout scheduling or batch norm.
-- [ ] TCN: Evaluate no per-window standardization or hybrid normalization to preserve slow trends.
-- [ ] TCN: Implement simple early stopping (monitor validation loss) to save compute.
+### 11.1 Validation & Monitoring
+- [ ] Extend out-of-sample replays into Oct–Nov 2025 to confirm relaxed-gate robustness across new regimes.
+- [ ] Automate coverage drift alerts using manifest gate baselines (spread/rvol/prob/min-hold) and `live_gate_coverage.csv` comparisons.
+- [ ] Wire RSS audit metrics into monitoring so the blender auto-falls back when minute spike share <5e-4.
 
-### 11.2 Ensemble & Meta
-- [ ] Prepare blender dataset once base models profitable; rerun `scripts/train_blender.py`.
-- [ ] Revisit meta-label training with updated base probabilities.
-- [ ] Evaluate ensemble/multi-model weighting strategies beyond logistic blending (e.g., gradient boosting on meta features).
+### 11.2 Modeling Enhancements
+- [ ] Explore alternative loss functions or monotonic constraints for the base XGB while preserving the relaxed gate.
+- [ ] Sweep TCN channels/dilations and evaluate shorter strides for high-volatility months without exceeding the 200-toggle guardrail.
+- [ ] Resume meta-label experiments once an extended blender matrix is available; enforce ≥1.2 equity and ≥20 toggles before considering deployment.
 
-### 11.3 Infrastructure & Ops
-- [ ] Add CI checks for training scripts (linting, smoke tests).
-- [ ] Extend Prometheus/Grafana dashboards for model metrics (PnL, Sharpe, turnover, coverage).
-- [ ] Document inference pipeline for live deployment (feature extraction, model loading, threshold application).
-- [ ] Build reproducible training workflow (Makefile or `invoke` tasks) to ensure consistent runs.
+### 11.3 Tooling & Automation
+- [ ] Integrate `scripts/report_shortlist.py` into CI to flag KPI regressions automatically.
+- [ ] Package dataset + model builds in a reproducible orchestration script (Makefile/`invoke`) for retrains.
+- [ ] Add regression tests that replay historical data through `training/infer.py` using the manifest gates.
 
-### 11.4 Documentation & Testing
-- [ ] Expand unit tests for `training/feature_eng.py`, `training/thresholds.py`, and TCN utilities.
-- [ ] Update `TRAINING_WALKTHROUGH.md` with new commands (stride option, augmented features) and pitfalls (spread scaling).
-- [ ] Maintain `TRAINING_STATUS.md` after each major experiment to track deltas and avoid rework.
+### 11.4 Documentation & Ops
+- [ ] Keep `TRAINING_STATUS.md` and `TRAINING_WALKTHROUGH.md` updated after each major run.
+- [ ] Document the live inference path (feature fetch, gating, threshold application) with references to manifest fields.
+- [ ] Plan Git LFS or external artifact storage to keep repository size manageable as more experiments accumulate.
 
 ---
 
 ## 12. Reference Commands
-- **Base GBDT (current best zero-cost)**
+- **Build RSS-enriched blender matrix**
   ```bash
-  source .venv/bin/activate
+  python scripts/build_blender_matrix.py \
+    --source datasets/market_btcusdt_1m_2024_2025.parquet \
+    --out datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet \
+    --base-dir models/base_xgb_h120_calmon_spread0 \
+    --tcn-dir models/tcn_h120_calmon_relaxed \
+    --tcn-stride 30 --include-reddit
+  ```
+- **Train base XGB (Calmon relaxed)**
+  ```bash
   python scripts/train_base_gbdt.py \
     --data datasets/market_btcusdt_1m_2024_2025.parquet \
-    --out models/base_xgb_tuned_features_nocost \
-    --cost-bps 0 --slippage-bps 0 --spread-scale 0 \
-    --xgb-n-estimators 1200 --xgb-learning-rate 0.03 \
-    --xgb-max-depth 6 --xgb-min-child-weight 5 \
-    --xgb-subsample 0.9 --xgb-colsample-bytree 0.9 \
-    --xgb-gamma 0.1 --xgb-reg-lambda 2.0 --xgb-reg-alpha 0.1 \
-    --auto-scale-pos-weight
+    --out models/base_xgb_h120_calmon_spread0 \
+    --fold-scheme calendar_month --n-folds 6 \
+    --cost-bps 5 --max-spread-z 0.25 --max-rvol20 2e-4
   ```
-- **TCN (stride 5)**
+- **Train TCN (Calmon relaxed)**
   ```bash
-  source .venv/bin/activate
   python scripts/train_tcn.py \
     --data datasets/market_btcusdt_1m_2024_2025.parquet \
-    --out models/tcn_tuned \
-    --window 48 --stride 5 --channels 48,48 \
-    --epochs 12 --batch-size 512 --lr 7e-4 \
-    --dropout 0.0 --weight-decay 1e-5 --class-weight 1.1 \
-    --n-folds 6 --embargo-minutes 60 \
-    --series-cols ret_1,logret_1,rvol_5,rvol_20,macd,macd_signal_9,rsi_14,hl_spread,oi_obv,ret_mean_5,ret_mean_20,ret_std_20,ret_z_20,macd_hist,macd_hist_abs,rvol_ratio,rvol_delta,rvol_z_50,rsi_centered,hl_spread_z,obv_diff,obv_z_50 \
-    --cost-bps 5 --spread-scale 0 --fold-scheme even
+    --out models/tcn_h120_calmon_relaxed \
+    --window 192 --stride 30 --channels 64,64 \
+    --epochs 10 --batch-size 256 --lr 5e-4 --class-weight 2.0 \
+    --cost-bps 5 --max-spread-z 0.25 --max-rvol20 2e-4
   ```
-- **Threshold Diagnostics**
+- **Train elastic-net blender**
   ```bash
-  source .venv/bin/activate
-  python - <<'PY'
-  # (See Section 7.3 for full script.)
-  PY
-  ```
-- **Blender (post-cost positive base & TCN)**
-  ```bash
-  source .venv/bin/activate
   python scripts/train_blender.py \
-    --data datasets/training_matrix_months_2025-08-09.parquet \
-    --base-dir models/base_xgb_tuned_features_cost \
-    --tcn-dir models/tcn_tuned \
-    --out models/blender_tuned \
-    --cost-bps 5 --spread-scale 0 --slippage-bps 0
+    --matrix datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet \
+    --base-dir models/base_xgb_h120_calmon_spread0 \
+    --tcn-dir models/tcn_h120_calmon_relaxed \
+    --out models/blender_h120_v6 \
+    --cost-bps 5 --tcn-stride 30 \
+    --max-total-turnover 10000 --min-toggle-count 2
   ```
-- **Meta-label Logistic Filter**
+- **Compile shortlist for review**
   ```bash
-  source .venv/bin/activate
-  python scripts/train_meta_label.py \
-    --data datasets/training_matrix_months_2025-08-09.parquet \
-    --base-dir models/base_xgb_tuned_features_cost \
-    --tcn-dir models/tcn_tuned \
-    --out models/meta \
-    --pt-mult 2.0 --sl-mult 2.0 --max-hold 60 \
-    --primary-prob-column base_prob --cost-bps 5
+  python scripts/report_shortlist.py --models-root models --out models/report_shortlist.json
   ```
 
 ---
