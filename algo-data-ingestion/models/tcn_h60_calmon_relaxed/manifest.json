@@ -3,7 +3,7 @@
   "calibrator_path": "tcn_calibrator.joblib",
   "preprocess_path": "tcn_preproc.joblib",
   "threshold": {
-    "value": 0.6000000000000001,
+    "value": 0.55,
     "path": "threshold.json"
   },
   "report_path": "report.json",
@@ -33,8 +33,8 @@
     "window": 192,
     "kernel_size": 3,
     "channels": [
-      48,
-      48
+      64,
+      64
     ],
     "fold_logits_path": "fold_logits.parquet",
     "prob_sigma_guardrail": {
@@ -42,10 +42,10 @@
       "months_below_threshold": []
     },
     "validation_prob_std_by_month": {
-      "2025-06": 0.05806693602292199,
-      "2025-07": 0.05607446741156243,
-      "2025-08": 0.052781300544753745,
-      "2025-09": 0.11120088850499246
+      "2025-06": 0.04254130845369599,
+      "2025-07": 0.04015773109183259,
+      "2025-08": 0.034709119233428225,
+      "2025-09": 0.09513451911561292
     }
   }
 }

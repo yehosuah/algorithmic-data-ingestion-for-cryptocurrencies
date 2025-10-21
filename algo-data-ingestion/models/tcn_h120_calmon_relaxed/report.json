@@ -1,12 +1,13 @@
 {
-  "mean_pnl": 6.933910855379288e-05,
-  "std_pnl": 0.0008978095236288297,
-  "sharpe": 46.52384096010483,
-  "max_drawdown": 0.10113249357344656,
-  "final_equity": 1.187587816873793,
-  "avg_turnover": 0.02165196471531676,
-  "total_turnover": 54.0,
-  "selected_threshold": 0.675,
+  "mean_pnl": 5.8246887837527046e-05,
+  "std_pnl": 0.0014064808175287098,
+  "sharpe": 24.947120731227546,
+  "max_drawdown": 0.12036008534394571,
+  "final_equity": 1.3305595300448367,
+  "avg_turnover": 0.03608660785886127,
+  "total_turnover": 180.0,
+  "toggle_count": 163,
+  "selected_threshold": 0.65,
   "criterion": "final_equity",
   "cost_bps": 5.0,
   "spread_scale": 0.0,
@@ -15,8 +16,9 @@
   "min_hold_bars": 5,
   "min_total_turnover": 4.0,
   "max_total_turnover": 200.0,
-  "oof_count": 2494,
-  "gate_fraction": 0.11748195669607057,
+  "kpi_schema_version": 1,
+  "oof_count": 4988,
+  "gate_fraction": 0.08961507618283882,
   "max_spread_z": 0.25,
   "max_rvol20": 0.0002,
   "gate_config": {
@@ -39,37 +41,50 @@
       "long_only": false
     }
   },
+  "rss_audit": {
+    "min_daily_coverage": 0.8,
+    "min_minute_spike_share": 0.0005,
+    "daily_coverage": 0.8516146637381427,
+    "minute_spike_share": 0.0006488041966182035,
+    "passed": true,
+    "reasons": [],
+    "minute_indicator_column": "rss_count_minute",
+    "minute_spike_share_candidates": {
+      "rss_count_minute": 0.0006488041966182035
+    },
+    "fallback_to_no_rss": false
+  },
   "diagnostic_final_equity": {
     "0.55": {
-      "final_equity": 0.8125645947092617,
-      "total_turnover": 144.0
+      "final_equity": 1.0203282122994382,
+      "total_turnover": 232.0
     },
     "0.6": {
-      "final_equity": 0.8563891489186833,
-      "total_turnover": 116.0
+      "final_equity": 1.0615126606327256,
+      "total_turnover": 220.0
     },
     "0.65": {
-      "final_equity": 1.0791502368300405,
-      "total_turnover": 92.0
+      "final_equity": 1.3305595300448367,
+      "total_turnover": 180.0
+    },
+    "0.675": {
+      "final_equity": 1.1231347396659523,
+      "total_turnover": 166.0
     },
     "0.7": {
-      "final_equity": 1.0953889452468042,
-      "total_turnover": 44.0
+      "final_equity": 1.1231347396659523,
+      "total_turnover": 166.0
     },
     "0.75": {
-      "final_equity": 1.0953889452468042,
-      "total_turnover": 44.0
-    },
-    "0.8": {
-      "final_equity": 1.0948829013174655,
-      "total_turnover": 20.0
+      "final_equity": 1.2011174219296123,
+      "total_turnover": 164.0
     }
   },
   "validation_prob_std_by_month": {
-    "2025-06": 0.12141130234724855,
-    "2025-07": 0.16143569203156327,
-    "2025-08": 0.1694285541697272,
-    "2025-09": 0.16282823722499218
+    "2025-06": 0.2828130877643465,
+    "2025-07": 0.20577792517385995,
+    "2025-08": 0.3586037865954962,
+    "2025-09": 0.25485536692139843
   },
   "prob_sigma_guardrail": {
     "threshold": 0.03,

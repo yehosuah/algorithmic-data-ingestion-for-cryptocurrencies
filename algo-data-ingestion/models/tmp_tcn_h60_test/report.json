@@ -1,0 +1,95 @@
+{
+  "mean_pnl": 5.7428293462443575e-05,
+  "std_pnl": 0.0007831171713353518,
+  "sharpe": 44.17541932341806,
+  "max_drawdown": 0.06135926468903097,
+  "final_equity": 1.1531717603646139,
+  "avg_turnover": 0.027254509018036072,
+  "total_turnover": 68.0,
+  "toggle_count": 66,
+  "selected_threshold": 0.55,
+  "criterion": "final_equity",
+  "cost_bps": 5.0,
+  "spread_scale": 0.0,
+  "slippage_bps": 0.0,
+  "long_only": false,
+  "min_hold_bars": 5,
+  "min_total_turnover": 4.0,
+  "max_total_turnover": 200.0,
+  "kpi_schema_version": 1,
+  "oof_count": 2495,
+  "gate_fraction": 0.1186372745490982,
+  "max_spread_z": 0.25,
+  "max_rvol20": 0.0002,
+  "gate_config": {
+    "spread_column": "hl_spread",
+    "prob_column": "tcn_prob",
+    "training": {
+      "hl_spread_max": null,
+      "hl_spread_z_max": 0.25,
+      "rvol20_max": 0.0002,
+      "prob_gate_min": null,
+      "min_hold_bars": 5,
+      "long_only": false
+    },
+    "inference": {
+      "hl_spread_max": 0.0005,
+      "hl_spread_z_max": -0.6,
+      "rvol20_max": 4e-05,
+      "prob_gate_min": 0.85,
+      "min_hold_bars": 10,
+      "long_only": false
+    }
+  },
+  "rss_audit": {
+    "min_daily_coverage": 0.8,
+    "min_minute_spike_share": 0.0005,
+    "daily_coverage": null,
+    "minute_spike_share": null,
+    "passed": false,
+    "reasons": [
+      "rss_has_signal_missing",
+      "rss_minute_indicator_missing"
+    ],
+    "minute_indicator_column": null,
+    "minute_spike_share_candidates": {},
+    "fallback_to_no_rss": true
+  },
+  "diagnostic_final_equity": {
+    "0.55": {
+      "final_equity": 1.1531717603646139,
+      "total_turnover": 68.0
+    },
+    "0.6": {
+      "final_equity": 1.0259833425868963,
+      "total_turnover": 42.0
+    },
+    "0.65": {
+      "final_equity": 0.9653447948411815,
+      "total_turnover": 12.0
+    },
+    "0.7": {
+      "final_equity": 0.9653447948411815,
+      "total_turnover": 12.0
+    },
+    "0.75": {
+      "final_equity": 0.9653447948411815,
+      "total_turnover": 12.0
+    },
+    "0.8": {
+      "final_equity": 0.9653447948411815,
+      "total_turnover": 12.0
+    }
+  },
+  "validation_prob_std_by_month": {
+    "2025-06": 0.05248842030817098,
+    "2025-07": 0.06364740707399175,
+    "2025-08": 0.04423937561598811,
+    "2025-09": 0.10757599427769607
+  },
+  "prob_sigma_guardrail": {
+    "threshold": 0.03,
+    "months_below_threshold": []
+  },
+  "fold_logits_path": "fold_logits.parquet"
+}

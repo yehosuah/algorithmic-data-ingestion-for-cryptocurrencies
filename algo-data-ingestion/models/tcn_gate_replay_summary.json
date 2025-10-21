@@ -1,0 +1,50 @@
+{
+  "tcn_h60_calmon_relaxed": {
+    "gate_config_inference": {
+      "hl_spread_max": 0.0007,
+      "hl_spread_z_max": 0.25,
+      "rvol20_max": 0.0002,
+      "prob_gate_min": 0.55,
+      "min_hold_bars": 5,
+      "long_only": false
+    },
+    "gate_coverage": 0.0008012820512820513,
+    "final_equity_by_threshold": {
+      "0.55": 0.9976799605719902,
+      "0.6": 0.9976799605719902,
+      "0.65": 0.9991929873123122,
+      "0.7": 0.9991929873123122
+    },
+    "toggle_count_by_threshold": {
+      "0.55": 4,
+      "0.6": 4,
+      "0.65": 2,
+      "0.7": 2
+    },
+    "oos_rows": 2496
+  },
+  "tcn_h180_calmon_relaxed": {
+    "gate_config_inference": {
+      "hl_spread_max": 0.0007,
+      "hl_spread_z_max": 0.25,
+      "rvol20_max": 0.0002,
+      "prob_gate_min": 0.55,
+      "min_hold_bars": 5,
+      "long_only": false
+    },
+    "gate_coverage": 0.00040064102564102563,
+    "final_equity_by_threshold": {
+      "0.55": 0.9991929873123122,
+      "0.6": 0.9991929873123122,
+      "0.65": 0.9991929873123122,
+      "0.7": 0.9991929873123122
+    },
+    "toggle_count_by_threshold": {
+      "0.55": 2,
+      "0.6": 2,
+      "0.65": 2,
+      "0.7": 2
+    },
+    "oos_rows": 2496
+  }
+}
