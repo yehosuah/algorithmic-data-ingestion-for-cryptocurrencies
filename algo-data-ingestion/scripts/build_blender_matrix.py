@@ -285,10 +285,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 .transform(lambda s: s.ewm(span=30, adjust=False).mean())
                 .fillna(0.0)
             )
+            df["rss_spike_decay_long"] = (
+                df.groupby("symbol", sort=False)["rss_spike_active"]
+                .transform(lambda s: s.ewm(span=60, adjust=False).mean())
+                .fillna(0.0)
+            )
             df["rss_sent_mean_minute_ewm"] = sent_ewm.fillna(0.0)
+            df["rss_sent_mean_minute_delta"] = (
+                df.groupby("symbol", sort=False)["rss_sent_mean_minute"]
+                .diff()
+                .fillna(0.0)
+            )
         else:
             df["rss_spike_decay"] = df["rss_spike_active"].ewm(span=30, adjust=False).mean().fillna(0.0)
+            df["rss_spike_decay_long"] = df["rss_spike_active"].ewm(span=60, adjust=False).mean().fillna(0.0)
             df["rss_sent_mean_minute_ewm"] = sent_ewm.fillna(0.0)
+            df["rss_sent_mean_minute_delta"] = df["rss_sent_mean_minute"].diff().fillna(0.0)
+
+        df["rss_spike_presence"] = (df["rss_spike_decay_long"] > 1e-6).astype(float)
 
         def _compute_spike_windows(spike_series: pd.Series) -> pd.DataFrame:
             arr = spike_series.to_numpy(dtype=float)
@@ -335,6 +349,65 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             df[col] = pd.to_numeric(time_feats[col], errors="coerce").reindex(df.index).fillna(0.0)
 
         df["rss_sent_minute_gap"] = (df["rss_sent_mean_minute"] - df["rss_sent_mean"]).fillna(0.0)
+        if "symbol" in df.columns:
+            df["rss_sent_minute_gap_ewm"] = (
+                df.groupby("symbol", sort=False)["rss_sent_minute_gap"]
+                .transform(lambda s: s.ewm(span=15, adjust=False).mean())
+                .fillna(0.0)
+            )
+        else:
+            df["rss_sent_minute_gap_ewm"] = df["rss_sent_minute_gap"].ewm(span=15, adjust=False).mean().fillna(0.0)
+
+        if "symbol" in df.columns:
+            df["rss_spike_velocity"] = (
+                df.groupby("symbol", sort=False)["rss_spike_decay"]
+                .diff()
+                .fillna(0.0)
+            )
+        else:
+            df["rss_spike_velocity"] = df["rss_spike_decay"].diff().fillna(0.0)
+        df["rss_count_minute_log1p"] = np.log1p(df["rss_count_minute"].clip(lower=0.0))
+        df["rss_sent_mean_minute_abs"] = df["rss_sent_mean_minute"].abs().fillna(0.0)
+
+        if "symbol" in df.columns:
+            trailing_15 = (
+                df.groupby("symbol", sort=False)["rss_spike_active"]
+                .transform(lambda s: s.rolling(window=15, min_periods=1).max())
+                .fillna(0.0)
+            )
+            leading_15 = (
+                df.groupby("symbol", sort=False)["rss_spike_active"]
+                .transform(lambda s: s.iloc[::-1].rolling(window=15, min_periods=1).max().iloc[::-1])
+                .fillna(0.0)
+            )
+            decay_fast = (
+                df.groupby("symbol", sort=False)["rss_spike_active"]
+                .transform(lambda s: s.ewm(span=10, adjust=False).mean())
+                .fillna(0.0)
+            )
+        else:
+            trailing_15 = df["rss_spike_active"].rolling(window=15, min_periods=1).max().fillna(0.0)
+            leading_15 = df["rss_spike_active"].iloc[::-1].rolling(window=15, min_periods=1).max().iloc[::-1].fillna(0.0)
+            decay_fast = df["rss_spike_active"].ewm(span=10, adjust=False).mean().fillna(0.0)
+
+        df["rss_spike_trailing_15"] = trailing_15
+        df["rss_spike_leading_15"] = leading_15
+        df["rss_spike_decay_fast"] = decay_fast
+        df["rss_spike_halo"] = np.maximum(trailing_15, leading_15).clip(0.0, 1.0)
+
+        proximity = pd.concat(
+            [
+                df["rss_minutes_since_spike"].replace(0.0, np.nan),
+                df["rss_minutes_to_next_spike"].replace(0.0, np.nan),
+            ],
+            axis=1,
+        ).min(axis=1, skipna=True)
+        proximity = proximity.fillna(np.inf)
+        df["rss_spike_proximity"] = np.exp(-proximity / 5.0)
+        df.loc[np.isinf(proximity), "rss_spike_proximity"] = 0.0
+        df["rss_spike_proximity"] = df["rss_spike_proximity"].clip(0.0, 1.0)
+        df["rss_spike_proximity_flag"] = (proximity <= 15).astype(float)
+        df.loc[np.isinf(proximity), "rss_spike_proximity_flag"] = 0.0
 
     count_cols = [c for c in df.columns if c.endswith("_count") and c != "rss_count"]
     sent_cols = [c for c in df.columns if c.endswith("_sent_mean") and c != "rss_sent_mean"]

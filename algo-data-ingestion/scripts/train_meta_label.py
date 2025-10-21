@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 import os
 import sys
 
@@ -18,11 +18,10 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from training.data import load_parquet_dataset, ensure_labels
 from training.meta import triple_barrier_events, rolling_vol
-from training.thresholds import select_prob_threshold
-from training.model import extract_features_labels
 from training.metrics import equity_curve, summary_stats
 
 from training.infer import load_base_predictor, predict_base, load_tcn_predictor, predict_tcn
+from training.reporting import ensure_kpi_schema, social_signal_audit
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -102,24 +101,57 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     # Evaluate a grid of meta thresholds as mask on the primary prob decisions
     thr_grid = np.linspace(0.50, 0.90, 9)
-    best = {"meta_threshold": 0.5, "final_equity": -np.inf}
+    trading_threshold = 0.6
+    best_report: Optional[Dict[str, float]] = None
     for thr_meta in thr_grid:
         mask_keep = raw_prob >= thr_meta
         prob_for_trading = dn[primary].values.copy()
         # mask out low-quality trades by moving prob to neutral 0.5
         prob_for_trading[~mask_keep] = 0.5
-        eq = equity_curve(dn["ret_next"], pd.Series(prob_for_trading, index=dn.index), threshold=0.6, cost_bps=args.cost_bps)
-        rep = summary_stats(eq)
-        if rep["final_equity"] > best["final_equity"]:
-            best = {**rep, "meta_threshold": float(thr_meta)}
+        eq = equity_curve(
+            dn["ret_next"],
+            pd.Series(prob_for_trading, index=dn.index),
+            threshold=trading_threshold,
+            cost_bps=args.cost_bps,
+        )
+        stats = summary_stats(eq)
+        candidate = ensure_kpi_schema(
+            stats,
+            overrides={
+                "selected_threshold": trading_threshold,
+                "criterion": "final_equity",
+                "cost_bps": float(args.cost_bps),
+                "spread_scale": 0.0,
+                "slippage_bps": 0.0,
+                "long_only": False,
+                "min_hold_bars": 1,
+                "min_total_turnover": 0.0,
+                "max_total_turnover": None,
+            },
+        )
+        candidate["meta_threshold"] = float(thr_meta)
+        candidate["mask_keep_fraction"] = float(mask_keep.mean())
+        if best_report is None or candidate["final_equity"] > best_report["final_equity"]:
+            best_report = candidate
+
+    if best_report is None:
+        raise RuntimeError("Meta-threshold sweep did not produce any candidate reports.")
+
+    best_report.update({
+        "pt_mult": float(args.pt_mult),
+        "sl_mult": float(args.sl_mult),
+        "max_hold": int(args.max_hold),
+        "label_pos_frac": float(yn.mean()) if len(yn) else 0.0,
+    })
+    best_report["rss_audit"] = social_signal_audit(dn)
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipe, out_dir / "meta_model.joblib")
     (out_dir / "features.txt").write_text("\n".join(feat_cols))
-    (out_dir / "meta_threshold.txt").write_text(str(best["meta_threshold"]))
-    (out_dir / "report.json").write_text(json.dumps(best, indent=2))
-    print(json.dumps({"out_dir": str(out_dir), "report": best, "features": feat_cols}, indent=2))
+    (out_dir / "meta_threshold.txt").write_text(str(best_report["meta_threshold"]))
+    (out_dir / "report.json").write_text(json.dumps(best_report, indent=2))
+    print(json.dumps({"out_dir": str(out_dir), "report": best_report, "features": feat_cols}, indent=2))
     return 0
 
 

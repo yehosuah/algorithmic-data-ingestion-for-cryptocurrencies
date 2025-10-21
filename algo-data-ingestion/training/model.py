@@ -11,6 +11,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 import xgboost as xgb
 
+from .reporting import ensure_kpi_schema
 
 NON_FEAT = {"timestamp","dt","symbol","exchange","timeframe","feature_version","close","ret_next","y_dir"}
 
@@ -83,7 +84,8 @@ def save_artifacts(out_dir: Path, booster: xgb.XGBClassifier, calib: CalibratedC
         (out_dir/"calibrator.joblib").unlink()
     (out_dir/"feature_list.json").write_text(json.dumps(feat_cols))
     (out_dir/"threshold.json").write_text(json.dumps({"prob_threshold": threshold}))
-    (out_dir/"report.json").write_text(json.dumps(report, indent=2))
+    report_payload = ensure_kpi_schema(report)
+    (out_dir/"report.json").write_text(json.dumps(report_payload, indent=2))
     manifest = {
         "model_path": "model.json",
         "calibrator_path": "calibrator.joblib" if calib is not None else None,

@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from .metrics import equity_curve, summary_stats
+from .reporting import ensure_kpi_schema
 
 
 def select_prob_threshold(
@@ -54,6 +55,9 @@ def select_prob_threshold(
             min_hold_bars=min_hold_bars,
         )
         rep = summary_stats(eq)
+        turn_val = rep.get("total_turnover", np.nan)
+        if not np.isfinite(turn_val) or not np.isfinite(rep.get("final_equity", np.nan)):
+            continue
         if rep.get("total_turnover", 0.0) < float(min_total_turnover):
             continue
         if max_total_turnover is not None and rep.get("total_turnover", 0.0) > float(max_total_turnover):
@@ -76,4 +80,5 @@ def select_prob_threshold(
         "min_total_turnover": float(min_total_turnover),
         "max_total_turnover": float(max_total_turnover) if max_total_turnover is not None else None,
     })
+    best_report = ensure_kpi_schema(best_report)
     return best_thr, best_report

@@ -19,6 +19,7 @@ from training.walkforward import time_folds
 from training.model import extract_features_labels, train_xgb, calibrate, predict_proba, save_artifacts
 from training.thresholds import select_prob_threshold
 from training.metrics import summary_stats, equity_curve
+from training.reporting import ensure_kpi_schema, social_signal_audit
 from sklearn.metrics import roc_auc_score
 
 
@@ -317,6 +318,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         "inference": inference_gate,
     }
     rep["gate_config"] = gate_config
+    rep["rss_audit"] = social_signal_audit(df)
+    rep = ensure_kpi_schema(rep)
 
     # Save artifacts
     out_dir = Path(args.out)

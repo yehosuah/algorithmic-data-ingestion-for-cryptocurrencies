@@ -27,6 +27,7 @@ from .model import (
     train_xgb,
 )
 from .thresholds import select_prob_threshold
+from .reporting import ensure_kpi_schema, social_signal_audit
 from .walkforward import time_folds
 from .tcn_model import TrainConfig, calibrate_logits, train_tcn
 
@@ -152,6 +153,7 @@ def evaluate_base_xgb_oos(
         raise KeyError("Dataset must include a timestamp column for leak-proof folds.")
     df_proc = augment_market_features(df_proc)
     df_proc = df_proc.sort_values("timestamp").reset_index(drop=True)
+    rss_audit = social_signal_audit(df_proc)
 
     gate_cfg = _resolve_gate_config(
         gate_config,
@@ -278,6 +280,10 @@ def evaluate_base_xgb_oos(
     report_infer = dict(report_infer)
     report_infer["gate_fraction"] = float(gate_infer_series.mean())
     report_infer["oof_count"] = int(len(valid_idx))
+    report_train["rss_audit"] = rss_audit
+    report_infer["rss_audit"] = rss_audit
+    report_train = ensure_kpi_schema(report_train)
+    report_infer = ensure_kpi_schema(report_infer)
 
     auc = roc_auc_score(y_series, prob_series)
 
@@ -371,6 +377,7 @@ def evaluate_tcn_oos(
             raise RuntimeError(f"Failed to generate base probabilities using {base_model_dir}") from exc
         df_proc["base_prob"] = base_prob.reindex(df_proc.index).fillna(0.0).astype(float)
     df_proc = df_proc.sort_values("timestamp").reset_index(drop=True)
+    rss_audit = social_signal_audit(df_proc)
 
     X, y, ts, series_cols, _ = sliding_windows(
         df_proc,
@@ -526,6 +533,10 @@ def evaluate_tcn_oos(
     report_infer = dict(report_infer)
     report_infer["gate_fraction"] = float(gate_infer_series.mean())
     report_infer["oof_count"] = int(len(valid_idx))
+    report_train["rss_audit"] = rss_audit
+    report_infer["rss_audit"] = rss_audit
+    report_train = ensure_kpi_schema(report_train)
+    report_infer = ensure_kpi_schema(report_infer)
 
     auc = roc_auc_score(y_series, prob_series)
 

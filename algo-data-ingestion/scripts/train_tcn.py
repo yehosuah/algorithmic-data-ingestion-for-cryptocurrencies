@@ -20,6 +20,7 @@ from training.tcn_model import train_tcn, calibrate_logits, save_tcn, TrainConfi
 from training.thresholds import select_prob_threshold
 from training.infer import load_base_predictor, predict_base, compute_gate_mask
 from training.metrics import equity_curve, summary_stats
+from training.reporting import ensure_kpi_schema, social_signal_audit
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -61,6 +62,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--inference-max-rvol20", type=float, default=4e-5, help="Inference gate: rvol_20 ceiling")
     ap.add_argument("--inference-prob-gate", type=float, default=0.85, help="Inference gate: minimum calibrated probability before thresholding")
     ap.add_argument("--inference-min-hold-bars", type=int, default=10, help="Inference gate: minimum hold bars constraint")
+    ap.add_argument(
+        "--calibration-method",
+        choices=["isotonic", "sigmoid"],
+        default="isotonic",
+        help="Calibration method passed to CalibratedClassifierCV (default isotonic).",
+    )
     args = ap.parse_args(argv)
 
     print(f"[TCN] Loading dataset: {args.data}", flush=True)
@@ -161,7 +168,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             raise RuntimeError(
                 "TCN validation logits contain non-finite values; check input preprocessing and training stability"
             )
-        calib = calibrate_logits(logits_va, y_va, method="isotonic")
+        calib = calibrate_logits(logits_va, y_va, method=args.calibration_method)
         p_va = calib.predict_proba(logits_va.reshape(-1, 1))[:, 1]
         logits_oof[va_idx] = p_va
         mask_oof[va_idx] = True
@@ -236,6 +243,18 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.max_rvol20 is not None:
             rep["max_rvol20"] = float(args.max_rvol20)
     rep["gate_config"] = gate_config
+    audit_df = df
+    if "rss_has_signal" not in audit_df.columns or "rss_count_minute" not in audit_df.columns:
+        data_path = Path(args.data)
+        candidate = None
+        if data_path.suffix:
+            candidate = data_path.with_name(f"{data_path.stem}_rss{data_path.suffix}")
+        if candidate and candidate.exists():
+            try:
+                audit_df = load_parquet_dataset(str(candidate))
+            except Exception:
+                audit_df = df
+    rep["rss_audit"] = social_signal_audit(audit_df)
     if args.threshold_criterion != "final_equity":
         rep["threshold_criterion"] = args.threshold_criterion
     if args.label_threshold_bps is not None:
@@ -311,6 +330,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         fold_logits=fold_logits_df,
     )
     (out_dir / "threshold.json").write_text(json.dumps({"prob_threshold": float(thr)}))
+    rep = ensure_kpi_schema(rep)
     (out_dir / "report.json").write_text(json.dumps(rep, indent=2))
     manifest_metadata = {
         "model_type": "tiny_tcn",
