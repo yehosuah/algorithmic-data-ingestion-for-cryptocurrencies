@@ -1,23 +1,25 @@
 import pytest
-from fastapi.testclient import TestClient
-from app.ingestion_service.main import app
-from pydantic_settings import BaseSettings
-from pydantic import Field
 
-client = TestClient(app)
+pytestmark = pytest.mark.anyio("asyncio")
 
-def test_root_endpoint():
-    response = client.get("/")
+
+async def test_root_endpoint(async_client):
+    async with async_client() as client:
+        response = await client.get("/")
     assert response.status_code == 200
     assert response.json() == {"service": "raw-data-ingestion", "version": "1.0.0"}
 
-def test_health_endpoint():
-    response = client.get("/health")
+
+async def test_health_endpoint(async_client):
+    async with async_client() as client:
+        response = await client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
-def test_metrics_endpoint():
-    response = client.get("/metrics")
+
+async def test_metrics_endpoint(async_client):
+    async with async_client() as client:
+        response = await client.get("/metrics")
     assert response.status_code == 200
     # Should include Prometheus metric for writes (even if zero)
     assert "parquet_writes_total" in response.text

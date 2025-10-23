@@ -20,38 +20,34 @@ def test_market_ingest_request_missing_field():
 
 def test_onchain_ingest_request_valid():
     req = OnchainIngestRequest(
-        source="glassnode",
-        chain_id=1,
         symbol="BTC",
-        address=None,
         metric="balance",
+        chain_id=1,
         days=7
     )
-    assert req.source == "glassnode"
     assert req.chain_id == 1
+    assert req.metric == "balance"
     assert req.days == 7
 
-def test_onchain_ingest_request_invalid_days():
-    with pytest.raises(ValidationError):
-        OnchainIngestRequest(source="covalent", chain_id=1, days=0)
+def test_onchain_ingest_request_optional_days_defaults():
+    req = OnchainIngestRequest(symbol="ETH", metric="supply")
+    assert req.days == 1  # default fallback
 
 def test_social_ingest_request_valid():
     now = datetime.now(timezone.utc)
     req = SocialIngestRequest(
-        platform="twitter",
         query="crypto",
         since=now - timedelta(hours=1),
         until=now,
         max_results=50
     )
-    assert req.platform == "twitter"
+    assert req.query == "crypto"
     assert req.max_results == 50
 
 def test_social_ingest_request_invalid_max_results():
     now = datetime.now(timezone.utc)
     with pytest.raises(ValidationError):
         SocialIngestRequest(
-            platform="reddit",
             query="blockchain",
             since=now - timedelta(hours=1),
             until=now,
