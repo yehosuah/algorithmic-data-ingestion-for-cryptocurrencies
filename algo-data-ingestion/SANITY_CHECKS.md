@@ -1,6 +1,6 @@
 # Sanity Checks and Optional Improvements
 
-_Last updated: 2025-10-21 02:50 UTC_
+_Last updated: 2025-10-23 01:00 UTC_
 
 This document summarizes quick validation steps for a 2‑week backfill (market + RSS) and tracks optional improvements to reference during iteration.
 
@@ -69,10 +69,12 @@ Data & Features
 ML & Evaluation
 - Walk‑forward cross‑validation across multiple windows, purging and embargoing data.
 - Model zoo: gradient boosting, calibrated probabilities, monotonic constraints, temporal ensembling.
-- PnL‑centric validation with the relaxed gate artifacts (`models/base_xgb_h120_calmon_spread0`, `models/tcn_h120_calmon_relaxed`, `models/blender_h120_v6`); regression-test via `scripts/report_shortlist.py`.
+- PnL‑centric validation with the relaxed gate artifacts (`models/base_xgb_h120_calmon_spread0`, `models/tcn_h120_calmon_relaxed`, `models/blender_h120_v6`); regression-test via `scripts/report_shortlist.py` and keep `tests/regression` (manifest gating + shortlist) green in CI.
+- Forward gate audit: mirror the Oct 2025 snapshot (`datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`, `models/oos_replay_oct_nov_2025.json`) to ensure deployable masks retain non-zero coverage before you ship.
 - Experiment tracking (MLflow/W&B) and reproducible pipelines.
 
 Serving & Ops
 - Real‑time scoring path that mirrors training transformations (avoid skew).
 - Feature monitoring: drift detection, data availability SLAs.
 - Hardening: retries/circuit breakers, backpressure on ingest, structured logging.
+- CI hygiene: `.github/workflows/ci.yml` now runs ingestion service E2E tests and KPI regressions; extend it with environment-specific smoke checks as needed.

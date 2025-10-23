@@ -1,6 +1,6 @@
 # Subtask 1 – 120-Bar TCN Turnover Control
 
-_Last updated: 2025-10-21 02:50 UTC_
+_Last updated: 2025-10-23 01:00 UTC_
 
 ## Run
 ```
@@ -29,7 +29,8 @@ _Last updated: 2025-10-21 02:50 UTC_
 ## Notes
 - Fold logits now persist, making recalibration and diagnostics reproducible without rerunning the network.
 - Monthly probability σ remains above 0.03, indicating no variance collapse under the relaxed gate.
+- Oct 2025 forward replay (`models/oos_replay_oct_nov_2025.json`) showed zero deployable trades despite healthy training-gate equity; thresholds need to be revisited alongside the base model.
 
 ## Follow-ups
-1. Replay Oct–Nov 2025 with the deployable gate to validate turnover and equity stability.
+1. Retune the deployable gate so forward windows retain minimal coverage without breaching turnover budgets.
 2. Train sibling horizons (60/180) for ensemble coverage and document selection triggers in the manifest.

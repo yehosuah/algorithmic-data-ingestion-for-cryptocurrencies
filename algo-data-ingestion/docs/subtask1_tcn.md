@@ -1,6 +1,6 @@
 # Subtask 1 – TCN Turnover Tightening
 
-_Last updated: 2025-10-21 02:50 UTC_
+_Last updated: 2025-10-23 01:00 UTC_
 
 ## Goal
 Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity > 1.0 (5 bps costs).
@@ -38,7 +38,8 @@ Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity
 ## Notes
 - Per-fold logits persist (`fold_logits.parquet`), enabling recalibration without rerunning the network.
 - Probability σ guardrail stays above 0.03 across validation months, avoiding the collapse seen with earlier tight gates.
+- Oct 2025 forward replay (`models/oos_replay_oct_nov_2025.json`) matched the base finding: relaxed gate equity holds, but the deployable mask produced zero toggles, so thresholds need to be revisited.
 
 ## Next Steps
-- Replay Oct–Nov 2025 with the deployable gate to confirm turnover remains under the live budget.
+- Retune the deployable gate (or stage a fallback) so forward windows retain minimal coverage without breaching turnover budgets.
 - Evaluate horizon 60 and 180 siblings for ensemble coverage; document selection criteria alongside manifests.

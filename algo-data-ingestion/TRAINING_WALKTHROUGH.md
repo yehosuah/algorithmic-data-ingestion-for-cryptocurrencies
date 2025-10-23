@@ -1,6 +1,6 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-10-21 02:50 UTC_
+_Last updated: 2025-10-23 01:00 UTC_
 
 This guide walks through the refreshed modeling stack: relaxed-gate retrains for the horizon-120 XGBoost baseline, the Calmon TCN suite, and the elastic-net blender that now clears 5 bps costs with RSS enrichment.
 
@@ -10,6 +10,7 @@ This guide walks through the refreshed modeling stack: relaxed-gate retrains for
 - Ensure the year-wide market parquet and the latest RSS matrix are present:
   - `datasets/market_btcusdt_1m_2024_2025.parquet`
   - `datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet`
+  - Optional forward replay matrix for gate audits: `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`
 
 ## 1. Generate/Refresh Feature Matrices
 The relaxed gate relies on augmented features and RSS spikes engineered by the new builder.
@@ -23,6 +24,7 @@ python scripts/build_blender_matrix.py \
 ```
 - Emits a JSON summary (`..._stats.json`) with RSS coverage diagnostics.
 - Persists minute/day RSS features, probability momentum (`prob_diff`, `*_mom_1`), and gating fields aligned to the relaxed training mask.
+- For forward audits we snapshot `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` (Oct 1–Oct 21 2025, probabilities included); regenerate by rerunning the builder with the desired window and output path.
 
 ## 2. Train Horizon-120 XGBoost (Relaxed Gate)
 ```bash
@@ -76,6 +78,20 @@ python scripts/report_shortlist.py \
 - Reads every `report.json`, enforces KPI schema, filters by RSS audit pass/fail, and ranks candidates (base, TCN, blender).
 - The shortlist feeds deployment review or CI checks.
 
-## 6. Optional – Meta Label Refresh
+## 6. Forward Replay & Gate Audit
+- Review `models/oos_replay_oct_nov_2025.json` (Oct 1–Oct 21 window) to compare training-vs-inference gate metrics across base, TCN, and blender models.
+- The relaxed gates retain equity >1 while the deployable mask currently produces zero toggles; adjust thresholds or introduce a fallback path before promoting to production.
+
+## 7. Run Regression Suites
+- Ensure manifests stay aligned with their reports and the shortlist keeps surfacing deployable candidates:
+  ```bash
+  pytest tests/regression -q
+  ```
+- Exercise async ingestion routes end-to-end with fakeredis before packaging artifacts:
+  ```bash
+  pytest tests/ingestion_service -q
+  ```
+
+## 8. Optional – Meta Label Refresh
 - Meta gating still lacks a stable decision surface; rerun `scripts/train_meta_label.py` only after extending the blender matrix to newer months.
 - Leverage the existing manifests for deployable gates in live inference until a calibrated meta filter clears the ≥1.2 equity hurdle.

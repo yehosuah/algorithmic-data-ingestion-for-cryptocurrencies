@@ -1,6 +1,6 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-10-21 02:50 UTC_
+_Last updated: 2025-10-23 01:00 UTC_
 
 End-to-end ingestion for **market**, **on-chain**, **social**, and **news** data with a Redis feature store, admin backfills/TTL sweeps, a scheduler, and monitoring (Prometheus + Grafana).
 
@@ -308,12 +308,15 @@ curl -s "http://localhost:8000/ingest/features/onchain/range?symbol=BTC&metric=a
 
 ## Tests
 
-Phase 2 includes e2e tests for market/onchain/social ingest and feature range endpoints. News tests are deferred until API keys are available.
+- `pytest tests/ingestion_service` covers async route flows (market/on-chain/social ingest, feature retrieval, metrics) with fakeredis and in-memory stores.
+- `pytest tests/regression` guards KPIs by asserting manifests stay aligned with their `report.json` files and that `scripts/report_shortlist.py` still elevates the Calmon baseline.
+- CI (`.github/workflows/ci.yml`) provisions Python 3.11 + CPU PyTorch, installs requirements, and runs the regression and `tests/training` suites on pushes/PRs.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-pytest -q
+pytest tests/ingestion_service -q
+pytest tests/regression -q
 ```
 
 ---
@@ -502,6 +505,7 @@ Notes
 - Horizon-120 XGB baseline (`models/base_xgb_h120_calmon_spread0`) keeps `final_equity 4.48` under the relaxed gate while the deployable inference mask (`prob ≥ 0.85`, tight spread/rvol caps) remains encoded in the manifest.
 - `training/blender.py` + `blender_h120_v6` introduce an elastic-net logistic stack (711 toggles, `final_equity 1.84`) that leans on the richer RSS signals; reports carry RSS coverage audits so operations can fall back gracefully when feeds drop.
 - `training/reporting.ensure_kpi_schema` and `scripts/report_shortlist.py` standardise KPI fields and emit `models/report_shortlist.json`, making it easy to bubble up deployable candidates without manual report diffing.
+- Forward validation for Oct 1 – Oct 21 2025 lives in `models/oos_replay_oct_nov_2025.json` plus `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`. Training gates still show equity 4.48 (base) / 2.48 (TCN) while the deployable inference mask currently produces zero turnover—flagged for gate-tuning before live launch.
 
 ---
 
