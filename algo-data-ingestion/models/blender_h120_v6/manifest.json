@@ -1,0 +1,36 @@
+{
+  "model_path": "blender.joblib",
+  "feature_list_path": "blender_features.txt",
+  "threshold": {
+    "value": 0.4,
+    "path": "threshold.txt"
+  },
+  "report_path": "report.json",
+  "gates": {
+    "prob_column": "blender_prob",
+    "spread_column": "hl_spread",
+    "training": {
+      "prob_gate_min": 0.4,
+      "rvol20_max": 0.0002,
+      "min_hold_bars": 1,
+      "long_only": false
+    },
+    "inference": {
+      "prob_gate_min": 0.8,
+      "rvol20_max": 0.0002,
+      "min_hold_bars": 10,
+      "long_only": true
+    }
+  },
+  "metadata": {
+    "model_type": "logistic_blender",
+    "calibrated": true,
+    "l1_ratio_grid": [
+      0.15,
+      0.35,
+      0.55,
+      0.75,
+      0.9
+    ]
+  }
+}
