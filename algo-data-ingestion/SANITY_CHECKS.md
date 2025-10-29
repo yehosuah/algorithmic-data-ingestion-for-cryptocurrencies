@@ -1,6 +1,6 @@
 # Sanity Checks and Optional Improvements
 
-_Last updated: 2025-10-23 01:00 UTC_
+_Last updated: 2025-10-29 15:53 UTC_
 
 This document summarizes quick validation steps for a 2‑week backfill (market + RSS) and tracks optional improvements to reference during iteration.
 
@@ -63,18 +63,18 @@ python scripts/build_training_matrix.py \
 Data & Features
 - Multi‑symbol, multi‑timeframe coverage (BTC/USDT, ETH/USDT; 1m + 5m).
 - Extend feature set (higher‑order returns, regime features, realized volatility variants, microstructure if L2 is added).
-- Social/news: expand RSS sources and add Twitter keys; ensure minute spikes stay ≥5e-4 so the blender’s RSS audit passes (`scripts/build_blender_matrix.py` emits coverage stats).
+- Social/news: expand RSS sources and add Twitter keys; ensure minute spikes stay ≥5e-4 so the blender’s RSS audit passes (`scripts/build_blender_matrix.py` emits coverage stats). The `/ingest/news` endpoint now uses `fetch_news_rss_once` to persist RSS/API payloads into `NEWS_PATH`, so live feeds can be mirrored in the sanity run.
 - On‑chain: add Glassnode metrics (with keys), align to bar closes.
 
 ML & Evaluation
 - Walk‑forward cross‑validation across multiple windows, purging and embargoing data.
 - Model zoo: gradient boosting, calibrated probabilities, monotonic constraints, temporal ensembling.
 - PnL‑centric validation with the relaxed gate artifacts (`models/base_xgb_h120_calmon_spread0`, `models/tcn_h120_calmon_relaxed`, `models/blender_h120_v6`); regression-test via `scripts/report_shortlist.py` and keep `tests/regression` (manifest gating + shortlist) green in CI.
-- Forward gate audit: mirror the Oct 2025 snapshot (`datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`, `models/oos_replay_oct_nov_2025.json`) to ensure deployable masks retain non-zero coverage before you ship.
+- Forward gate audit: replay `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` through `models/oos_replay_summary_latest.json` to confirm deployable masks retain coverage (base regained 12 gate hits, blender ≈16 % coverage; TCN manifests still idle, so plan a fallback/tune-up before shipping).
 - Experiment tracking (MLflow/W&B) and reproducible pipelines.
 
 Serving & Ops
 - Real‑time scoring path that mirrors training transformations (avoid skew).
-- Feature monitoring: drift detection, data availability SLAs.
+- Feature monitoring: drift detection, data availability SLAs; hook `app/monitoring/model_metrics.py` gauges (`model_gate_coverage_ratio`, `model_rss_minute_spike_share`, `model_probability_sigma`) into dashboards and alert when thresholds (from manifests) are breached.
 - Hardening: retries/circuit breakers, backpressure on ingest, structured logging.
 - CI hygiene: `.github/workflows/ci.yml` now runs ingestion service E2E tests and KPI regressions; extend it with environment-specific smoke checks as needed.

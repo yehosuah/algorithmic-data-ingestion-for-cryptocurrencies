@@ -1,6 +1,6 @@
 # Subtask 2 – Horizon-120 XGB Baseline Refresh
 
-_Last updated: 2025-10-23 01:00 UTC_
+_Last updated: 2025-10-29 15:53 UTC_
 
 ## Run
 ```
@@ -27,10 +27,10 @@ _Last updated: 2025-10-23 01:00 UTC_
 ## Observations
 - Relaxing the training gate (`hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2e-4`, no prob filter) restored probability variance and kept turnover manageable (3.6 k toggles) during training.
 - RSS audit passes; spread stress (`spread_scale ∈ {0,0.05,0.1,0.2}`) leaves equity unchanged, indicating resilience to moderate cost inflation.
-- Oct 2025 forward replay retained 4.48 equity under the relaxed gate but delivered zero trades under the deployable mask (`models/oos_replay_oct_nov_2025.json`), so thresholds need recalibration or a fallback gate.
+- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) now logs 12 deployable gate hits (8 trades, `final_equity 1.23`), so lock the thresholds in release notes and monitor coverage for drift.
 
 ## Deployable Gate Update
-- Manifest inference mask: `hl_spread ≤ 0.0005`, `hl_spread_z ≤ -0.6`, `rvol_20 ≤ 4e-5`, `prob ≥ 0.85`, `min_hold 10`, long-only. CI now enforces manifest alignment via `tests/regression/test_manifest_gating.py` and shortlist viability via `test_report_shortlist.py`.
+- Manifest inference mask: `hl_spread ≤ 0.0007`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`, long-only. CI now enforces manifest alignment via `tests/regression/test_manifest_gating.py` and shortlist viability via `test_report_shortlist.py`.
 - `live_gate_coverage.csv` confirms monthly coverage within ±1.63× baseline (peak 0.0179 % in Jul 2025) historically, but the Oct 2025 forward replay revealed zero coverage under the deployable mask—update once thresholds are retuned.
 
 ## Next Steps

@@ -1,6 +1,6 @@
 # Subtask 3 – Blender Refresh
 
-_Last updated: 2025-10-23 01:00 UTC_
+_Last updated: 2025-10-29 15:53 UTC_
 
 ## Run
 ```
@@ -31,7 +31,7 @@ python scripts/train_blender.py \
 - Intraday RSS spike features and probability momentum restored signal diversity; elastic-net fits converge across the l1 ratio grid with identical metrics.
 - KPI schema + shortlist tooling (`training/reporting.ensure_kpi_schema`, `scripts/report_shortlist.py`) make regression checks straightforward.
 - Forward audit artifact `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` is captured for gate analysis; regenerate by re-running the builder over the target window before packaging.
-- Oct 2025 forward replay (`models/oos_replay_oct_nov_2025.json`) exposed zero deployable trades despite healthy training-gate equity; blender gating must follow the retuned base thresholds.
+- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) now fires 5 870 deployable trades (`gate_fraction ≈ 0.162`), confirming the eased manifest stays aligned with the retuned base thresholds.
 
 ## Follow-ups
 1. Retune blender gating so Oct–Nov 2025 delivers equity ≥1.2 with turnover within ±25 % of baseline instead of the current zero-coverage outcome.

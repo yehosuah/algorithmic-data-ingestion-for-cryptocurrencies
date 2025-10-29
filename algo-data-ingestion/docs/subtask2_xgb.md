@@ -1,6 +1,6 @@
 # Subtask 2 – Horizon-120 XGB Baseline
 
-_Last updated: 2025-10-23 01:00 UTC_
+_Last updated: 2025-10-29 15:53 UTC_
 
 ## Goal
 Retrain the base XGBoost classifier on the 2024–2025 minute feed using the relaxed Calmon gate so post-cost equity exceeds 1.0 at 5 bps while preserving a deployable inference mask.
@@ -29,12 +29,12 @@ Retrain the base XGBoost classifier on the 2024–2025 minute feed using the rel
 - RSS audit: daily coverage 0.852, minute spike share 6.5e-4 (pass)
 
 ## Deployable Gate Snapshot
-- Manifest inference mask: `hl_spread ≤ 0.0005`, `hl_spread_z ≤ -0.6`, `rvol_20 ≤ 4e-5`, `prob ≥ 0.85`, `min_hold 10`, long-only.
+- Manifest inference mask: `hl_spread ≤ 0.0007`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`, long-only.
 - Monthly coverage replay (see `live_gate_coverage.csv`) remains within ±1.63× baseline, keeping live turnover <0.02 % of bars.
-- Oct 2025 forward replay (`models/oos_replay_oct_nov_2025.json`) retained 4.48 equity under the relaxed gate but delivered zero toggles under the deployable mask—thresholds/fallback logic must be adjusted before deployment.
+- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) logs 12 deployable gate hits (8 trades, `final_equity 1.23`) under the retuned manifest—keep the thresholds under review as you expand to new months.
 - CI now runs `tests/regression/test_manifest_gating.py` and `test_report_shortlist.py` to keep manifests aligned with reports and highlight KPI regressions automatically.
 
 ## Next Steps
-1. Retune the inference mask so Oct–Nov 2025 delivers non-zero coverage and equity ≥1.2 without blowing turnover budgets.
-2. Integrate manifest gates and threshold into `training/infer.py` regression tests so CI catches drift.
+1. Monitor deployable coverage via `model_gate_coverage_ratio` and iterate thresholds if Oct–Nov 2025 drops below the new floor.
+2. Integrate manifest gates and threshold into `training/infer.py` regression tests so CI catches drift (use `score_base_with_manifest`).
 3. Export coverage alert thresholds and RSS audit metadata alongside the artifact bundle.

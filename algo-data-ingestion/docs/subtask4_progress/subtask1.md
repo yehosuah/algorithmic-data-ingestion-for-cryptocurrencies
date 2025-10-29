@@ -1,6 +1,6 @@
 # Subtask 1 – 120-Bar TCN Turnover Control
 
-_Last updated: 2025-10-23 01:00 UTC_
+_Last updated: 2025-10-29 15:53 UTC_
 
 ## Run
 ```
@@ -24,12 +24,12 @@ _Last updated: 2025-10-23 01:00 UTC_
 - `final_equity` **1.331** (threshold 0.65)
 - `total_turnover` **180** (≤200 guardrail)
 - `sharpe` **24.9**
-- Training gate coverage 0.0896; deployable inference mask inherits base manifest (`hl_spread ≤ 0.0005`, `hl_spread_z ≤ -0.6`, `rvol_20 ≤ 4e-5`, `prob ≥ 0.85`, `min_hold 10`).
+- Training gate coverage 0.0896; deployable inference mask inherits base manifest (`hl_spread ≤ 0.0007`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`).
 
 ## Notes
 - Fold logits now persist, making recalibration and diagnostics reproducible without rerunning the network.
 - Monthly probability σ remains above 0.03, indicating no variance collapse under the relaxed gate.
-- Oct 2025 forward replay (`models/oos_replay_oct_nov_2025.json`) showed zero deployable trades despite healthy training-gate equity; thresholds need to be revisited alongside the base model.
+- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) still shows zero deployable trades for TCNs even after the base manifest retune; thresholds or fallback logic must be revisited alongside the base model.
 
 ## Follow-ups
 1. Retune the deployable gate so forward windows retain minimal coverage without breaching turnover budgets.

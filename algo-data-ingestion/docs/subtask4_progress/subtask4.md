@@ -1,6 +1,6 @@
 # Subtask 4 – Meta-Label Training Refresh
 
-_Last updated: 2025-10-23 01:00 UTC_
+_Last updated: 2025-10-29 15:53 UTC_
 
 ## Run
 ```
@@ -19,10 +19,10 @@ python scripts/train_meta_label.py \
 - `label_pos_frac` ≈0.54 after barrier generation
 
 ## Findings
-- Even with the forward replay matrix (`datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`), filtering to rows that satisfy deployable gates collapses to one class—base/TCN/blender probabilities drop to zero coverage under the strict mask.
+- Even with the forward replay matrix (`datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`), filtering to rows that satisfy deployable gates still collapses to a single dominant class—base now contributes only 12 gate hits (8 trades) and TCN/blender probabilities offer limited overlap despite the blender manifest firing 5 870 trades.
 - The relaxed gate already suppresses most trades; additional meta gating adds no value until deployable thresholds are retuned to yield meaningful overlap.
 
 ## Next Steps
-1. Wait for deployable gate retuning to restore non-zero coverage on forward windows before attempting further meta training.
+1. Wait for deployable gate retuning (especially on the TCN suite) to restore meaningful overlap on forward windows before attempting further meta training.
 2. Once coverage stabilises, explore asymmetric barrier settings or longer holding periods to diversify labels.
 3. Defer deployment of meta models; rely on manifest gates + blender until a refreshed matrix demonstrates ≥1.2 equity and meaningful turnover after meta filtering.

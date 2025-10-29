@@ -1,6 +1,6 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-10-23 01:00 UTC_
+_Last updated: 2025-10-29 15:53 UTC_
 
 End-to-end ingestion for **market**, **on-chain**, **social**, and **news** data with a Redis feature store, admin backfills/TTL sweeps, a scheduler, and monitoring (Prometheus + Grafana).
 
@@ -125,10 +125,10 @@ NEWS_API_KEY=
   `{"chain_id":1,"address":"0x0000000000000000000000000000000000000000"}`
 - `POST /ingest/social/{platform}` (e.g. `twitter`)  
   **Body:** `{"query":"bitcoin","since":null,"until":null,"max_results":5}`
-- `POST /ingest/news/{source}` (e.g. `newsapi`, `rss`)  
+- `POST /ingest/news`  
   **Body:**  
   API: `{"source_type":"api","category":"business"}`  
-  RSS: `{"source_type":"rss","feed_url":"https://..."}`
+  RSS: `{"source_type":"rss","feed_url":"https://..."}` 
 
 **Typical success:**
 ```json
@@ -244,6 +244,7 @@ Common metrics:
 - API: `service_info{service="raw-data-ingestion"}` + feature store counters/histograms
 - Scheduler: APScheduler & process metrics on `:9002`
 - Redis: via redis_exporter
+- Model gates: `model_gate_coverage_ratio{model,mode}`, `model_rss_minute_spike_share`, and `model_probability_sigma` expose manifest coverage, RSS health, and probability variance; matching `*_threshold` gauges set from manifests so Prometheus alerts (`monitoring/alert.rules.yml`) fire when coverage or sigma fall below guardrails.
 
 ---
 
@@ -278,10 +279,11 @@ curl -s -X POST "http://localhost:8000/ingest/social/twitter" \
 
 **News**
 ```bash
-curl -s -X POST "http://localhost:8000/ingest/news/newsapi" \
+curl -s -X POST "http://localhost:8000/ingest/news" \
   -H "Content-Type: application/json" \
   -d '{"source_type":"api","category":"business"}'
 ```
+> The endpoint normalises RSS/API payloads with `fetch_news_rss_once`/`fetch_news_api`, partitions by `dt` + `source`, writes Parquet under `NEWS_PATH`, and mirrors the rows into Redis when the schema check passes.
 
 **Admin: backfill & TTL sweep**
 ```bash
@@ -500,12 +502,12 @@ Notes
 
 ## Modeling Snapshot (Oct 2025)
 
-- `scripts/build_blender_matrix.py` now produces the year-wide matrix `datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet` with intraday/day RSS features, probability momentum (`prob_diff*`), and spread-aware regime columns aligned to the relaxed training gates.
-- Refreshed TCN suite (`models/tcn_h{60,120,180}_calmon_relaxed`) clears 5 bps costs with relaxed training gates; `tcn_h120_calmon_relaxed` reports `final_equity 1.33`, `total_turnover 180`, and persists fold logits for downstream recalibration.
-- Horizon-120 XGB baseline (`models/base_xgb_h120_calmon_spread0`) keeps `final_equity 4.48` under the relaxed gate while the deployable inference mask (`prob ≥ 0.85`, tight spread/rvol caps) remains encoded in the manifest.
-- `training/blender.py` + `blender_h120_v6` introduce an elastic-net logistic stack (711 toggles, `final_equity 1.84`) that leans on the richer RSS signals; reports carry RSS coverage audits so operations can fall back gracefully when feeds drop.
+- `scripts/build_blender_matrix.py` now emits a 606 121-row matrix (`datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet`) covering 2024‑09‑01 ➜ 2025‑10‑26 with intraday RSS aggregations, probability momentum (`prob_diff*`), and spread-aware regime labels; the JSON stats include window start/end for sanity checks.
+- Refreshed TCN suite (`models/tcn_h{60,120,180}_calmon_relaxed`) still clears 5 bps costs under the relaxed gate; `tcn_h120_calmon_relaxed` reports `final_equity 1.33`, `total_turnover 180`, and persists fold logits for downstream recalibration.
+- Horizon-120 XGB baseline (`models/base_xgb_h120_calmon_spread0`) keeps `final_equity 4.48` under the relaxed gate and now publishes a deployable manifest mask (`hl_spread ≤ 7e-4`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`) that restores a trickle of live coverage (Oct 2025 replay: 12 gate hits, 8 toggles, `final_equity 1.23`).
+- `training/blender.py` + `blender_h120_v6` add optional class weighting and calibration control; the elastic-net stack (711 toggles, `final_equity 1.84`) leans on the richer RSS signals and its manifest now gates inference at `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`, delivering `gate_coverage ≈ 16 %` on the Oct 2025 replay.
 - `training/reporting.ensure_kpi_schema` and `scripts/report_shortlist.py` standardise KPI fields and emit `models/report_shortlist.json`, making it easy to bubble up deployable candidates without manual report diffing.
-- Forward validation for Oct 1 – Oct 21 2025 lives in `models/oos_replay_oct_nov_2025.json` plus `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`. Training gates still show equity 4.48 (base) / 2.48 (TCN) while the deployable inference mask currently produces zero turnover—flagged for gate-tuning before live launch.
+- Forward validation for Oct 1 – Oct 27 2025 is tracked in `models/oos_replay_summary_latest.json` (paired with `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`); base regained minimal coverage under the deployable mask while TCNs remain idle, signalling the need for further gate tuning before launch.
 
 ---
 

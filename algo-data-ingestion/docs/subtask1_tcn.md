@@ -1,6 +1,6 @@
 # Subtask 1 – TCN Turnover Tightening
 
-_Last updated: 2025-10-23 01:00 UTC_
+_Last updated: 2025-10-29 15:53 UTC_
 
 ## Goal
 Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity > 1.0 (5 bps costs).
@@ -33,12 +33,12 @@ Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity
 - `sharpe`: 24.9
 - `total_turnover`: 180 (≤200 target)
 - `selected_threshold`: 0.65
-- Gate coverage (training): 0.0896 under the relaxed mask (`hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2e-4`); deployable inference gate mirrors the base manifest (`hl_spread ≤ 0.0005`, `hl_spread_z ≤ -0.6`, `rvol_20 ≤ 4e-5`, `prob ≥ 0.85`, `min_hold 10`).
+- Gate coverage (training): 0.0896 under the relaxed mask (`hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2e-4`); deployable inference gate mirrors the base manifest (`hl_spread ≤ 0.0007`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`).
 
 ## Notes
 - Per-fold logits persist (`fold_logits.parquet`), enabling recalibration without rerunning the network.
 - Probability σ guardrail stays above 0.03 across validation months, avoiding the collapse seen with earlier tight gates.
-- Oct 2025 forward replay (`models/oos_replay_oct_nov_2025.json`) matched the base finding: relaxed gate equity holds, but the deployable mask produced zero toggles, so thresholds need to be revisited.
+- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) mirrors the base retune outcome in reverse: relaxed gate equity holds, yet the deployable mask still produces zero toggles, so thresholds or fallback logic must be revisited before production.
 
 ## Next Steps
 - Retune the deployable gate (or stage a fallback) so forward windows retain minimal coverage without breaching turnover budgets.
