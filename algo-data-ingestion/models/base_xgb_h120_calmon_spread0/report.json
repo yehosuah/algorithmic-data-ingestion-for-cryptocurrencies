@@ -1,12 +1,12 @@
 {
-  "mean_pnl": 0.0001726293163589191,
-  "std_pnl": 0.0009601623888043029,
-  "sharpe": 108.30571585020935,
-  "max_drawdown": 0.07645803630512749,
+  "mean_pnl": 0.00020328254391405585,
+  "std_pnl": 0.0010404094352719068,
+  "sharpe": 117.70023264853545,
+  "max_drawdown": 0.02634637139149243,
   "final_equity": 4.4816890703380645,
-  "avg_turnover": 0.015462868769074262,
-  "total_turnover": 3648.0,
-  "toggle_count": 3648,
+  "avg_turnover": 0.017948262685368886,
+  "total_turnover": 4650.0,
+  "toggle_count": 4650,
   "selected_threshold": 0.55,
   "criterion": "final_equity",
   "cost_bps": 5.0,
@@ -14,31 +14,37 @@
   "slippage_bps": 0.0,
   "long_only": true,
   "min_hold_bars": 10,
-  "min_total_turnover": 4.0,
+  "min_total_turnover": 2.0,
   "max_total_turnover": null,
   "kpi_schema_version": 1,
-  "oof_count": 235920,
-  "oof_auc": 0.999998225614131,
-  "gate_fraction": 0.0944175991861648,
+  "oof_count": 259078,
+  "oof_auc": 0.9999989958688636,
+  "gate_fraction": 0.111900663120759,
   "max_spread_z": 0.25,
   "max_rvol20": 0.0002,
-  "monthly_diagnostics": {
-    "2025-04": {
-      "mean_pnl": 7.340421444526698e-05,
-      "std_pnl": 0.000706974092837265,
-      "sharpe": 62.54592394820788,
-      "max_drawdown": 0.07645803630512749,
+  "diagnostic_final_equity": {
+    "0.5": {
       "final_equity": 4.4816890703380645,
-      "avg_turnover": 0.006388888888888889,
-      "total_turnover": 276.0,
-      "toggle_count": 276,
-      "n_samples": 43200,
-      "gate_fraction": 0.03388888888888889
+      "total_turnover": 4650.0
     },
+    "0.55": {
+      "final_equity": 4.4816890703380645,
+      "total_turnover": 4650.0
+    },
+    "0.6": {
+      "final_equity": 4.4816890703380645,
+      "total_turnover": 4650.0
+    },
+    "0.65": {
+      "final_equity": 4.4816890703380645,
+      "total_turnover": 4650.0
+    }
+  },
+  "monthly_diagnostics": {
     "2025-05": {
-      "mean_pnl": 0.00012408315424807033,
-      "std_pnl": 0.0008755010830263245,
-      "sharpe": 85.37636370713727,
+      "mean_pnl": 0.0001240831542480703,
+      "std_pnl": 0.0008755010830263246,
+      "sharpe": 85.37636370713723,
       "max_drawdown": 0.02634637139149243,
       "final_equity": 4.4816890703380645,
       "avg_turnover": 0.008646953405017921,
@@ -49,8 +55,8 @@
     },
     "2025-06": {
       "mean_pnl": 0.0002148269283522594,
-      "std_pnl": 0.0010798203924532374,
-      "sharpe": 119.84466627853358,
+      "std_pnl": 0.0010798203924532377,
+      "sharpe": 119.84466627853357,
       "max_drawdown": 0.020039234382620563,
       "final_equity": 4.4816890703380645,
       "avg_turnover": 0.018518518518518517,
@@ -60,40 +66,52 @@
       "gate_fraction": 0.11983796296296297
     },
     "2025-07": {
-      "mean_pnl": 0.00024323165713070825,
-      "std_pnl": 0.0009915971989643473,
-      "sharpe": 147.76321226345067,
+      "mean_pnl": 0.00024321327233626293,
+      "std_pnl": 0.0009913973819549488,
+      "sharpe": 147.781823055885,
       "max_drawdown": 0.009710552182957466,
       "final_equity": 4.4816890703380645,
-      "avg_turnover": 0.02338709677419355,
-      "total_turnover": 1044.0,
-      "toggle_count": 1044,
+      "avg_turnover": 0.023342293906810037,
+      "total_turnover": 1042.0,
+      "toggle_count": 1042,
       "n_samples": 44640,
       "gate_fraction": 0.15024641577060932
     },
     "2025-08": {
-      "mean_pnl": 0.00016950330003144654,
-      "std_pnl": 0.0009844897335090396,
-      "sharpe": 103.71665044940492,
-      "max_drawdown": 0.027241212219534905,
+      "mean_pnl": 0.00016951067945069183,
+      "std_pnl": 0.0009837279765948378,
+      "sharpe": 103.80148304993712,
+      "max_drawdown": 0.02721241408815045,
       "final_equity": 4.4816890703380645,
-      "avg_turnover": 0.017293906810035842,
-      "total_turnover": 772.0,
-      "toggle_count": 772,
+      "avg_turnover": 0.017338709677419354,
+      "total_turnover": 774.0,
+      "toggle_count": 774,
       "n_samples": 44640,
       "gate_fraction": 0.10582437275985664
     },
     "2025-09": {
-      "mean_pnl": 0.00027638220853785944,
-      "std_pnl": 0.0012184450566571515,
-      "sharpe": 136.64245273852066,
+      "mean_pnl": 0.00028299999340646335,
+      "std_pnl": 0.0011532999927287607,
+      "sharpe": 147.81743181261092,
       "max_drawdown": 0.09753644537794237,
       "final_equity": 4.4816890703380645,
-      "avg_turnover": 0.023717948717948717,
-      "total_turnover": 370.0,
-      "toggle_count": 370,
-      "n_samples": 15600,
-      "gate_fraction": 0.13282051282051283
+      "avg_turnover": 0.02826388888888889,
+      "total_turnover": 1221.0,
+      "toggle_count": 1221,
+      "n_samples": 43200,
+      "gate_fraction": 0.19479166666666667
+    },
+    "2025-10": {
+      "mean_pnl": 0.00018560162449160727,
+      "std_pnl": 0.0011427406805646827,
+      "sharpe": 97.83981016281912,
+      "max_drawdown": 0.01459547625580404,
+      "final_equity": 4.4816890703380645,
+      "avg_turnover": 0.010991279219773982,
+      "total_turnover": 426.0,
+      "toggle_count": 426,
+      "n_samples": 38758,
+      "gate_fraction": 0.047396666494659165
     }
   },
   "gate_config": {
@@ -108,10 +126,10 @@
       "long_only": true
     },
     "inference": {
-      "hl_spread_max": 0.0005,
-      "hl_spread_z_max": -0.6,
-      "rvol20_max": 4e-05,
-      "prob_gate_min": 0.85,
+      "hl_spread_max": 0.0007,
+      "hl_spread_z_max": -0.25,
+      "rvol20_max": 8e-05,
+      "prob_gate_min": 0.72,
       "min_hold_bars": 10,
       "long_only": true
     }
@@ -119,14 +137,15 @@
   "rss_audit": {
     "min_daily_coverage": 0.8,
     "min_minute_spike_share": 0.0005,
-    "daily_coverage": 0.8515803939532753,
-    "minute_spike_share": 0.0006470453504351809,
-    "passed": true,
-    "reasons": [],
-    "minute_indicator_column": "rss_count_minute",
-    "minute_spike_share_candidates": {
-      "rss_count_minute": 0.0006470453504351809
-    },
-    "fallback_to_no_rss": false
+    "daily_coverage": null,
+    "minute_spike_share": null,
+    "passed": false,
+    "reasons": [
+      "rss_has_signal_missing",
+      "rss_minute_indicator_missing"
+    ],
+    "minute_indicator_column": null,
+    "minute_spike_share_candidates": {},
+    "fallback_to_no_rss": true
   }
 }

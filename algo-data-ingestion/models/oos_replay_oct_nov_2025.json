@@ -100,17 +100,44 @@
         "gate_fraction": 0.0789708950034767
       },
       "inference_gate": {
-        "mean_pnl": 0.0003513931135247268,
-        "std_pnl": 0.003052462869260408,
-        "sharpe": 69.34647223566077,
-        "max_drawdown": 0.01650650441252033,
-        "final_equity": 4.4816890703380645,
-        "avg_turnover": 0.008542763484652827,
-        "total_turnover": 258.0,
-        "toggle_count": 173,
-        "gate_fraction": 0.0789708950034767
+        "mean_pnl": 2.272159390673898e-05,
+        "std_pnl": 0.0017227519366905157,
+        "sharpe": 7.945066987501609,
+        "max_drawdown": 2.585544769257418,
+        "final_equity": 1.838607787092162,
+        "avg_turnover": 0.01603849238171612,
+        "total_turnover": 460.0,
+        "toggle_count": 460,
+        "gate_fraction": 0.00801924619085806
       },
-      "oos_rows": 30201
+      "rss_audit": {
+        "min_daily_coverage": 0.8,
+        "min_minute_spike_share": 0.0005,
+        "daily_coverage": 1.0,
+        "minute_spike_share": 1.0,
+        "passed": true,
+        "reasons": [],
+        "minute_indicator_column": "rss_spike_halo",
+        "minute_spike_share_candidates": {
+          "rss_spike_proximity_flag": 0.0,
+          "rss_spike_halo": 1.0,
+          "rss_spike_trailing_15": 1.0,
+          "rss_spike_leading_15": 1.0,
+          "rss_spike_decay_fast": 1.0,
+          "rss_spike_presence": 1.0,
+          "rss_spike_decay_long": 1.0,
+          "rss_spike_decay": 1.0,
+          "rss_spike_active": 1.0,
+          "rss_count_minute": 0.06669920853526726
+        },
+        "fallback_to_no_rss": false
+      },
+      "oos_rows": 30201,
+      "deployable_gate_params": {
+        "prob_gate_min": 0.5,
+        "rvol20_max": 0.0005,
+        "min_hold_bars": 10
+      }
     }
   }
 }

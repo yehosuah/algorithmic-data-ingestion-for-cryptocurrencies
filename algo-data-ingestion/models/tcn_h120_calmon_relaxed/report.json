@@ -1,24 +1,24 @@
 {
-  "mean_pnl": 5.8246887837527046e-05,
-  "std_pnl": 0.0014064808175287098,
-  "sharpe": 24.947120731227546,
-  "max_drawdown": 0.12036008534394571,
-  "final_equity": 1.3305595300448367,
-  "avg_turnover": 0.03608660785886127,
-  "total_turnover": 180.0,
-  "toggle_count": 163,
-  "selected_threshold": 0.65,
+  "mean_pnl": 0.000295313912113704,
+  "std_pnl": 0.0014677880661841777,
+  "sharpe": 121.19984682450037,
+  "max_drawdown": 0.21515670433835643,
+  "final_equity": 4.4816890703380645,
+  "avg_turnover": 0.034688156972669935,
+  "total_turnover": 198.0,
+  "toggle_count": 198,
+  "selected_threshold": 0.55,
   "criterion": "final_equity",
   "cost_bps": 5.0,
   "spread_scale": 0.0,
   "slippage_bps": 0.0,
-  "long_only": false,
-  "min_hold_bars": 5,
+  "long_only": true,
+  "min_hold_bars": 10,
   "min_total_turnover": 4.0,
   "max_total_turnover": 200.0,
   "kpi_schema_version": 1,
-  "oof_count": 4988,
-  "gate_fraction": 0.08961507618283882,
+  "oof_count": 5708,
+  "gate_fraction": 0.1355991590749825,
   "max_spread_z": 0.25,
   "max_rvol20": 0.0002,
   "gate_config": {
@@ -29,16 +29,16 @@
       "hl_spread_z_max": 0.25,
       "rvol20_max": 0.0002,
       "prob_gate_min": null,
-      "min_hold_bars": 5,
-      "long_only": false
+      "min_hold_bars": 10,
+      "long_only": true
     },
     "inference": {
-      "hl_spread_max": 0.0005,
-      "hl_spread_z_max": -0.6,
-      "rvol20_max": 4e-05,
-      "prob_gate_min": 0.85,
+      "hl_spread_max": 0.0007,
+      "hl_spread_z_max": -0.25,
+      "rvol20_max": 8e-05,
+      "prob_gate_min": 0.72,
       "min_hold_bars": 10,
-      "long_only": false
+      "long_only": true
     }
   },
   "rss_audit": {
@@ -56,35 +56,27 @@
   },
   "diagnostic_final_equity": {
     "0.55": {
-      "final_equity": 1.0203282122994382,
-      "total_turnover": 232.0
+      "final_equity": 4.4816890703380645,
+      "total_turnover": 198.0
     },
     "0.6": {
-      "final_equity": 1.0615126606327256,
-      "total_turnover": 220.0
+      "final_equity": 4.4816890703380645,
+      "total_turnover": 198.0
     },
     "0.65": {
-      "final_equity": 1.3305595300448367,
-      "total_turnover": 180.0
-    },
-    "0.675": {
-      "final_equity": 1.1231347396659523,
-      "total_turnover": 166.0
+      "final_equity": 4.4816890703380645,
+      "total_turnover": 198.0
     },
     "0.7": {
-      "final_equity": 1.1231347396659523,
-      "total_turnover": 166.0
-    },
-    "0.75": {
-      "final_equity": 1.2011174219296123,
-      "total_turnover": 164.0
+      "final_equity": 4.4816890703380645,
+      "total_turnover": 198.0
     }
   },
   "validation_prob_std_by_month": {
-    "2025-06": 0.2828130877643465,
-    "2025-07": 0.20577792517385995,
-    "2025-08": 0.3586037865954962,
-    "2025-09": 0.25485536692139843
+    "2025-07": 0.43595443028185077,
+    "2025-08": 0.43369665974463295,
+    "2025-09": 0.43309211088721866,
+    "2025-10": 0.44097093008079713
   },
   "prob_sigma_guardrail": {
     "threshold": 0.03,

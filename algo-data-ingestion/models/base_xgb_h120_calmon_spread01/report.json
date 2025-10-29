@@ -108,10 +108,10 @@
       "long_only": true
     },
     "inference": {
-      "hl_spread_max": 0.0005,
-      "hl_spread_z_max": -0.6,
-      "rvol20_max": 4e-05,
-      "prob_gate_min": 0.85,
+      "hl_spread_max": 0.0007,
+      "hl_spread_z_max": -0.25,
+      "rvol20_max": 8e-05,
+      "prob_gate_min": 0.72,
       "min_hold_bars": 10,
       "long_only": true
     }

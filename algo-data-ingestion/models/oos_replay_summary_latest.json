@@ -1,0 +1,50 @@
+{
+  "period": "2025-10-01_to_2025-10-27",
+  "row_count": 38879,
+  "timestamp_start": "2025-10-01T00:00:00+00:00",
+  "timestamp_end": "2025-10-27T23:58:00+00:00",
+  "models": {
+    "base_xgb_h120_calmon_spread0": {
+      "mean_pnl": 5.429700370066279e-06,
+      "std_pnl": 0.00024452025817830976,
+      "sharpe": 13.376501270143788,
+      "max_drawdown": 0.0019870624499815914,
+      "final_equity": 1.2336134157703136,
+      "avg_turnover": 0.00020576660922348825,
+      "total_turnover": 8.0,
+      "toggle_count": 8,
+      "avg_minutes_between_trades": 10217.333333333334,
+      "p95_minutes_between_trades": 27443.899999999998,
+      "gate_coverage": 0.0003086499138352324,
+      "gate_hits": 12
+    },
+    "tcn_h120_calmon_relaxed": {
+      "mean_pnl": 0.0,
+      "std_pnl": 1e-12,
+      "sharpe": 0.0,
+      "max_drawdown": 0.0,
+      "final_equity": 1.0,
+      "avg_turnover": 0.0,
+      "total_turnover": 0.0,
+      "toggle_count": 0,
+      "avg_minutes_between_trades": null,
+      "p95_minutes_between_trades": null,
+      "gate_coverage": 0.0,
+      "gate_hits": 0
+    },
+    "blender_h120_v6": {
+      "mean_pnl": 0.0004783880759607831,
+      "std_pnl": 0.0018712149739033251,
+      "sharpe": 154.0061905523641,
+      "max_drawdown": 0.025572644118397214,
+      "final_equity": 4.4816890703380645,
+      "avg_turnover": 0.1572841027839554,
+      "total_turnover": 5870.0,
+      "toggle_count": 5870,
+      "avg_minutes_between_trades": 12.715064758009543,
+      "p95_minutes_between_trades": 34.34999999999991,
+      "gate_coverage": 0.1623214812036119,
+      "gate_hits": 6058
+    }
+  }
+}

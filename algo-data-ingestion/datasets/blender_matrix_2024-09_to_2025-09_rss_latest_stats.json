@@ -1,12 +1,7 @@
 {
-  "rows": 542760,
-  "base_prob_nan": 0,
-  "base_prob_mean": 0.5153477338005934,
-  "base_prob_std": 0.4989146122037651,
-  "base_prob_positive_share": 0.5156662244822757,
-  "tcn_prob_rows": 18086,
-  "tcn_prob_mean": 0.585319356048639,
-  "tcn_prob_std": 0.08725951734941569,
-  "tcn_prob_high_share": 0.5799513435806701,
-  "y_dir_mean": 0.5156441152627312
+  "rows": 606121,
+  "start": "2024-09-01T00:00:00+00:00",
+  "end": "2025-10-26T22:00:00+00:00",
+  "base_prob_mean": 0.5150536150820338,
+  "tcn_prob_mean": 0.5092233313613448
 }

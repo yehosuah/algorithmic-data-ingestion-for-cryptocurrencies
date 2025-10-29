@@ -3,7 +3,7 @@
   "calibrator_path": "tcn_calibrator.joblib",
   "preprocess_path": "tcn_preproc.joblib",
   "threshold": {
-    "value": 0.65,
+    "value": 0.55,
     "path": "threshold.json"
   },
   "report_path": "report.json",
@@ -15,16 +15,16 @@
       "hl_spread_z_max": 0.25,
       "rvol20_max": 0.0002,
       "prob_gate_min": null,
-      "min_hold_bars": 5,
-      "long_only": false
+      "min_hold_bars": 10,
+      "long_only": true
     },
     "inference": {
-      "hl_spread_max": 0.0005,
-      "hl_spread_z_max": -0.6,
-      "rvol20_max": 4e-05,
-      "prob_gate_min": 0.85,
+      "hl_spread_max": 0.0007,
+      "hl_spread_z_max": -0.25,
+      "rvol20_max": 8e-05,
+      "prob_gate_min": 0.72,
       "min_hold_bars": 10,
-      "long_only": false
+      "long_only": true
     }
   },
   "metadata": {
@@ -33,8 +33,8 @@
     "window": 192,
     "kernel_size": 3,
     "channels": [
-      48,
-      48
+      64,
+      64
     ],
     "fold_logits_path": "fold_logits.parquet",
     "prob_sigma_guardrail": {
@@ -42,10 +42,10 @@
       "months_below_threshold": []
     },
     "validation_prob_std_by_month": {
-      "2025-06": 0.2828130877643465,
-      "2025-07": 0.20577792517385995,
-      "2025-08": 0.3586037865954962,
-      "2025-09": 0.25485536692139843
+      "2025-07": 0.43595443028185077,
+      "2025-08": 0.43369665974463295,
+      "2025-09": 0.43309211088721866,
+      "2025-10": 0.44097093008079713
     }
   }
 }

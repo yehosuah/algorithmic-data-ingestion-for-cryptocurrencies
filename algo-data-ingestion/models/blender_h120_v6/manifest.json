@@ -2,7 +2,7 @@
   "model_path": "blender.joblib",
   "feature_list_path": "blender_features.txt",
   "threshold": {
-    "value": 0.4,
+    "value": 0.5,
     "path": "threshold.txt"
   },
   "report_path": "report.json",
@@ -13,11 +13,11 @@
       "prob_gate_min": 0.4,
       "rvol20_max": 0.0002,
       "min_hold_bars": 1,
-      "long_only": false
+      "long_only": true
     },
     "inference": {
-      "prob_gate_min": 0.8,
-      "rvol20_max": 0.0002,
+      "prob_gate_min": 0.5,
+      "rvol20_max": 0.0005,
       "min_hold_bars": 10,
       "long_only": true
     }
