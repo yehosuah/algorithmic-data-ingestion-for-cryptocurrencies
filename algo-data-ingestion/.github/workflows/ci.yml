@@ -27,8 +27,14 @@ jobs:
           pip install pytest pytest-asyncio
           pip install --extra-index-url https://download.pytorch.org/whl/cpu torch
 
+      - name: Run manifest gating checks
+        run: pytest tests/regression/test_manifest_gating.py
+
+      - name: Run report shortlist gate
+        run: pytest tests/regression/test_report_shortlist.py
+
       - name: Run KPI regression suite
-        run: pytest tests/regression
+        run: pytest tests/regression -k "not manifest_gate_configs_match_reports and not report_shortlist_contains_calmon_candidate"
 
       - name: Run training test suite
         run: pytest tests/training

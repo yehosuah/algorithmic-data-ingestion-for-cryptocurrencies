@@ -33,10 +33,10 @@ def test_load_gate_config_defaults_when_missing(tmp_path):
 def test_compute_gate_mask_inference_defaults():
     df = pd.DataFrame(
         {
-            "hl_spread": [4.5e-4, 6e-4, 4.5e-4],
-            "hl_spread_z": [-0.7, -0.55, -0.7],
-            "rvol_20": [3.5e-5, 3.5e-5, 4.5e-5],
-            "base_prob": [0.9, 0.9, 0.82],
+            "hl_spread": [6e-4, 8e-4, 6e-4],
+            "hl_spread_z": [-0.4, -0.2, -0.3],
+            "rvol_20": [6e-5, 6e-5, 9e-5],
+            "base_prob": [0.82, 0.82, 0.71],
         },
         index=pd.Index([0, 1, 2], name="idx"),
     )

@@ -30,3 +30,24 @@ groups:
     annotations:
       summary: "Low cache hit ratio ({{ $labels.domain }})"
       description: "Hit ratio < 20% over 15m for domain={{ $labels.domain }}."
+- name: model-inference
+  rules:
+  - alert: ModelRSSCoverageDegraded
+    expr: (model_rss_minute_spike_threshold > 0)
+          and on(model)
+          (model_rss_minute_spike_share / model_rss_minute_spike_threshold < 0.98)
+    for: 30m
+    labels: { severity: warning }
+    annotations:
+      summary: "RSS coverage below manifest floor ({{ $labels.model }})"
+      description: "RSS minute spike share is tracking below the manifest floor for model={{ $labels.model }}."
+
+  - alert: ModelProbabilitySigmaLow
+    expr: (model_probability_sigma_threshold > 0)
+          and on(model)
+          (model_probability_sigma < model_probability_sigma_threshold)
+    for: 1h
+    labels: { severity: critical }
+    annotations:
+      summary: "Probability sigma guardrail breached ({{ $labels.model }})"
+      description: "Probability sigma fell below the configured guardrail for model={{ $labels.model }}. Investigate calibration drift before deploying."

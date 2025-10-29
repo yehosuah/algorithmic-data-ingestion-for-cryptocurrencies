@@ -57,10 +57,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--base-dir", default=None, help="Optional path to trained base model; adds base_prob to TCN series inputs")
     ap.add_argument("--horizon", type=int, default=1, help="Prediction horizon in bars for labels and PnL evaluation")
     ap.add_argument("--max-total-turnover", type=float, default=None, help="Maximum total turnover allowed when selecting thresholds")
-    ap.add_argument("--inference-max-spread", type=float, default=5e-4, help="Inference gate: absolute spread ceiling in live trading")
-    ap.add_argument("--inference-max-spread-z", type=float, default=-0.6, help="Inference gate: z-score ceiling using hl_spread_z")
-    ap.add_argument("--inference-max-rvol20", type=float, default=4e-5, help="Inference gate: rvol_20 ceiling")
-    ap.add_argument("--inference-prob-gate", type=float, default=0.85, help="Inference gate: minimum calibrated probability before thresholding")
+    ap.add_argument("--inference-max-spread", type=float, default=7e-4, help="Inference gate: absolute spread ceiling in live trading")
+    ap.add_argument("--inference-max-spread-z", type=float, default=-0.25, help="Inference gate: z-score ceiling using hl_spread_z")
+    ap.add_argument("--inference-max-rvol20", type=float, default=8e-5, help="Inference gate: rvol_20 ceiling")
+    ap.add_argument("--inference-prob-gate", type=float, default=0.72, help="Inference gate: minimum calibrated probability before thresholding")
     ap.add_argument("--inference-min-hold-bars", type=int, default=10, help="Inference gate: minimum hold bars constraint")
     ap.add_argument(
         "--calibration-method",

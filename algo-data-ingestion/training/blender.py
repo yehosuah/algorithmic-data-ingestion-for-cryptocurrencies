@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import joblib
 import numpy as np
@@ -353,6 +353,7 @@ def train_blender(
     threshold_grid: Optional[Sequence[float]] = None,
     long_only: bool = True,
     gate_series: Optional[pd.Series] = None,
+    class_weight: Optional[str] = "balanced",
 ) -> Tuple[CalibratedClassifierCV, float, Dict, List[str]]:
     df_proc = df.reset_index(drop=True)
     min_total_turnover = float(min_total_turnover)
@@ -401,7 +402,14 @@ def train_blender(
     best_thr = 0.0
     best_report: Dict = {}
     grid_reports: List[Dict] = []
-    calibration_cv = max(2, int(calibration_cv))
+    calibration_cv_int = int(calibration_cv) if calibration_cv is not None else 0
+    calibration_cv_int = max(0, calibration_cv_int)
+
+    class_weight_value: Optional[str]
+    if class_weight is None or str(class_weight).strip().lower() in {"none", ""}:
+        class_weight_value = None
+    else:
+        class_weight_value = "balanced"
 
     for ratio in l1_grid:
         clf = LogisticRegression(
@@ -410,18 +418,25 @@ def train_blender(
             solver="saga",
             max_iter=1500,
             tol=1e-3,
-            class_weight="balanced",
+            class_weight=class_weight_value,
             random_state=42,
         )
         pipe = Pipeline([
             ("scaler", StandardScaler()),
             ("clf", clf),
         ])
-        calibrated = CalibratedClassifierCV(pipe, method="sigmoid", cv=calibration_cv, ensemble=False)
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=ConvergenceWarning)
-            calibrated.fit(X.values, y)
-        prob = calibrated.predict_proba(X.values)[:, 1]
+        if calibration_cv_int <= 1:
+            calibrated: Union[CalibratedClassifierCV, Pipeline] = pipe
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=ConvergenceWarning)
+                calibrated.fit(X.values, y)
+            prob = calibrated.predict_proba(X.values)[:, 1]
+        else:
+            calibrated = CalibratedClassifierCV(pipe, method="sigmoid", cv=calibration_cv_int, ensemble=False)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=ConvergenceWarning)
+                calibrated.fit(X.values, y)
+            prob = calibrated.predict_proba(X.values)[:, 1]
         prob_series = pd.Series(prob, index=df_proc.index, name="blender_prob")
         thr, rep = select_prob_threshold(
             df_proc["ret_next"],
@@ -440,7 +455,8 @@ def train_blender(
         rep.update({
             "model_family": "logistic_elastic_net",
             "l1_ratio": float(ratio),
-            "calibration_cv": calibration_cv,
+            "calibration_cv": calibration_cv_int if calibration_cv_int > 1 else "disabled",
+            "class_weight": class_weight_value or "none",
         })
         turnover = float(rep.get("total_turnover", 0.0))
         rep["total_turnover"] = turnover

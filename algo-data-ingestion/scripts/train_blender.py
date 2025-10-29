@@ -76,6 +76,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--rss-gate-column", default="rss_spike_decay_fast", help="Column used to build the RSS activity gate mask.")
     ap.add_argument("--rss-gate-threshold", type=float, default=0.08, help="Gating threshold applied to the RSS gate column (strictly greater activates).")
     ap.add_argument("--disable-rss-gate", action="store_true", help="Disable gating by RSS activity before selecting thresholds.")
+    ap.add_argument(
+        "--class-weight",
+        choices=("balanced", "none"),
+        default="balanced",
+        help="Class weight strategy for the elastic-net blender (default balanced).",
+    )
     args = ap.parse_args(argv)
 
     df = load_parquet_dataset(args.data)
@@ -179,6 +185,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         threshold_grid=threshold_grid,
         long_only=not args.allow_shorts,
         gate_series=gate_series,
+        class_weight=args.class_weight,
     )
     if gate_metadata:
         rep["rss_gate"] = gate_metadata
