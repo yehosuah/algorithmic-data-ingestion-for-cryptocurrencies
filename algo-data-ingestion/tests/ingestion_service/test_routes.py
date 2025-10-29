@@ -211,6 +211,55 @@ async def test_post_market_no_data(async_client, monkeypatch):
     assert body["path"] is None
 
 
+async def test_post_news_rss_success(async_client, monkeypatch, tmp_path):
+    ts = pd.to_datetime(["2025-10-01T00:00:00Z", "2025-10-01T00:05:00Z"], utc=True)
+    df = pd.DataFrame(
+        {
+            "published_at": ts,
+            "id": pd.Series(["n1", "n2"], dtype="string"),
+            "title": pd.Series(["t1", "t2"], dtype="string"),
+            "url": pd.Series(["https://example.com/a", "https://example.com/b"], dtype="string"),
+            "source": pd.Series(["example.com", "example.com"], dtype="string"),
+            "author": pd.Series(["alice", "bob"], dtype="string"),
+            "description": pd.Series(["d1", "d2"], dtype="string"),
+            "dt": pd.Series(["2025-10-01", "2025-10-01"], dtype="string"),
+        }
+    )
+
+    async def fake_fetch(feed_url: str, limit: int = 500):
+        assert feed_url == "https://example.com/rss"
+        return df
+
+    writes = []
+
+    def fake_write(df_in: pd.DataFrame, base: str, partitions: dict, filename: str | None = None):
+        writes.append((df_in.copy(), base, partitions))
+        return f"{base}/dt={df_in['dt'].iloc[0]}/part.parquet"
+
+    async def fake_store(df_in: pd.DataFrame) -> int:
+        return len(df_in)
+
+    monkeypatch.setattr(ingestion_routes, "fetch_news_rss_once", fake_fetch)
+    monkeypatch.setattr(ingestion_routes, "write_to_parquet", fake_write)
+    monkeypatch.setattr(ingestion_routes, "_write_news_features_to_store", fake_store)
+    monkeypatch.setattr(ingestion_routes.settings, "NEWS_PATH", str(tmp_path / "news"), raising=False)
+
+    async with async_client() as client:
+        response = await client.post(
+            "/ingest/news",
+            json={"source_type": "rss", "feed_url": "https://example.com/rss"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["features_written"] == len(df)
+    assert payload["path"].endswith("part.parquet")
+    assert writes, "expected write_to_parquet to be called"
+    _, base, parts = writes[0]
+    assert base.endswith("/rss")
+    assert parts.get("source") == "example.com"
+
 async def test_post_market_write_error(async_client, monkeypatch):
     df = pd.DataFrame(
         {

@@ -6,46 +6,13 @@ import sys
 import json
 from typing import Optional, List
 import pandas as pd
-import httpx
-import feedparser
 from urllib.parse import urlparse
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app.ingestion_service.config import settings
 from app.ingestion_service.utils import write_to_parquet
-from app.ingestion_service.parquet_schemas import NEWS_SCHEMA
-from app.common.time_norm import standardize_time_column, add_dt_partition, coerce_schema
-
-
-async def fetch_rss_once(feed_url: str, limit: int = 200) -> pd.DataFrame:
-    # Some feeds (e.g., Google News) redirect to add region/lang params.
-    # Follow redirects and send a simple User-Agent to avoid blocks.
-    headers = {"User-Agent": "AlgoDataIngestion/1.0 (+https://example.local)"}
-    async with httpx.AsyncClient(follow_redirects=True, headers=headers, timeout=15) as client:
-        resp = await client.get(feed_url)
-        resp.raise_for_status()
-        content = resp.text
-    feed = feedparser.parse(content)
-    rows = []
-    for i, entry in enumerate(feed.entries[:limit]):
-        entry_id = entry.get("id") or entry.get("link") or f"idx-{i}"
-        published_raw = entry.get("published") or entry.get("updated")
-        rows.append({
-            "id": entry_id,
-            "title": entry.get("title"),
-            "url": entry.get("link"),
-            "source": urlparse(entry.get("link") or "").netloc,
-            "author": None,
-            "description": entry.get("summary"),
-            "published_at": published_raw,
-        })
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return df
-    df = standardize_time_column(df, candidates=["published_at", "date"], dest="published_at")
-    df = coerce_schema(df, NEWS_SCHEMA)
-    add_dt_partition(df, ts_col="published_at")
-    return df
+from app.common.time_norm import add_dt_partition
+from app.adapters.news_adapter import fetch_news_rss_once
 
 
 async def _enrich_sentiment(df: pd.DataFrame, *, mode: str, ml_base_url: str, model_id: str, batch_size: int = 64) -> pd.DataFrame:
@@ -120,7 +87,7 @@ async def _enrich_sentiment(df: pd.DataFrame, *, mode: str, ml_base_url: str, mo
 
 
 async def main_async(args) -> int:
-    df = await fetch_rss_once(args.feed, args.limit)
+    df = await fetch_news_rss_once(args.feed, limit=args.limit)
     if df.empty:
         print("No entries fetched.")
         return 0

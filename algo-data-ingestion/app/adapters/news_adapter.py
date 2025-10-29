@@ -6,9 +6,11 @@ import feedparser
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from urllib.parse import urlparse
 import pandas as pd
 from prometheus_client import Counter, CollectorRegistry
 from app.common.time_norm import standardize_time_column, add_dt_partition, coerce_schema, to_utc_dt
+from app.ingestion_service.parquet_schemas import NEWS_SCHEMA
 
 _METRICS_REGISTRY = CollectorRegistry()
 
@@ -132,6 +134,54 @@ async def fetch_news_api(*args, **kwargs) -> pd.DataFrame:
         until_utc = pd.Timestamp(until, tz="UTC") if not isinstance(until, pd.Timestamp) else (until if until.tzinfo else until.tz_localize("UTC"))
         df = df[df["published_at"] <= until_utc]
 
+    add_dt_partition(df, ts_col="published_at")
+    return df
+
+
+async def fetch_news_rss_once(
+    feed_url: str,
+    *,
+    limit: int = 200,
+    http: Optional[httpx.AsyncClient] = None,
+) -> pd.DataFrame:
+    """Fetch a single RSS snapshot and return a normalized DataFrame."""
+    headers = {"User-Agent": "AlgoDataIngestion/1.0 (+https://example.local)"}
+    limit = max(limit, 1)
+
+    if http is None:
+        async with httpx.AsyncClient(follow_redirects=True, headers=headers, timeout=15) as client:
+            resp = await _retry_http(client.get, feed_url)
+    else:
+        resp = await _retry_http(http.get, feed_url, headers=headers)
+
+    resp.raise_for_status()
+    content = resp.text
+
+    try:
+        feed = feedparser.parse(content)
+    except Exception as e:
+        NEWS_PARSE_ERRORS.inc()
+        logger.error(f"RSS parse error in snapshot fetch: {e}")
+        return coerce_schema(pd.DataFrame(), NEWS_SCHEMA)
+
+    rows: List[Dict[str, Any]] = []
+    for idx, entry in enumerate(feed.entries[:limit]):
+        entry_id = entry.get("id") or entry.get("link") or f"idx-{idx}"
+        link = entry.get("link") or ""
+        published_raw = entry.get("published") or entry.get("updated")
+        rows.append({
+            "id": entry_id,
+            "title": entry.get("title"),
+            "url": link,
+            "source": urlparse(link).netloc,
+            "author": entry.get("author"),
+            "description": entry.get("summary"),
+            "published_at": published_raw,
+        })
+
+    df = pd.DataFrame(rows)
+    df = standardize_time_column(df, candidates=["published_at", "updated", "pubDate"], dest="published_at")
+    df = coerce_schema(df, NEWS_SCHEMA)
     add_dt_partition(df, ts_col="published_at")
     return df
 

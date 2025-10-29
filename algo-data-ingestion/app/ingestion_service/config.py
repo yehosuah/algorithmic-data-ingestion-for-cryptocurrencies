@@ -1,19 +1,22 @@
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from dotenv import load_dotenv
-from typing import Optional
+from typing import Optional, List
+
 load_dotenv()  # this will read your .env into os.environ
+
+
 class Settings(BaseSettings):
-    twitter_api_key: str | None = Field(None, env="TWITTER_API_KEY")
-    twitter_api_secret: str | None = Field(None, env="TWITTER_API_SECRET")
-    twitter_bearer: str | None = Field(None, env="TWITTER_BEARER")
-    reddit_client_id: str | None = Field(None, env="REDDIT_CLIENT_ID")
-    reddit_client_secret: str | None = Field(None, env="REDDIT_CLIENT_SECRET")
-    reddit_user_agent: str | None = Field(None, env="REDDIT_USER_AGENT")
+    twitter_api_key: Optional[str] = Field(None, env="TWITTER_API_KEY")
+    twitter_api_secret: Optional[str] = Field(None, env="TWITTER_API_SECRET")
+    twitter_bearer: Optional[str] = Field(None, env="TWITTER_BEARER")
+    reddit_client_id: Optional[str] = Field(None, env="REDDIT_CLIENT_ID")
+    reddit_client_secret: Optional[str] = Field(None, env="REDDIT_CLIENT_SECRET")
+    reddit_user_agent: Optional[str] = Field(None, env="REDDIT_USER_AGENT")
     data_lake_path: str = Field("data_lake", env="DATA_LAKE_PATH")
-    news_api_key: str | None = Field(None, env="NEWS_API_KEY")
-    glassnode_api_key: str | None = Field(None, env="GLASSNODE_API_KEY")
-    covalent_api_key: str | None = Field(None, env="COVALENT_API_KEY")
+    news_api_key: Optional[str] = Field(None, env="NEWS_API_KEY")
+    glassnode_api_key: Optional[str] = Field(None, env="GLASSNODE_API_KEY")
+    covalent_api_key: Optional[str] = Field(None, env="COVALENT_API_KEY")
 
     # Data lake paths
     MARKET_PATH: str = Field("data_lake/market", env="MARKET_PATH")
@@ -25,7 +28,7 @@ class Settings(BaseSettings):
     redis_host: str = Field("localhost", env="REDIS_HOST")
     redis_port: int = Field(6379, env="REDIS_PORT")
     redis_db: int = Field(0, env="REDIS_DB")
-    redis_password: str | None = Field(None, env="REDIS_PASSWORD")
+    redis_password: Optional[str] = Field(None, env="REDIS_PASSWORD")
 
     # Feature Store TTL (in seconds)
     feature_ttl_seconds: int = Field(60, env="FEATURE_TTL_SECONDS")
@@ -39,7 +42,7 @@ class Settings(BaseSettings):
     ingest_host: str = Field("0.0.0.0", env="INGEST_HOST")
     ingest_port: int = Field(8000, env="INGEST_PORT")
     #CORS
-    cors_origins: list[str] = Field(["*"], env="CORS_ORIGINS")
+    cors_origins: List[str] = Field(["*"], env="CORS_ORIGINS")
     #Logging
     log_level: str = Field("INFO", env="LOG_LEVEL")
     #Metrics/Prometheus

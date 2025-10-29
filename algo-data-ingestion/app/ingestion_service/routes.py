@@ -5,6 +5,7 @@ import math
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Any
+from urllib.parse import urlparse
 from app.features.jobs.backfill import backfill_market_once, ttl_sweep_once
 from fastapi import BackgroundTasks
 from fastapi import Security
@@ -39,7 +40,7 @@ from .schemas import (
 from app.adapters.ccxt_adapter import CCXTAdapter
 from app.adapters.onchain_adapter import fetch_glassnode, fetch_covalent
 from app.adapters.reddit_adapter import fetch_reddit_api, fetch_pushshift
-from app.adapters.news_adapter import fetch_news_api, fetch_news_rss
+from app.adapters.news_adapter import fetch_news_api, fetch_news_rss, fetch_news_rss_once
 from app.adapters.sentiment_adapter import fetch_twitter_sentiment
 from .utils import write_to_parquet
 from app.features.ingestion.ccxt_client import CCXTClient
@@ -57,6 +58,7 @@ from app.ingestion_service import ml_utils
 import fsspec
 import os
 import time
+from app.common.time_norm import add_dt_partition
 
 logger = logging.getLogger(__name__)
 
@@ -471,51 +473,102 @@ async def ingest_social(platform: str, body: SocialIngestRequest):
 
 @router.post("/news", tags=["ingest-news"])
 async def ingest_news(req: NewsIngestRequest):
-    """
-    Ingest news from either an API or an RSS feed.
+    """Ingest news content from the configured source and persist to the lake + feature store."""
+    with ingest_span("news") as span:
+        try:
+            source_type = (req.source_type or "").lower().strip()
+            if source_type not in ("api", "rss"):
+                span.set_status("error")
+                raise HTTPException(status_code=422, detail="source_type must be 'api' or 'rss'")
 
-    This mirrors the style of the other ingest endpoints:
-      - returns 200 on success or when there is simply "no data"
-      - never 5xx just because credentials are missing
-      - consistent response shape: {status, path, features_written}
+            base_root = getattr(settings, "NEWS_PATH", "/app/data_lake/news").rstrip("/")
+            df: Optional[pd.DataFrame]
+            base_path: str
+            partitions_common = {}
 
-    For Phase 2 (no keys yet), this endpoint will typically return `no_data`.
-    Later (Phase 3), wire it to your real fetchers and writer just like social/onchain.
-    """
-    try:
-        # minimal validation consistent with the schema
-        st = (req.source_type or "").lower().strip()
-        if st not in ("api", "rss"):
-            raise HTTPException(status_code=422, detail="source_type must be 'api' or 'rss'")
+            if source_type == "api":
+                category = (req.category or "general").strip() or "general"
+                try:
+                    df = await fetch_news_api(source=category, limit=200)
+                except Exception as e:
+                    span.set_status("error")
+                    raise HTTPException(status_code=502, detail=f"news api fetch failed: {e}")
+                base_path = base_root + "/api"
+                partitions_common["source"] = category.replace(" ", "_")
+            else:
+                if not req.feed_url:
+                    span.set_status("error")
+                    raise HTTPException(status_code=422, detail="feed_url is required when source_type='rss'")
+                try:
+                    df = await fetch_news_rss_once(req.feed_url, limit=500)
+                except Exception as e:
+                    span.set_status("error")
+                    raise HTTPException(status_code=502, detail=f"rss fetch failed: {e}")
+                base_path = base_root + "/rss"
+                host = urlparse(req.feed_url).netloc.replace(":", "-")
+                partitions_common["source"] = host or "rss"
 
-        if st == "api":
-            # Without API keys we won't fetch. Return a safe, consistent payload.
-            # Phase 3: call your real fetcher then write features (same pattern as social/onchain).
-            #   df = fetch_news_api(category=req.category)
-            #   written, path = _write_news_features_to_store(df)  # if/when you add it
-            return JSONResponse(
-                status_code=200,
-                content={"status": "no_data", "path": None, "features_written": 0},
-            )
+            df = df if df is not None else pd.DataFrame()
 
-        # st == "rss"
-        if not req.feed_url:
-            raise HTTPException(status_code=422, detail="feed_url is required when source_type='rss'")
+            if "dt" not in df.columns:
+                add_dt_partition(df, ts_col="published_at")
 
-        # Phase 2: we don't fetch; return safe no_data.
-        # Phase 3: resolve your RSS fetcher + writer here (mirroring social logic).
-        #   df = fetch_news_rss(feed_url=req.feed_url)
-        #   written, path = _write_news_features_to_store(df)
-        return JSONResponse(
-            status_code=200,
-            content={"status": "no_data", "path": None, "features_written": 0},
-        )
+            if not df.empty:
+                df = df[df["dt"].notna() & (df["dt"] != "")].copy()
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        # Keep parity with other endpoints' error style
-        raise HTTPException(status_code=502, detail=f"news ingest failed: {e}")
+            dt_values = sorted([d for d in df.get("dt", pd.Series(dtype="string")).dropna().unique().tolist() if d])
+
+            last_path: Optional[str] = None
+            wrote_any = False
+
+            if not dt_values and not df.empty:
+                dt_values = [None]
+
+            for dt_value in dt_values or []:
+                subset = df if dt_value is None else df[df["dt"] == dt_value]
+                subset = subset.copy()
+                if subset.empty:
+                    continue
+                published = subset.get("published_at")
+                partitions = dict(partitions_common)
+                if published is not None and not published.empty:
+                    try:
+                        ts0 = pd.to_datetime(published.iloc[0], utc=True)
+                        if pd.notna(ts0):
+                            partitions.setdefault("year", int(ts0.year))
+                            partitions.setdefault("month", int(ts0.month))
+                            partitions.setdefault("day", int(ts0.day))
+                    except Exception:
+                        pass
+                try:
+                    path = write_to_parquet(subset, base_path, partitions)
+                except ValueError as ve:
+                    span.set_status("error")
+                    raise HTTPException(status_code=422, detail=str(ve))
+                except Exception as e:
+                    span.set_status("error")
+                    raise HTTPException(status_code=500, detail=f"Write failed: {e}")
+                if path:
+                    last_path = str(path)
+                    wrote_any = True
+
+            features_written = 0
+            if not df.empty:
+                try:
+                    features_written = await _write_news_features_to_store(df)
+                except Exception as e:
+                    logger.warning("News feature write failed", exc_info=e)
+                    features_written = 0
+
+            status = "ok" if wrote_any else "no_data"
+            span.set_status(status)
+            return {"status": status, "path": last_path, "features_written": features_written}
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            span.set_status("error")
+            raise HTTPException(status_code=502, detail=f"news ingest failed: {e}")
 
 # ---------------------------
 # News Search (GET via NewsClient)
