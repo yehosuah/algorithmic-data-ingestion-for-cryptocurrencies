@@ -72,6 +72,25 @@ def _shift(series: pd.Series, group_keys: Optional[pd.Series], periods: int = 1)
     return series.shift(periods)
 
 
+def _infer_stride_from_timestamps(ts: pd.Series) -> int:
+    ts_conv = pd.to_datetime(ts, utc=True, errors="coerce")
+    diffs = ts_conv.diff().dt.total_seconds().dropna()
+    if diffs.empty:
+        return 1
+    finite = diffs[np.isfinite(diffs) & (diffs > 0.0)]
+    if finite.empty:
+        return 1
+    mode = finite.mode(dropna=True)
+    if not mode.empty:
+        candidate = float(mode.iloc[0])
+    else:
+        candidate = float(finite.median())
+    if not np.isfinite(candidate) or candidate <= 0.0:
+        return 1
+    stride = int(round(candidate / 60.0))
+    return max(1, stride)
+
+
 def _augment_blender_frame(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     group_keys: Optional[pd.Series] = out["symbol"] if "symbol" in out.columns else None
@@ -354,6 +373,7 @@ def train_blender(
     long_only: bool = True,
     gate_series: Optional[pd.Series] = None,
     class_weight: Optional[str] = "balanced",
+    gate_smoothing_stride: Optional[int] = None,
 ) -> Tuple[CalibratedClassifierCV, float, Dict, List[str]]:
     df_proc = df.reset_index(drop=True)
     min_total_turnover = float(min_total_turnover)
@@ -366,11 +386,28 @@ def train_blender(
 
     X, cols = build_blender_features(df_proc, use_rss_features=bool(use_rss))
     y = df_proc["y_dir"].astype(int).values
+    gate_smoothing_window = 1
     if gate_series is not None:
         gate_series = pd.Series(gate_series).astype(float).reset_index(drop=True)
         if len(gate_series) != len(df_proc):
             gate_series = gate_series.reindex(df_proc.index)
         gate_series = gate_series.fillna(0.0)
+        if gate_smoothing_stride is None and "timestamp" in df_proc.columns:
+            gate_smoothing_window = _infer_stride_from_timestamps(df_proc["timestamp"])
+        elif gate_smoothing_stride is not None:
+            try:
+                gate_smoothing_window = max(1, int(gate_smoothing_stride))
+            except Exception:
+                gate_smoothing_window = 1
+        if gate_smoothing_window > 1:
+            gate_series = (
+                gate_series.rolling(window=gate_smoothing_window, min_periods=1)
+                .max()
+                .fillna(0.0)
+                .clip(0.0, 1.0)
+            )
+        else:
+            gate_smoothing_window = 1
 
     if threshold_grid is not None:
         grid = np.array([float(x) for x in threshold_grid], dtype=float)
@@ -525,6 +562,7 @@ def train_blender(
     if gate_series is not None:
         gate_series = pd.Series(gate_series).astype(float)
         best_report["gate_mask_share"] = float(gate_series.fillna(0.0).mean())
+        best_report["gate_smoothing_stride"] = int(gate_smoothing_window)
     return best_model, best_thr, best_report, cols
 
 

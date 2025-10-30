@@ -186,6 +186,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         long_only=not args.allow_shorts,
         gate_series=gate_series,
         class_weight=args.class_weight,
+        gate_smoothing_stride=max(1, int(args.tcn_stride)),
     )
     if gate_metadata:
         rep["rss_gate"] = gate_metadata

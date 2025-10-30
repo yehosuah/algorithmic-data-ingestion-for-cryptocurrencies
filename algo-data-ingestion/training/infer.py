@@ -429,19 +429,31 @@ def predict_tcn(df: pd.DataFrame, model: TinyTCN, calib, series_cols: List[str],
     N = len(starts)
     if N == 0:
         return pd.DataFrame(columns=["timestamp", "tcn_prob"])  # not enough data
-    X = np.empty((N, c, L), dtype=np.float32)
-    ts_idx = []
-    for i, start in enumerate(starts):
-        seg = vals[start:start + L, :].T
-        m = seg.mean(axis=1, keepdims=True)
-        s = seg.std(axis=1, keepdims=True) + 1e-6
-        seg = (seg - m) / s
-        X[i] = seg
-        ts_idx.append(start + L)
-
-    with torch.no_grad():
-        logits = model(torch.tensor(X, dtype=torch.float32)).view(-1).cpu().numpy()
-    p = calib.predict_proba(logits.reshape(-1, 1))[:, 1]
+    batch_size = max(256, min(4096, max(1, 8192 // stride)))
+    prob_chunks: List[np.ndarray] = []
+    ts_idx: List[int] = []
+    for offset in range(0, N, batch_size):
+        batch_starts = starts[offset:offset + batch_size]
+        batch_len = len(batch_starts)
+        if batch_len == 0:
+            continue
+        X_batch = np.empty((batch_len, c, L), dtype=np.float32)
+        ts_batch: List[int] = []
+        for i, start in enumerate(batch_starts):
+            seg = vals[start:start + L, :].T
+            m = seg.mean(axis=1, keepdims=True)
+            s = seg.std(axis=1, keepdims=True) + 1e-6
+            seg = (seg - m) / s
+            X_batch[i] = seg
+            ts_batch.append(start + L)
+        with torch.no_grad():
+            logits_batch = model(torch.from_numpy(X_batch)).view(-1).cpu().numpy()
+        prob_batch = calib.predict_proba(logits_batch.reshape(-1, 1))[:, 1]
+        prob_chunks.append(prob_batch)
+        ts_idx.extend(ts_batch)
+    if not prob_chunks:
+        return pd.DataFrame(columns=["timestamp", "tcn_prob"])
+    prob = np.concatenate(prob_chunks)
     ts = pd.to_datetime(df["timestamp"], utc=True).iloc[ts_idx].reset_index(drop=True)
-    out = pd.DataFrame({"timestamp": ts, "tcn_prob": p})
+    out = pd.DataFrame({"timestamp": ts, "tcn_prob": prob})
     return out
