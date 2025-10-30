@@ -1,13 +1,13 @@
 {
-  "mean_pnl": 0.000295313912113704,
-  "std_pnl": 0.0014677880661841777,
-  "sharpe": 121.19984682450037,
-  "max_drawdown": 0.21515670433835643,
-  "final_equity": 4.4816890703380645,
-  "avg_turnover": 0.034688156972669935,
-  "total_turnover": 198.0,
-  "toggle_count": 198,
-  "selected_threshold": 0.55,
+  "mean_pnl": 0.00022275163656282877,
+  "std_pnl": 0.0013442134164925012,
+  "sharpe": 99.82382207082175,
+  "max_drawdown": 0.34073614960224585,
+  "final_equity": 3.623668771203621,
+  "avg_turnover": 0.022053756030323914,
+  "total_turnover": 128.0,
+  "toggle_count": 128,
+  "selected_threshold": 0.6000000000000001,
   "criterion": "final_equity",
   "cost_bps": 5.0,
   "spread_scale": 0.0,
@@ -17,8 +17,8 @@
   "min_total_turnover": 4.0,
   "max_total_turnover": 200.0,
   "kpi_schema_version": 1,
-  "oof_count": 5708,
-  "gate_fraction": 0.1355991590749825,
+  "oof_count": 5804,
+  "gate_fraction": 0.08390764989662301,
   "max_spread_z": 0.25,
   "max_rvol20": 0.0002,
   "gate_config": {
@@ -56,27 +56,27 @@
   },
   "diagnostic_final_equity": {
     "0.55": {
-      "final_equity": 4.4816890703380645,
-      "total_turnover": 198.0
+      "final_equity": 3.618380411442159,
+      "total_turnover": 130.0
     },
     "0.6": {
-      "final_equity": 4.4816890703380645,
-      "total_turnover": 198.0
+      "final_equity": 3.623668771203621,
+      "total_turnover": 128.0
     },
     "0.65": {
-      "final_equity": 4.4816890703380645,
-      "total_turnover": 198.0
+      "final_equity": 3.623668771203621,
+      "total_turnover": 128.0
     },
     "0.7": {
-      "final_equity": 4.4816890703380645,
-      "total_turnover": 198.0
+      "final_equity": 3.5214882794331257,
+      "total_turnover": 126.0
     }
   },
   "validation_prob_std_by_month": {
-    "2025-07": 0.43595443028185077,
-    "2025-08": 0.43369665974463295,
-    "2025-09": 0.43309211088721866,
-    "2025-10": 0.44097093008079713
+    "2025-07": 0.4340058581848912,
+    "2025-08": 0.4427397750472214,
+    "2025-09": 0.4282737851589664,
+    "2025-10": 0.44161911107183216
   },
   "prob_sigma_guardrail": {
     "threshold": 0.03,

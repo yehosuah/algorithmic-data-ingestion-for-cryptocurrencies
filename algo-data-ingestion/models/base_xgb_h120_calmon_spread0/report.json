@@ -1,12 +1,12 @@
 {
-  "mean_pnl": 0.00020328254391405585,
-  "std_pnl": 0.0010404094352719068,
-  "sharpe": 117.70023264853545,
+  "mean_pnl": 0.00020198758317365218,
+  "std_pnl": 0.0010367180008672076,
+  "sharpe": 117.36687731910327,
   "max_drawdown": 0.02634637139149243,
   "final_equity": 4.4816890703380645,
-  "avg_turnover": 0.017948262685368886,
-  "total_turnover": 4650.0,
-  "toggle_count": 4650,
+  "avg_turnover": 0.01781965047832095,
+  "total_turnover": 4668.0,
+  "toggle_count": 4668,
   "selected_threshold": 0.55,
   "criterion": "final_equity",
   "cost_bps": 5.0,
@@ -17,34 +17,34 @@
   "min_total_turnover": 2.0,
   "max_total_turnover": null,
   "kpi_schema_version": 1,
-  "oof_count": 259078,
-  "oof_auc": 0.9999989958688636,
-  "gate_fraction": 0.111900663120759,
+  "oof_count": 261958,
+  "oof_auc": 0.9999989889499251,
+  "gate_fraction": 0.11096817047007536,
   "max_spread_z": 0.25,
   "max_rvol20": 0.0002,
   "diagnostic_final_equity": {
     "0.5": {
       "final_equity": 4.4816890703380645,
-      "total_turnover": 4650.0
+      "total_turnover": 4668.0
     },
     "0.55": {
       "final_equity": 4.4816890703380645,
-      "total_turnover": 4650.0
+      "total_turnover": 4668.0
     },
     "0.6": {
       "final_equity": 4.4816890703380645,
-      "total_turnover": 4650.0
+      "total_turnover": 4668.0
     },
     "0.65": {
       "final_equity": 4.4816890703380645,
-      "total_turnover": 4650.0
+      "total_turnover": 4668.0
     }
   },
   "monthly_diagnostics": {
     "2025-05": {
-      "mean_pnl": 0.0001240831542480703,
-      "std_pnl": 0.0008755010830263246,
-      "sharpe": 85.37636370713723,
+      "mean_pnl": 0.00012416781633908263,
+      "std_pnl": 0.0008754355200080844,
+      "sharpe": 85.44101446628818,
       "max_drawdown": 0.02634637139149243,
       "final_equity": 4.4816890703380645,
       "avg_turnover": 0.008646953405017921,
@@ -54,14 +54,14 @@
       "gate_fraction": 0.047737455197132614
     },
     "2025-06": {
-      "mean_pnl": 0.0002148269283522594,
-      "std_pnl": 0.0010798203924532377,
-      "sharpe": 119.84466627853357,
+      "mean_pnl": 0.00021467496666004,
+      "std_pnl": 0.0010799072354952428,
+      "sharpe": 119.75026125103047,
       "max_drawdown": 0.020039234382620563,
       "final_equity": 4.4816890703380645,
-      "avg_turnover": 0.018518518518518517,
-      "total_turnover": 800.0,
-      "toggle_count": 800,
+      "avg_turnover": 0.018564814814814815,
+      "total_turnover": 802.0,
+      "toggle_count": 802,
       "n_samples": 43200,
       "gate_fraction": 0.11983796296296297
     },
@@ -78,14 +78,14 @@
       "gate_fraction": 0.15024641577060932
     },
     "2025-08": {
-      "mean_pnl": 0.00016951067945069183,
-      "std_pnl": 0.0009837279765948378,
-      "sharpe": 103.80148304993712,
+      "mean_pnl": 0.00016911942804305244,
+      "std_pnl": 0.0009832664552270893,
+      "sharpe": 103.61050595110486,
       "max_drawdown": 0.02721241408815045,
       "final_equity": 4.4816890703380645,
-      "avg_turnover": 0.017338709677419354,
-      "total_turnover": 774.0,
-      "toggle_count": 774,
+      "avg_turnover": 0.017293906810035842,
+      "total_turnover": 772.0,
+      "toggle_count": 772,
       "n_samples": 44640,
       "gate_fraction": 0.10582437275985664
     },
@@ -102,16 +102,16 @@
       "gate_fraction": 0.19479166666666667
     },
     "2025-10": {
-      "mean_pnl": 0.00018560162449160727,
-      "std_pnl": 0.0011427406805646827,
-      "sharpe": 97.83981016281912,
+      "mean_pnl": 0.0001791639140948565,
+      "std_pnl": 0.0011147985372545344,
+      "sharpe": 96.81344357752302,
       "max_drawdown": 0.01459547625580404,
       "final_equity": 4.4816890703380645,
-      "avg_turnover": 0.010991279219773982,
-      "total_turnover": 426.0,
-      "toggle_count": 426,
-      "n_samples": 38758,
-      "gate_fraction": 0.047396666494659165
+      "avg_turnover": 0.010663336375426293,
+      "total_turnover": 444.0,
+      "toggle_count": 444,
+      "n_samples": 41638,
+      "gate_fraction": 0.04599164224986791
     }
   },
   "gate_config": {
