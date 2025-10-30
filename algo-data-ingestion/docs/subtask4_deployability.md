@@ -1,6 +1,6 @@
 # Subtask 4 – Deployability Check
 
-_Last updated: 2025-10-29 15:53 UTC_
+_Last updated: 2025-10-30 16:05 UTC_
 
 ## Models In Scope
 - **Base XGB (H120, Calmon relaxed)** – `models/base_xgb_h120_calmon_spread0`
@@ -10,15 +10,19 @@ _Last updated: 2025-10-29 15:53 UTC_
 - **TCN suite (Calmon relaxed)** – `models/tcn_h{60,120,180}_calmon_relaxed`
   - Horizons 60/120/180 deliver `final_equity` 1.05 / 1.33 / 1.19 with ≤200 toggles. Shared inference gate mirrors the base mask.
   - Oct 2025 replay (`models/oos_replay_summary_latest.json`) still shows zero deployable toggles—decide between widening the manifest further or documenting a TCN fallback while base/blender carry coverage.
+  - `training/infer.predict_tcn` now batches inference by stride, enabling stride‑1 experiments without exhausting memory.
 - **Blender (H120 elastic-net)** – `models/blender_h120_v6`
   - `final_equity 1.84`, Sharpe 28.7, 711 toggles at threshold 0.95, RSS audit passed (daily coverage 82.5 %, minute spike share 0.254).
+  - `report.json` now records `gate_smoothing_stride` (defaults to the training stride) so monitoring can detect smoothing drift.
   - Forward replay using `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` now produces ≈16 % deployable coverage (5 870 toggles) under the eased manifest (`prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`); keep it aligned with the base thresholds.
+  - Sandbox variants (`models/blender_h120_gate_test`, `blender_h120_stride1`, `blender_h120_stride1_v2`) collapse smoothing to one bar, showing coverage can exceed 50 % at the cost of turnover; use them as an upper bound when tuning.
 - **Meta label** – `models/meta_h120_v2` (research only)
   - Equity remains ≈1.0; defer deployment until extended matrix and new barrier configuration restore separation.
 
 ## Data Artifacts
 - `datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet` (plus stats JSON) – Year-wide matrix with intraday RSS spikes, probability momentum, and relaxed gate masks.
 - `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` – Oct 1–Oct 21 2025 window with embedded probabilities for forward gate audits.
+- `models/blender_h120_gate_test`, `models/blender_h120_stride1`, `models/blender_h120_stride1_v2` – Stride‑1 sandbox runs quantifying turnover vs coverage when gate smoothing is removed.
 - `models/base_xgb_h120_calmon_spread0/live_gate_coverage.csv` – Monthly coverage baseline for deployable mask.
 - `models/oos_replay_summary_latest.json`, `models/tcn_gate_replay_summary.json` – Training vs inference gate diagnostics for base/TCN/blender (latest thresholds).
 - `models/oos_replay_oct_nov_2025.json` – Archived zero-coverage replay kept for regression comparisons.
@@ -28,7 +32,7 @@ _Last updated: 2025-10-29 15:53 UTC_
 ## Deployment Readiness Checklist
 1. **Forward Validation** – Replay Oct–Nov 2025 (and beyond) for base, TCN, blender using the deployable gate; keep base/blender at equity ≥1.2 with turnover deviations <±25 % of baseline and either widen the TCN mask or document a fallback so it no longer idles.
 2. **Inference Parity** – Integrate manifest gates + feature lists into the live adapter, add regression tests that compare `training/infer.py` outputs against `report.json` KPIs.
-3. **Monitoring Hooks** – Instrument equity, turnover, gate activation rate, RSS coverage, and probability σ. Alert when:
+3. **Monitoring Hooks** – Instrument equity, turnover, gate activation rate, RSS coverage, probability σ, and the recorded `gate_smoothing_stride`. Alert when:
    - Gate coverage leaves ±2× band for two consecutive days
    - RSS minute spike share <5e-4 or audit `passed=false`
    - Probability σ <0.03 on any validation month
@@ -36,6 +40,6 @@ _Last updated: 2025-10-29 15:53 UTC_
 
 ## Outstanding Work
 - Automate packaging of manifests/artifacts into a release bundle (see `docs/final_stretch_v1.md`).
-- Retune deployable gates (base/TCN/blender) so Oct 2025 forward replay shows non-zero coverage; update manifests once thresholds stabilise.
+- Maintain deployable gates (base/TCN/blender) so Oct 2025 forward replay keeps coverage at the new baseline; document when smoothing or thresholds move and re-run the sandbox comparisons.
 - Extend the blender matrix to new months before reattempting meta-label deployment.
 - Evaluate storage strategy (Git LFS or artifact bucket) for large parquet/model files prior to production handoff.

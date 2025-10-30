@@ -1,6 +1,6 @@
 # Subtask 1 – TCN Turnover Tightening
 
-_Last updated: 2025-10-29 15:53 UTC_
+_Last updated: 2025-10-30 16:05 UTC_
 
 ## Goal
 Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity > 1.0 (5 bps costs).
@@ -39,6 +39,7 @@ Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity
 - Per-fold logits persist (`fold_logits.parquet`), enabling recalibration without rerunning the network.
 - Probability σ guardrail stays above 0.03 across validation months, avoiding the collapse seen with earlier tight gates.
 - Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) mirrors the base retune outcome in reverse: relaxed gate equity holds, yet the deployable mask still produces zero toggles, so thresholds or fallback logic must be revisited before production.
+- `training/infer.predict_tcn` now batches inference by stride, letting us probe stride‑1 gate experiments without exhausting memory.
 
 ## Next Steps
 - Retune the deployable gate (or stage a fallback) so forward windows retain minimal coverage without breaching turnover budgets.

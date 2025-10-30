@@ -1,13 +1,13 @@
 # Algo Data Ingestion – Comprehensive Project Dossier
 
-_Last updated: 2025-10-29 15:53 UTC_
+_Last updated: 2025-10-30 16:05 UTC_
 
 ---
 
 ## 1. Executive Summary
 - **Mission**: Deliver an end-to-end ingestion and modeling platform that converts high-frequency market, social, and news data into actionable trading signals and deploys them through a monitored production stack.
 - **Scope**: Covers data acquisition (API ingest, backfills), feature engineering, supervised learning (XGBoost baseline, Temporal Convolutional Networks), ensemble/meta-label strategies, backtesting & diagnostics, and deployment readiness (FastAPI service, Redis store, scheduler, monitoring).
-- **Current State**: Data pipelines and infrastructure are operational with async route coverage under `tests/ingestion_service` and manifest regression checks in CI. The relaxed-gate Horizon-120 XGB (`final_equity 4.48`), Calmon TCN suite (`final_equity 1.05–1.33`), and elastic-net blender (`final_equity 1.84`) still clear 5 bps costs. Oct–Oct 27 2025 replays show deployable masks diverging: the base manifest now produces a trickle of trades (12 gate hits, 8 toggles, `final_equity 1.23`), the blender delivers 16 % gate coverage after easing its thresholds, while the TCN manifests remain idle—highlighting the need for further gate tuning before launch.
+- **Current State**: Data pipelines and infrastructure are operational with async route coverage under `tests/ingestion_service` and manifest regression checks in CI. The relaxed-gate Horizon-120 XGB (`final_equity 4.48`), Calmon TCN suite (`final_equity 1.05–1.33`), and elastic-net blender (`final_equity 1.84`) still clear 5 bps costs. Oct–Oct 27 2025 replays show deployable masks diverging: the base manifest now produces a trickle of trades (12 gate hits, 8 toggles, `final_equity 1.23`), the blender delivers 16 % gate coverage after easing its thresholds, while the TCN manifests remain idle—highlighting the need for further gate tuning before launch. Blender training now smooths gate masks over the detected stride (recorded as `gate_smoothing_stride`) and sandboxed stride‑1 variants map the turnover trade-off, while inference batches TCN predictions by stride so these experiments remain production-safe.
 - **Immediate Goal**: Close the gating gap before launch (retune inference thresholds or add calibration fallback), extend validation beyond Oct 2025, and decide whether to ship blender + base ensemble alone or wait for a calibrated meta layer once probability spread stabilises.
 
 ---
@@ -138,10 +138,12 @@ _Last updated: 2025-10-29 15:53 UTC_
 ### 7.2 TCN Experiments
 - **Relaxed Calmon suite** – Horizons 60/120/180 all clear 5 bps costs with tight turnover guards (≤200 toggles). Probability variance guardrails remain above the 0.03 threshold, signalling healthy calibration after loosening training gates.
 - **OOS gate audits** – `models/oos_replay_summary_latest.json` and `tcn_gate_replay_summary.json` confirm the deployable TCN masks still collapse coverage (<0.001 %) even after the base/blender retune, informing live expectations and highlighting that retraining can focus on the relaxed gate while keeping deployable safety nets.
+- **Inference batching** – `training/infer.predict_tcn` now processes batches sized by stride, so shrinking stride for deployability experiments no longer exhausts GPU/CPU memory.
 
 ### 7.3 Blender Experiments
 - **v5 (baseline)** – First elastic-net attempt showed modest gains but relied on sparse RSS spikes, limiting deployment appetite.
-- **v6 (current)** – With the expanded matrix (`build_blender_matrix.py` intraday features + probability momentum) the logistic stack reached `final_equity 1.84`, Sharpe 28.7, 711 toggles. `rss_audit` passes with daily coverage 82.5 % and minute spike share 0.254, triggering the internal RSS gate mask recorded in the manifest.
+- **v6 (current)** – With the expanded matrix (`build_blender_matrix.py` intraday features + probability momentum) the logistic stack reached `final_equity 1.84`, Sharpe 28.7, 711 toggles. `rss_audit` passes with daily coverage 82.5 % and minute spike share 0.254, triggering the internal RSS gate mask recorded in the manifest; the run now smooths gate masks over the detected stride and writes `gate_smoothing_stride` to `report.json`.
+- **Stride‑1 sandbox** – `models/blender_h120_gate_test`, `blender_h120_stride1`, and `blender_h120_stride1_v2` collapse the smoothing window to one bar, keeping relaxed equity at 4.48 while pushing gate share into the 52–70 % range; they provide an upper bound for turnover before finalising production manifests.
 - **Forward replay** – `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` (30 201 rows, Oct 1 → Oct 27 2025) and `models/oos_replay_summary_latest.json` capture how the training-vs-inference gates behave on the latest window; the retuned manifest now delivers ≈16 % deployable coverage (5 870 toggles) versus the archived zero-coverage `...oct_nov_2025.json` snapshot.
 
 ### 7.4 Diagnostics & Tooling

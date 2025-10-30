@@ -1,12 +1,13 @@
 # Subtask 3b – Meta-Label Attempt
 
-_Last updated: 2025-10-29 15:53 UTC_
+_Last updated: 2025-10-30 16:05 UTC_
 
 ## Goal
 Train a logistic meta-label filter on horizon-120 signals using the relaxed-gate base/TCN probabilities and the RSS-enriched matrix.
 
-## Observations (2025-10-29)
+## Observations (2025-10-30)
 - Even with the forward replay matrix (`datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`) layered on top of the year-wide build, filtering for rows that satisfy deployable gates still collapses towards a single class—base manifest now supplies only 12 gate hits (8 trades) and all TCN probabilities remain at zero coverage under the strict mask.
+- Blender stride experiments (`models/blender_h120_gate_test`, `blender_h120_stride1`, `blender_h120_stride1_v2`) confirm that collapsing the smoothing window pushes coverage >50 % but requires turnover the meta layer cannot presently justify; the deployable gate stays at ≈16 %.
 - Meta models fitted on the relaxed gate still hover around equity ≈1.0; there is no separation to exploit until the primary models regain coverage under the deployable constraints.
 - `scripts/train_meta_label.py` retains relaxed gate defaults and stride control; artifacts (`models/meta_h120_v2`) remain exploratory and are not deployable.
 

@@ -1,6 +1,6 @@
 # Walkthrough: Implement with Your Datasets
 
-_Last updated: 2025-10-29 15:53 UTC_
+_Last updated: 2025-10-30 16:05 UTC_
 
 This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your own instruments once you have equivalent market + RSS coverage.
 
@@ -14,6 +14,7 @@ This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your
 1. **Market dataset**: reuse `scripts/build_market_dataset.py` to generate your symbol’s feature parquet (ensures consistent `ret_next` and `y_dir` labels).
 2. **RSS aggregation**: ingest feeds via `scripts/rss_to_parquet.py` (or your own collectors). The blender builder depends on daily coverage ≥80 % and minute spike share ≥5e-4.
 3. **Blender matrix**: run `scripts/build_blender_matrix.py`, pointing `--base-dir` / `--tcn-dir` at the calibrated models to backfill probabilities and engineered RSS features. Capture forward audit windows (e.g., Oct 2025) into a dedicated matrix with predictions so you can compare training vs inference gates later.
+   - The stride you select (or that the builder infers) doubles as the blender gate smoothing window and will be persisted as `gate_smoothing_stride` in the resulting report.
 
 ## Step 2 – Base Learner
 - Train with relaxed gate defaults:
@@ -36,6 +37,7 @@ This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your
   - Threshold respects turnover guardrails
   - `report.json` lists meaningful feature weights (probability momentum, RSS spikes, regime features)
 - Adjust `--class-weight` (`balanced` vs `none`) to match your label imbalance; manifests exported from the recipe gate inference at `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10` to retain coverage on forward windows.
+- Inspect the reported `gate_smoothing_stride` (defaults to your stride) and keep sandbox stride‑1 runs handy to understand turnover ceilings before loosening gates.
 
 ## Step 5 – Meta Filter (optional)
 - Once the base + TCN + blender produce non-degenerate probabilities on your data, experiment with `scripts/train_meta_label.py`.
@@ -47,3 +49,4 @@ This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your
 - Monitor RSS coverage and probability variance to trigger fallbacks if data quality dips below thresholds captured in the reports.
 - Run regression guardrails before deployment: `pytest tests/regression -q` keeps manifests aligned with reports and verifies the shortlist; `pytest tests/ingestion_service -q` exercises the async API.
 - Inspect your forward replay equivalent of `models/oos_replay_summary_latest.json`; aim for at least the current baseline (base: 12 gate hits, blender: ≈16 % coverage). If deployable masks fall back to zero, widen thresholds or stage a fallback gate prior to launch (keep an archived zero-coverage snapshot like `...oct_nov_2025.json` for regression).
+- Ensure your inference path uses the updated stride-aware batching in `training/infer.predict_tcn` so experiments with smaller strides do not overload memory.

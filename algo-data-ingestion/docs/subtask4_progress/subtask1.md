@@ -1,6 +1,6 @@
 # Subtask 1 – 120-Bar TCN Turnover Control
 
-_Last updated: 2025-10-29 15:53 UTC_
+_Last updated: 2025-10-30 16:05 UTC_
 
 ## Run
 ```
@@ -30,6 +30,7 @@ _Last updated: 2025-10-29 15:53 UTC_
 - Fold logits now persist, making recalibration and diagnostics reproducible without rerunning the network.
 - Monthly probability σ remains above 0.03, indicating no variance collapse under the relaxed gate.
 - Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) still shows zero deployable trades for TCNs even after the base manifest retune; thresholds or fallback logic must be revisited alongside the base model.
+- `training/infer.predict_tcn` now batches inference by stride, letting us explore stride‑1 gates without exhausting memory.
 
 ## Follow-ups
 1. Retune the deployable gate so forward windows retain minimal coverage without breaching turnover budgets.

@@ -1,6 +1,6 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-10-29 15:53 UTC_
+_Last updated: 2025-10-30 16:05 UTC_
 
 End-to-end ingestion for **market**, **on-chain**, **social**, and **news** data with a Redis feature store, admin backfills/TTL sweeps, a scheduler, and monitoring (Prometheus + Grafana).
 
@@ -40,6 +40,7 @@ docker compose up -d --build
 > Notes
 > - La imagen se construye “lean” por defecto (sin instalar `torch`/`transformers`) para acelerar el build. Si necesitas ML dentro del contenedor, puedes construir con `--build-arg INSTALL_ML=1`.
 > - Sin llaves API, social/news y on-chain pueden devolver `no_data` o errores 401 del proveedor. Con llaves, funcionará scraping real.
+> - Update 2025-10-30: the blender training CLI now smooths gate masks using the TCN stride (or inferred cadence) and `training/infer.py` batches TCN predictions by stride to keep inference stable on long windows.
 
 ---
 

@@ -1,6 +1,6 @@
 # Subtask 2 – Horizon-120 XGB Baseline Refresh
 
-_Last updated: 2025-10-29 15:53 UTC_
+_Last updated: 2025-10-30 16:05 UTC_
 
 ## Run
 ```
@@ -31,9 +31,9 @@ _Last updated: 2025-10-29 15:53 UTC_
 
 ## Deployable Gate Update
 - Manifest inference mask: `hl_spread ≤ 0.0007`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`, long-only. CI now enforces manifest alignment via `tests/regression/test_manifest_gating.py` and shortlist viability via `test_report_shortlist.py`.
-- `live_gate_coverage.csv` confirms monthly coverage within ±1.63× baseline (peak 0.0179 % in Jul 2025) historically, but the Oct 2025 forward replay revealed zero coverage under the deployable mask—update once thresholds are retuned.
+- `live_gate_coverage.csv` confirms monthly coverage within ±1.63× baseline (peak 0.0179 % in Jul 2025) historically, and the Oct 2025 forward replay now records 12 deployable hits (8 trades, `final_equity 1.23`) under the widened mask—treat that coverage as the new floor.
 
 ## Next Steps
-1. Retune the deployable gate so Oct–Nov 2025 forward replay delivers equity ≥1.2 with non-zero coverage and stable turnover.
+1. Monitor the widened manifest so Oct–Nov 2025 forward replay maintains equity ≥1.2 with coverage at or above the new Oct baseline (12 hits) and stable turnover.
 2. Add regression tests that load the manifest into `training/infer.py` and compare KPIs against `report.json`.
 3. Include manifest + coverage CSV in the packaging pipeline for consistent deployment hand-offs.

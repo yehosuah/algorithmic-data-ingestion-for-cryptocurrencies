@@ -1,6 +1,6 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-10-29 15:53 UTC_
+_Last updated: 2025-10-30 16:05 UTC_
 
 This guide walks through the refreshed modeling stack: relaxed-gate retrains for the horizon-120 XGBoost baseline, the Calmon TCN suite, and the elastic-net blender that now clears 5 bps costs with RSS enrichment.
 
@@ -24,6 +24,7 @@ python scripts/build_blender_matrix.py \
 ```
 - Emits a JSON summary (`..._stats.json`) with window start/end and probability means for quick sanity checks.
 - Persists minute/day RSS features, probability momentum (`prob_diff`, `*_mom_1`), and gating fields aligned to the relaxed training mask.
+- The matrix cadence (set by `--tcn-stride` or inferred from timestamps) now controls the blender gate smoothing window, so choose the stride you expect to honour at inference.
 - For forward audits we snapshot `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` (Oct 1–Oct 20 2025, probabilities included); regenerate by rerunning the builder with the desired window and output path.
 
 ## 2. Train Horizon-120 XGBoost (Relaxed Gate)
@@ -67,6 +68,7 @@ python scripts/train_blender.py \
 ```
 - Builds a StandardScaler + LogisticRegressionCV pipeline, sweeps thresholds, and records RSS audits, feature usage, and elastic-net weights.
 - Result: `final_equity ≈ 1.84`, 711 toggles at threshold 0.95 with RSS spike gating automatically noted in `report.json`.
+- Gate masks are smoothed over the stride detected above (defaults to the TCN stride); the chosen window is emitted as `gate_smoothing_stride` in the report, and sandboxed stride‑1 runs (`models/blender_h120_gate_test`, `blender_h120_stride1`, `blender_h120_stride1_v2`) illustrate the turnover impact of reducing smoothing.
 - CLI adds `--class-weight {balanced,none}` (default balanced) and treats `--calibration-cv <= 1` as “no calibration”; the manifest gates inference at `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`, restoring ≈16 % deployable coverage on Oct 2025 data.
 
 ## 5. Compile Deployment Shortlist
@@ -83,6 +85,7 @@ python scripts/report_shortlist.py \
 - Review `models/oos_replay_summary_latest.json` (Oct 1–Oct 27 window) alongside the forward matrix to compare training-vs-inference gate metrics across base, TCN, and blender models.
 - The retuned base manifest now logs 12 deployable gate hits (8 trades, `final_equity 1.23`) and the blender fires 5 870 toggles (`gate_coverage ≈ 16 %`); all TCN manifests remain idle, so widen their thresholds or stage a fallback before promoting to production.
 - Wire the replay into monitoring by feeding batches through `training/infer.py::score_base_with_manifest`; the helper updates Prometheus gauges (`model_gate_coverage_ratio`, `model_rss_minute_spike_share`, `model_probability_sigma`) so coverage drift and probability variance show up on dashboards.
+- `training/infer.predict_tcn` now processes inference in stride-aware batches, preventing memory spikes when experimenting with smaller strides (e.g., the stride‑1 blender tests).
 
 ## 7. Run Regression Suites
 - Ensure manifests stay aligned with their reports and the shortlist keeps surfacing deployable candidates:

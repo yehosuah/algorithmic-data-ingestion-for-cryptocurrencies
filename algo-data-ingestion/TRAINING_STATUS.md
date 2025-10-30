@@ -1,11 +1,11 @@
 # Model Training Status (XGB · TCN · Blender)
 
-_Last updated: 2025-10-29 15:53 UTC_
+_Last updated: 2025-10-30 16:05 UTC_
 
 ## Quick Status
 - **Base XGB (Calmon relaxed gate)** – `models/base_xgb_h120_calmon_spread0` retains `final_equity 4.48`, Sharpe 108, 3.6 k toggles under the relaxed mask, and the manifest now ships a widened deployable profile (`hl_spread ≤ 7e-4`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`). The refreshed Oct 1 – Oct 27 2025 replay (`models/oos_replay_summary_latest.json`) records 12 gate hits, 8 toggles, and `final_equity 1.23`, restoring minimal live coverage.
-- **TCN suite (Calmon relaxed)** – horizons 60/120/180 still clear 5 bps costs (`final_equity` 1.05/1.33/1.19 with ≤200 toggles), but the deployable manifest mirrors the base thresholds and remains idle in the latest replay (zero toggles, gate coverage <0.001 %).
-- **Logistic blender (elastic-net)** – `models/blender_h120_v6` continues to post `final_equity 1.84`, Sharpe 28.7, 711 toggles at threshold 0.95; loosening the manifest to `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10` now yields 5 870 deployable toggles (`gate_coverage ≈ 16 %`) on the Oct 2025 replay.
+- **TCN suite (Calmon relaxed)** – horizons 60/120/180 still clear 5 bps costs (`final_equity` 1.05/1.33/1.19 with ≤200 toggles); the deployable manifest mirrors the base thresholds and remains idle in the latest replay (zero toggles, gate coverage <0.001 %), but `training/infer.predict_tcn` now batches by stride so stride-1 experiments no longer exhaust memory.
+- **Logistic blender (elastic-net)** – `models/blender_h120_v6` continues to post `final_equity 1.84`, Sharpe 28.7, 711 toggles at threshold 0.95; the run now records `gate_smoothing_stride` (defaults to the TCN stride) and fresh stride‑1 prototypes (`models/blender_h120_gate_test`, `blender_h120_stride1`, `blender_h120_stride1_v2`) highlight how collapsing the smoothing window drives gate share into the 52–70 % band while keeping relaxed equity at 4.48.
 - **CI guardrails & monitoring** – `.github/workflows/ci.yml` runs ingestion, regression, and training suites with manifest tests split out; `app/monitoring/model_metrics.py` surfaces gate coverage, RSS share, and probability σ gauges so Prometheus alerts trigger when deployable behaviour drifts.
 
 ## Data Landscape
@@ -31,12 +31,13 @@ _Last updated: 2025-10-29 15:53 UTC_
 
 ## Blender & Meta Label
 - `scripts/build_blender_matrix.py` now builds the RSS-enriched matrix with intraday spike features, exponential decays, probability momentum, and ensures label continuity. Outputs include a JSON summary and leverage `settings.FSSPEC_STORAGE_OPTIONS` for remote stores; the forward replay variant writes `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`.
-- `scripts/train_blender.py` consumes the matrix, standardises features, and runs an elastic-net sweep (`l1_ratio` grid). `models/blender_h120_v6` demonstrates that once RSS spikes are engineered into continuous signals the logistic stack can operate with 711 toggles while keeping the 5 bps cost budget.
+- `scripts/train_blender.py` consumes the matrix, standardises features, and runs an elastic-net sweep (`l1_ratio` grid). `models/blender_h120_v6` demonstrates that once RSS spikes are engineered into continuous signals the logistic stack can operate with 711 toggles while keeping the 5 bps cost budget, and it now smooths gate masks over the detected stride (from `--tcn-stride` or inferred timestamps) while persisting that window as `gate_smoothing_stride` in `report.json`.
+- New sandboxed runs (`models/blender_h120_gate_test`, `blender_h120_stride1`, `blender_h120_stride1_v2`) explore stride‑1 gating to quantify the turnover trade-off when smoothing is removed; gate share surges above 50 %, giving us bounds for production manifests.
 - Forward diagnostics combine the Oct 2025 matrix with `models/oos_replay_summary_latest.json`; the relaxed gate keeps equity >1 while the retuned deployable manifest now fires 5 870 toggles (`gate_coverage ≈ 16 %`), validating the eased thresholds ahead of broader monitoring rollout.
 - `scripts/train_meta_label.py` benefits from the shared relaxed gate yet still lacks a stable decision surface—the current meta artifacts remain placeholders until the blender/base probabilities regain dynamic range on forward months.
 
 ## Operational Follow-Ups
-1. Extend the deployable retune to the TCN suite (or document a fallback) while tracking `model_gate_coverage_ratio` for the base manifest so coverage stays above the new floor.
-2. Thread `training/infer.py`’s `load_manifest_artifacts`/`score_base_with_manifest` helpers through the production API, ensuring Prometheus gauges expose gate coverage, RSS share, and probability σ for every inference batch.
-3. Monitor RSS coverage via the new gauges + alerts and keep the no-RSS fallback path ready when `model_rss_minute_spike_share` drops below the manifest threshold.
-4. Revisit meta-label training only after deployable coverage stabilises across base/TCN/blender; until then prioritise hardening the ensemble and regression checks.
+1. Extend the deployable retune to the TCN suite (or document a fallback) while tracking `model_gate_coverage_ratio` for both the base manifest and the smoothed blender gate so coverage stays above the new floor.
+2. Thread `training/infer.py`’s `load_manifest_artifacts`/`score_base_with_manifest` helpers through the production API, ensuring Prometheus gauges expose gate coverage, RSS share, and probability σ for every inference batch and that stride-aware batching is exercised end-to-end.
+3. Monitor RSS coverage via the new gauges + alerts, keep the no-RSS fallback path ready when `model_rss_minute_spike_share` drops below the manifest threshold, and document when lowering the smoothing stride is acceptable to boost coverage.
+4. Revisit meta-label training only after deployable coverage stabilises across base/TCN/blender (including the stride experiments); until then prioritise hardening the ensemble and regression checks.

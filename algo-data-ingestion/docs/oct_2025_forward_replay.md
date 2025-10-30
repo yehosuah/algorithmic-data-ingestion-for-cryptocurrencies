@@ -1,11 +1,11 @@
 # Oct 2025 Forward Replay – Manifest Refresh (2025-10-27)
 
-_Last updated: 2025-10-29 15:53 UTC_
+_Last updated: 2025-10-30 16:05 UTC_
 
 ## Model Refresh Snapshot
 - `models/base_xgb_h120_calmon_spread0` (deployable manifest `hl_spread ≤ 7e-4`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`) now registers 12 gate hits on Oct 2025 (`toggle_count 8`, deployable `final_equity 1.23`, `gate_coverage 0.00031`).  
 - `models/tcn_h120_calmon_relaxed` shares the same manifest but remains idle out of sample (`gate_hits 0`, `toggle_count 0`, `gate_coverage 0`). Horizons 60/180 behave similarly.  
-- `models/blender_h120_v6` (deployable manifest `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`) delivers 5 870 deployable toggles (`gate_coverage 0.162`, deployable `final_equity 4.48`) while retaining `final_equity 1.84` under the relaxed gate.  
+- `models/blender_h120_v6` (deployable manifest `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`) delivers 5 870 deployable toggles (`gate_coverage 0.162`, deployable `final_equity 4.48`) while retaining `final_equity 1.84` under the relaxed gate and now records `gate_smoothing_stride = 30` in `report.json`.  
 - RSS audit for the replay window remains healthy (daily coverage 100 %, minute spike share ≈1.0e0), confirming the rebuilt RSS lake.
 
 ## Shortlist Status
@@ -16,10 +16,10 @@ Source: `models/oos_replay_summary_latest.json` (38 879 rows, Oct 1 00:00 
 
 - **Base XGB** – relaxed gate coverage 3.64 %; deployable mask now hits 12 bars (`toggle_count 8`, `avg_minutes_between_trades ≈ 10 217`).  
 - **TCN h120** – relaxed gate retains profitability but deployable mask remains idle (`gate_hits 0`, `toggle_count 0`).  
-- **Blender h120** – relaxed gate yields 92 toggles (average 274 min spacing); deployable manifest fires 5 870 trades (`gate_fraction ≈ 16.2 %`, `avg_minutes_between_trades ≈ 12.7`).  
+- **Blender h120** – relaxed gate yields 92 toggles (average 274 min spacing); deployable manifest fires 5 870 trades (`gate_fraction ≈ 16.2 %`, `avg_minutes_between_trades ≈ 12.7`). Sandbox stride‑1 runs (`models/blender_h120_gate_test`, `blender_h120_stride1`, `blender_h120_stride1_v2`) demonstrate coverage >50 % when smoothing is removed, providing an upper-cap turnover reference.
 
 ## Observations & Next Steps
 1. Document the retuned base manifest (thresholds + coverage floor) and add a weekly regression replay that fails when `model_gate_coverage_ratio` for the base drops below the new baseline.  
 2. Extend the retune—or provide a fallback—for the TCN suite; zero deployable hits persist despite the widened thresholds.  
-3. Align shortlist criteria with the refreshed manifest bundle so reviewers see the deployable artifacts that actually ship.  
+3. Align shortlist criteria with the refreshed manifest bundle so reviewers see the deployable artifacts that actually ship and include the recorded `gate_smoothing_stride` in release notes.  
 4. Ensure CI exercises `training/infer.py::score_base_with_manifest` over the replay window and fails when deployable coverage or probability σ violates guardrails.
