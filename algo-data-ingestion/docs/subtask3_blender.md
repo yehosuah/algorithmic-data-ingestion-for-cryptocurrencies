@@ -1,6 +1,6 @@
 # Subtask 3 – Elastic-Net Blender Refresh
 
-_Last updated: 2025-10-30 16:05 UTC_
+_Last updated: 2025-10-31 02:39 UTC_
 
 ## Goal
 Train an elastic-net logistic blender that combines Calmon relaxed base and TCN probabilities with RSS spike features, clearing 5 bps transaction costs while maintaining actionable turnover.
@@ -23,25 +23,24 @@ python scripts/train_blender.py \
 ```
 
 ## Result (`models/blender_h120_v6/report.json`)
-- `final_equity`: **1.837**
-- `sharpe`: 28.7
-- `total_turnover`: 711
-- `selected_threshold`: 0.95
-- `gate_smoothing_stride`: 30 (derived from `--tcn-stride`; reports persist it for monitoring)
-- RSS audit: daily coverage 0.825, minute spike share 0.254 (pass, indicator `rss_spike_presence`)
-- RSS gate applied: `rss_spike_decay_fast ≥ 0.08` (share ≈0.021)
+- `final_equity`: **4.482**
+- `sharpe`: 206.8
+- `total_turnover`: 4 809
+- `selected_threshold`: 0.5
+- RSS audit: daily coverage 0.995, minute spike share 0.991 (pass, indicator `rss_spike_presence`)
+- Deployable manifest: `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10` (long-only).
 - Manifest (`gates.inference`): `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`.
-- Oct 2025 replay: `gate_fraction ≈ 0.162`, `toggle_count 5 870`, deployable `final_equity 4.48`.
+- Oct 2025 replay: `gate_fraction ≈ 0.158`, `toggle_count 6 346`, deployable `final_equity 4.48`.
 
 ## Notes
 - Feature set includes probability momentum (`prob_diff`, `*_mom_1`), RSS spike windows, and volatility deltas. The manifest lists candidate features for transparency.
 - Training pipeline now leverages KPI schema normalization (`training/reporting.ensure_kpi_schema`) so reports align with base/TCN outputs.
 - The matrix stats JSON (`..._rss_latest_stats.json`) provides sanity checks on probability distributions and RSS coverage before fitting.
-- CLI exposes `--class-weight {balanced,none}` and treats `--calibration-cv <= 1` as “no calibration”, matching production’s deterministic requirements.
-- Oct 2025 replay (`models/oos_replay_summary_latest.json`) confirms the eased manifest now delivers 5 870 deployable trades while TCN manifests remain idle; keep blender aligned with base thresholds as they evolve.
-- Sandbox runs (`models/blender_h120_gate_test`, `blender_h120_stride1`, `blender_h120_stride1_v2`) collapse the smoothing window to 1 bar to stress turnover—relaxed equity jumps to 4.48 while gate share exceeds 50 %, giving a ceiling for production manifests.
+- CLI exposes `--class-weight {balanced,none}` and treats `--calibration-cv <= 1` as “no calibration”, matching production’s deterministic requirements. The refreshed `scripts/run_oos_eval.py --family blender` keeps forward replay checks aligned with base/TCN guardrails.
+- Oct 2025 replay (`models/oos_replay_summary_latest.json`) confirms the eased manifest now delivers 6 346 deployable trades while maintaining `final_equity 4.48`; keep blender aligned with base thresholds as they evolve.
+- Sandbox runs (`models/blender_h120_stride1_v2`) collapse the smoothing window to 1 bar to stress turnover—relaxed equity stays at 4.48 while gate share drops to ≈0.2 % with 134 toggles, giving a ceiling for production manifests when smoothing is reduced.
 
 ## Next Steps
-1. Keep blender gating in lockstep with the base manifest so Oct–Nov 2025 maintains equity ≥1.2 with turnover within ±25 % of the 711-toggle baseline; use the stride‑1 sandbox results as the upper bound before widening further when coverage dips below ≈16 %.
+1. Keep blender gating in lockstep with the base manifest so Oct–Nov 2025 maintains equity ≥1.2 with turnover within ±25 % of the 4 809-toggle baseline; use the stride‑1 sandbox results as the turnover ceiling when coverage dips below ≈15.8 %.
 2. Integrate RSS audit thresholds into monitoring; automatically switch to a no-RSS fallback when coverage dips below requirements.
 3. Document feature preprocessing in inference code to mirror StandardScaler + selected columns from the manifest.

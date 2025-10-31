@@ -1,14 +1,14 @@
 # Launch Roadmap – Calmon Stack
 
-_Last updated: 2025-10-30 16:05 UTC_
+_Last updated: 2025-10-31 02:39 UTC_
 
 ## Executive Summary
-- Training gates remain profitable (base `final_equity 4.48`, TCN `1.05–1.33`, blender `1.84`), and the retuned Oct 1–Oct 27 2025 replay (`models/oos_replay_summary_latest.json`) now shows **minimal deployable coverage**: base logs 12 gate hits (8 trades, `final_equity 1.23`), blender fires ≈16 % of bars (5 870 toggles), while TCN manifests remain idle. Blender training now smooths gate masks over the stride (captured as `gate_smoothing_stride`) and stride‑1 sandbox runs expose the turnover bounds for future manifest tweaks.
-- CI now enforces manifest/report alignment and shortlist viability, yet live-readiness hinges on retuning gating thresholds and wiring those predicates into the production API.
-- Launch is gated on restoring minimal deployable coverage, packaging refreshed artifacts (including forward matrices), and finalising monitoring/fallback playbooks.
+- Training gates remain profitable (base `final_equity 4.48`, TCN `1.28/3.62/1.85`, blender `4.48`), and the retuned Oct 1–Oct 28 2025 replay (`models/oos_replay_summary_latest.json`) now shows **deployable coverage across all manifests**: base logs 12 gate hits (8 trades, `final_equity 1.2336`), TCN horizons 60/120/180 clear the guardrail (`gate_coverage 4.73e-4/7.71e-4/4.23e-4` with 4/62/2 toggles), and the eased blender manifest fires ≈15.8 % of bars (6 346 toggles) while the stride‑1 sandbox variant bounds turnover at 134 toggles.
+- CI now enforces manifest/report alignment, shortlist viability, and a forward replay guardrail that fails when TCN deployable coverage drops below 5e-4 or `final_equity` slips under 1.2; wiring those predicates into the production API remains critical.
+- Launch is gated on keeping the new coverage floor stable, packaging refreshed artifacts (including forward matrices + manifests), and finalising monitoring/fallback playbooks.
 
 ## Critical Blockers (Must Resolve Before Cutover)
-- **Deployable gate retune** – Base and blender now clear the coverage hurdle; finish widening or layering the TCN manifests (or ship a fallback mode) so Oct 2025 replay yields sustainable coverage without blowing turnover limits.
+- **Deployable gate stability** – Base, TCN, and blender now clear the coverage hurdle; keep the widened TCN manifests above the 5e-4 floor via the CI guardrail, document fallback modes, and ensure turnover stays within agreed limits as thresholds evolve.
 - **Inference parity** – Mirror the manifest-driven gates inside the FastAPI ingestion/inference path via `training/infer.py::score_base_with_manifest`, exercising the new stride-aware batching in `predict_tcn`, and keep regression tests that replay historical batches tied to the new Prometheus gauges.
 - **Fallback definition** – Document and implement the fallback hierarchy (no-RSS blender, base-only mode) that activates when gating coverage or RSS audits breach thresholds.
 

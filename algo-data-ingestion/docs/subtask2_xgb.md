@@ -1,6 +1,6 @@
 # Subtask 2 – Horizon-120 XGB Baseline
 
-_Last updated: 2025-10-29 15:53 UTC_
+_Last updated: 2025-10-31 02:39 UTC_
 
 ## Goal
 Retrain the base XGBoost classifier on the 2024–2025 minute feed using the relaxed Calmon gate so post-cost equity exceeds 1.0 at 5 bps while preserving a deployable inference mask.
@@ -23,15 +23,15 @@ Retrain the base XGBoost classifier on the 2024–2025 minute feed using the rel
 
 ## Result (`models/base_xgb_h120_calmon_spread0/report.json`)
 - `final_equity`: **4.482**
-- `sharpe`: 108.3
-- `total_turnover`: 3 648 (relaxed gate)
+- `sharpe`: 117.4
+- `total_turnover`: 4 668 (relaxed gate)
 - `selected_threshold`: 0.55
-- RSS audit: daily coverage 0.852, minute spike share 6.5e-4 (pass)
+- RSS audit: daily coverage 1.00, minute spike share 9.92e-1 (pass)
 
 ## Deployable Gate Snapshot
 - Manifest inference mask: `hl_spread ≤ 0.0007`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`, long-only.
 - Monthly coverage replay (see `live_gate_coverage.csv`) remains within ±1.63× baseline, keeping live turnover <0.02 % of bars.
-- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) logs 12 deployable gate hits (8 trades, `final_equity 1.23`) under the retuned manifest—keep the thresholds under review as you expand to new months.
+- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`, 40 201 rows) logs 12 deployable gate hits (8 trades, `final_equity 1.2336`, `gate_coverage 2.99e-4`) under the retuned manifest—keep the thresholds under review as you expand to new months.
 - CI now runs `tests/regression/test_manifest_gating.py` and `test_report_shortlist.py` to keep manifests aligned with reports and highlight KPI regressions automatically.
 
 ## Next Steps

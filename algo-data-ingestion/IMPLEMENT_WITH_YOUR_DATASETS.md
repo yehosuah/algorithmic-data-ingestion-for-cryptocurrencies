@@ -1,6 +1,6 @@
 # Walkthrough: Implement with Your Datasets
 
-_Last updated: 2025-10-30 16:05 UTC_
+_Last updated: 2025-10-31 02:39 UTC_
 
 This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your own instruments once you have equivalent market + RSS coverage.
 
@@ -8,7 +8,7 @@ This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your
 - Market history: `datasets/market_btcusdt_1m_2024_2025.parquet` (2024-01-01 ➜ 2025-10-27, 959 039 bars).
 - RSS-enriched blender matrix: `datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet` (606 121 rows, mirrored as `..._2025-10_rss_latest.parquet`).
 - Baseline models: `models/base_xgb_h120_calmon_spread0`, `models/tcn_h120_calmon_relaxed`
-- Forward replay snapshot: `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` + `models/oos_replay_summary_latest.json` (Oct 1–Oct 27 deployable vs relaxed gate comparison; `...oct_nov_2025.json` kept for regression).
+- Forward replay snapshot: `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` + `models/oos_replay_summary_latest.json` (Oct 1–Oct 28 deployable vs relaxed gate comparison; `...oct_nov_2025.json` kept for regression).
 
 ## Step 1 – Feature Engineering
 1. **Market dataset**: reuse `scripts/build_market_dataset.py` to generate your symbol’s feature parquet (ensures consistent `ret_next` and `y_dir` labels).
@@ -47,6 +47,7 @@ This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your
 - Use `scripts/report_shortlist.py` to summarise candidates.
 - Replay live coverage with the manifest gates (`live_gate_coverage.csv` pattern) and integrate `training/infer.py::score_base_with_manifest` into your inference stack so Prometheus gauges (`model_gate_coverage_ratio`, `model_rss_minute_spike_share`, `model_probability_sigma`) surface in monitoring.
 - Monitor RSS coverage and probability variance to trigger fallbacks if data quality dips below thresholds captured in the reports.
+- Reproduce the guardrail locally with `scripts/run_oos_eval.py --family {base_xgb,tcn,blender}` to generate forward replay diagnostics; enforce `gate_fraction ≥ 5e-4` and `final_equity ≥ 1.2` for deployable horizons before promoting manifests.
 - Run regression guardrails before deployment: `pytest tests/regression -q` keeps manifests aligned with reports and verifies the shortlist; `pytest tests/ingestion_service -q` exercises the async API.
-- Inspect your forward replay equivalent of `models/oos_replay_summary_latest.json`; aim for at least the current baseline (base: 12 gate hits, blender: ≈16 % coverage). If deployable masks fall back to zero, widen thresholds or stage a fallback gate prior to launch (keep an archived zero-coverage snapshot like `...oct_nov_2025.json` for regression).
+- Inspect your forward replay equivalent of `models/oos_replay_summary_latest.json`; aim for at least the current baseline (base: 12 gate hits, `final_equity 1.2336`, gate coverage 2.99e-4; TCN h60/h120/h180: gate coverage 4.73e-4/7.71e-4/4.23e-4 with toggles 4/62/2; blender: ≈15.8 % coverage with 6 346 toggles). If deployable masks fall back to zero, widen thresholds or stage a fallback gate prior to launch (keep an archived zero-coverage snapshot like `...oct_nov_2025.json` for regression).
 - Ensure your inference path uses the updated stride-aware batching in `training/infer.predict_tcn` so experiments with smaller strides do not overload memory.

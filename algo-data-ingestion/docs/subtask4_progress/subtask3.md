@@ -1,6 +1,6 @@
 # Subtask 3 – Blender Refresh
 
-_Last updated: 2025-10-30 16:05 UTC_
+_Last updated: 2025-10-31 02:39 UTC_
 
 ## Run
 ```
@@ -22,20 +22,19 @@ python scripts/train_blender.py \
 ```
 
 ## Result (`models/blender_h120_v6/report.json`)
-- `final_equity` **1.837**
-- `sharpe` **28.7**
-- `total_turnover` **711** at threshold 0.95
-- `gate_smoothing_stride` **30** (derived from the TCN stride, persisted in `report.json`)
-- RSS audit passed (daily coverage 0.825, minute spike share 0.254); RSS spike gate threshold 0.08 on `rss_spike_decay_fast`.
+- `final_equity` **4.482**
+- `sharpe` **206.8**
+- `total_turnover` **4 809** at threshold 0.5
+- RSS audit passed (daily coverage 0.995, minute spike share 0.991); deployable manifest: `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`.
 
 ## Findings
 - Intraday RSS spike features and probability momentum restored signal diversity; elastic-net fits converge across the l1 ratio grid with identical metrics.
 - KPI schema + shortlist tooling (`training/reporting.ensure_kpi_schema`, `scripts/report_shortlist.py`) make regression checks straightforward.
-- Forward audit artifact `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` is captured for gate analysis; regenerate by re-running the builder over the target window before packaging.
-- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) now fires 5 870 deployable trades (`gate_fraction ≈ 0.162`), confirming the eased manifest stays aligned with the retuned base thresholds.
-- Smoothing now follows the stride specified in training; sandbox runs (`models/blender_h120_gate_test`, `blender_h120_stride1`, `blender_h120_stride1_v2`) collapse it to 1 bar, pushing gate share above 50 % and mapping the turnover ceiling for production manifests.
+- Forward audit artifact `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` (40 201 rows) is captured for gate analysis; regenerate by re-running the builder over the target window before packaging.
+- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) now fires 6 346 deployable trades (`gate_fraction ≈ 0.158`), confirming the eased manifest stays aligned with the retuned base thresholds.
+- Smoothing follows the stride specified in training; sandbox runs (`models/blender_h120_stride1_v2`) collapse it to 1 bar, dropping gate share to ≈0.2 % (134 toggles) while preserving equity, mapping the turnover ceiling for production manifests.
 
 ## Follow-ups
-1. Keep the deployable gate aligned with the base manifest so Oct–Nov 2025 maintains ≈16 % coverage and turnover within ±25 % of the 711-toggle baseline; use the stride‑1 sandbox runs as the upper bound when adjusting smoothing.
+1. Keep the deployable gate aligned with the base manifest so Oct–Nov 2025 maintains ≈15.8 % coverage and turnover within ±25 % of the 4 809-toggle baseline; use the stride‑1 sandbox runs as the upper bound when adjusting smoothing.
 2. Expose RSS audit metrics, gate share, and `gate_smoothing_stride` to monitoring; implement automatic fallback to a no-RSS blender when coverage drops below thresholds.
 3. Document inference feature pipeline (StandardScaler + selected columns) to mirror training behaviour in production.

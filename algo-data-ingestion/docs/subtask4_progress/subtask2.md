@@ -1,6 +1,6 @@
 # Subtask 2 – Horizon-120 XGB Baseline Refresh
 
-_Last updated: 2025-10-30 16:05 UTC_
+_Last updated: 2025-10-31 02:39 UTC_
 
 ## Run
 ```
@@ -20,18 +20,18 @@ _Last updated: 2025-10-30 16:05 UTC_
 
 ## Result (`models/base_xgb_h120_calmon_spread0/report.json`)
 - `final_equity` **4.482**
-- `sharpe` **108.3**
-- `gate_fraction` 0.094 (relaxed training gate)
+- `sharpe` **117.4**
+- `gate_fraction` 0.111 (relaxed training gate)
 - `selected_threshold` 0.55
 
 ## Observations
-- Relaxing the training gate (`hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2e-4`, no prob filter) restored probability variance and kept turnover manageable (3.6 k toggles) during training.
+- Relaxing the training gate (`hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2e-4`, no prob filter) restored probability variance and kept turnover manageable (4.7 k toggles) during training.
 - RSS audit passes; spread stress (`spread_scale ∈ {0,0.05,0.1,0.2}`) leaves equity unchanged, indicating resilience to moderate cost inflation.
-- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) now logs 12 deployable gate hits (8 trades, `final_equity 1.23`), so lock the thresholds in release notes and monitor coverage for drift.
+- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`, 40 201 rows) now logs 12 deployable gate hits (8 trades, `final_equity 1.2336`, `gate_coverage 2.99e-4`), so lock the thresholds in release notes and monitor coverage for drift.
 
 ## Deployable Gate Update
 - Manifest inference mask: `hl_spread ≤ 0.0007`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`, long-only. CI now enforces manifest alignment via `tests/regression/test_manifest_gating.py` and shortlist viability via `test_report_shortlist.py`.
-- `live_gate_coverage.csv` confirms monthly coverage within ±1.63× baseline (peak 0.0179 % in Jul 2025) historically, and the Oct 2025 forward replay now records 12 deployable hits (8 trades, `final_equity 1.23`) under the widened mask—treat that coverage as the new floor.
+- `live_gate_coverage.csv` confirms monthly coverage within ±1.63× baseline (peak 0.0179 % in Jul 2025) historically, and the Oct 2025 forward replay now records 12 deployable hits (8 trades, `final_equity 1.2336`, `gate_coverage 2.99e-4`) under the widened mask—treat that coverage as the new floor.
 
 ## Next Steps
 1. Monitor the widened manifest so Oct–Nov 2025 forward replay maintains equity ≥1.2 with coverage at or above the new Oct baseline (12 hits) and stable turnover.

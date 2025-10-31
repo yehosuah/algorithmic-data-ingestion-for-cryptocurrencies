@@ -1,6 +1,6 @@
 # Subtask 1 – TCN Turnover Tightening
 
-_Last updated: 2025-10-30 16:05 UTC_
+_Last updated: 2025-10-31 02:39 UTC_
 
 ## Goal
 Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity > 1.0 (5 bps costs).
@@ -29,18 +29,18 @@ Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity
 ```
 
 ## Result (`models/tcn_h120_calmon_relaxed/report.json`)
-- `final_equity`: **1.331**
-- `sharpe`: 24.9
-- `total_turnover`: 180 (≤200 target)
-- `selected_threshold`: 0.65
-- Gate coverage (training): 0.0896 under the relaxed mask (`hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2e-4`); deployable inference gate mirrors the base manifest (`hl_spread ≤ 0.0007`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`).
+- `final_equity`: **3.624**
+- `sharpe`: 99.8
+- `total_turnover`: 128 (≤200 target)
+- `selected_threshold`: 0.55
+- Gate coverage (training): 0.0839 under the relaxed mask (`hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2.5e-4`); deployable inference gate now uses the widened thresholds (`hl_spread ≤ 0.0009`, `hl_spread_z ≤ 0.25`, `rvol_20 ≤ 1.8e-4`, `prob ≥ 0.68`, `min_hold 10`).
 
 ## Notes
 - Per-fold logits persist (`fold_logits.parquet`), enabling recalibration without rerunning the network.
 - Probability σ guardrail stays above 0.03 across validation months, avoiding the collapse seen with earlier tight gates.
-- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) mirrors the base retune outcome in reverse: relaxed gate equity holds, yet the deployable mask still produces zero toggles, so thresholds or fallback logic must be revisited before production.
+- Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) now records deployable coverage: `gate_hits 31`, `toggle_count 62`, `gate_fraction 7.71e-4`, `final_equity 1.94`. Keep the CI guardrail (`gate_fraction ≥ 5e-4`, `final_equity ≥ 1.2`) green as thresholds evolve.
 - `training/infer.predict_tcn` now batches inference by stride, letting us probe stride‑1 gate experiments without exhausting memory.
 
 ## Next Steps
-- Retune the deployable gate (or stage a fallback) so forward windows retain minimal coverage without breaching turnover budgets.
+- Maintain the deployable gate above the 5e-4 floor with the guardrail; document fallback behaviour if coverage regresses.
 - Evaluate horizon 60 and 180 siblings for ensemble coverage; document selection criteria alongside manifests.

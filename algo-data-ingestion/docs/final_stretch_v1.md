@@ -1,6 +1,6 @@
 # Final Stretch – Production Checklist (Calmon Stack)
 
-Last updated: 2025-10-30 16:05 UTC
+Last updated: 2025-10-31 02:39 UTC
 
 Scope: Align the relaxed-gate Horizon-120 XGB, Calmon TCN suite, and elastic-net blender for a deployable release, with manifest-driven governance and monitoring.
 
@@ -12,26 +12,26 @@ Scope: Align the relaxed-gate Horizon-120 XGB, Calmon TCN suite, and elastic-net
 - Keep `.github/workflows/ci.yml` green so manifest gating and shortlist regressions (`tests/regression`) stay enforced ahead of release tagging.
 
 ## 2. Base XGBoost (H120 Calmon)
-- **Status**: `final_equity 4.48`, Sharpe 108, relaxed gate coverage 9.4 %. Oct 1–Oct 27 2025 replay now logs 12 deployable gate hits (8 trades, `final_equity 1.23`) under the widened manifest (`hl_spread ≤ 7e-4`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold = 10`).
+- **Status**: `final_equity 4.48`, Sharpe 117, relaxed gate coverage 9.4 %. Oct 1–Oct 28 2025 replay now logs 12 deployable gate hits (8 trades, `final_equity 1.2336`, `gate_coverage 2.99e-4`) under the widened manifest (`hl_spread ≤ 7e-4`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`).
 - **Actions**
   1. Lock the retuned manifest into the release bundle (document thresholds + coverage floor) and schedule a weekly replay to confirm coverage stays above the minimal target.
   2. Extend regression tests to call `training/infer.py::score_base_with_manifest`, asserting gate alignment against `report.json` and the Prometheus gauges emitted by `app/monitoring/model_metrics.py`.
   3. Export coverage alert configs (±2× baseline) for production monitoring with `model_gate_coverage_ratio` thresholds.
 
 ## 3. TCN Suite (H60/H120/H180 Calmon)
-- **Status**: All horizons clear 5 bps costs (`final_equity` 1.05–1.33) with ≤200 toggles and share the retuned deployable mask, but Oct 2025 replay still recorded zero deployable trades—TCN manifests have yet to benefit from the widened thresholds.
+- **Status**: All horizons clear 5 bps costs (`final_equity` 1.28/3.62/1.85) with ≤200 toggles and share the widened deployable mask; Oct 2025 replay now records non-zero coverage (`gate_coverage 4.73e-4/7.71e-4/4.23e-4`, toggles 4/62/2), so the focus shifts to keeping the 5e-4 floor intact without breaching turnover guards.
 - **Actions**
- 1. Decide whether to further widen the TCN manifest (risking turnover) or document a fallback mode (base-only or blender-only) until TCN coverage returns.
+ 1. Keep the widened TCN manifests under the CI guardrail (`gate_fraction ≥ 5e-4`, `final_equity ≥ 1.2`) and document fallback modes should coverage regress.
  2. Bundle `fold_logits.parquet`, calibrator, scaler, and manifests for each horizon; document when to switch horizons.
- 3. Integrate probability σ guardrail (alert <0.03) and gate coverage checks into monitoring so TCN drift surfaces alongside base/blender metrics.
-  4. Exercise the new stride-aware batching in `training/infer.predict_tcn` during staging runs so stride experiments (e.g., stride‑1) remain production-safe.
+ 3. Integrate probability σ guardrail (alert <0.03) and gate coverage checks into monitoring so TCN drift surfaces alongside base/blender metrics (Prometheus rule `TCNGateCoverageUnexpected` now tracks unexpected spikes).
+ 4. Exercise the stride-aware batching in `training/infer.predict_tcn` during staging runs so stride experiments (e.g., stride‑1) remain production-safe.
 
 ## 4. Elastic-Net Blender (H120)
-- **Status**: `final_equity 1.84`, Sharpe 28.7, 711 toggles at threshold 0.95 with RSS spike gate share ≈2 %. Oct 2025 replay now fires 5 870 deployable trades (`gate_coverage ≈ 16 %`) under the eased manifest (`prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`), and `report.json` records `gate_smoothing_stride = 30`; stride‑1 sandbox runs push coverage >50 %, defining the turnover ceiling.
+- **Status**: `final_equity 4.48`, Sharpe 206.8, 4 809 toggles at threshold 0.5 with RSS audit passing at 99 % coverage. Oct 2025 replay fires 6 346 deployable trades (`gate_coverage ≈ 15.8 %`) under the eased manifest (`prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`), and stride‑1 sandbox runs (`blender_h120_stride1_v2`) bound turnover at 134 toggles (`gate_coverage ≈ 0.2 %`).
 - **Actions**
-  1. Verify RSS coverage alerts (minute spike share ≥5e-4, daily coverage ≥0.8). Configure automatic fallback to no-RSS feature set.
-  2. Document feature weights, probability momentum, class weight choice, and gating logic so live scoring can match the training pipeline and explain coverage swings.
-  3. Keep the blender manifest aligned with the latest base thresholds and confirm Oct 2025 replay maintains equity ≥1.2 with turnover within ±25 % of the current run before sign-off; log any smoothing window changes in monitoring.
+ 1. Verify RSS coverage alerts (minute spike share ≥5e-4, daily coverage ≥0.8). Configure automatic fallback to no-RSS feature set.
+ 2. Document feature weights, probability momentum, class weight choice, and gating logic so live scoring can match the training pipeline and explain coverage swings.
+ 3. Keep the blender manifest aligned with the latest base thresholds and confirm Oct 2025 replay maintains equity ≥1.2 with turnover within ±25 % of the current run before sign-off; log any smoothing or stride adjustments in monitoring.
 
 ## 5. Meta Label (Deferred)
 - Training still collapses due to limited dynamic range. Revisit after extending the blender matrix or widening event definitions. Until then, rely on deterministic manifest gates + blender.

@@ -1,6 +1,6 @@
 # Sanity Checks and Optional Improvements
 
-_Last updated: 2025-10-30 16:05 UTC_
+_Last updated: 2025-10-31 02:39 UTC_
 
 This document summarizes quick validation steps for a 2‑week backfill (market + RSS) and tracks optional improvements to reference during iteration.
 
@@ -70,7 +70,8 @@ ML & Evaluation
 - Walk-forward cross-validation across multiple windows, purging and embargoing data.
 - Model zoo: gradient boosting, calibrated probabilities, monotonic constraints, temporal ensembling.
 - PnL-centric validation with the relaxed gate artifacts (`models/base_xgb_h120_calmon_spread0`, `models/tcn_h120_calmon_relaxed`, `models/blender_h120_v6`); regression-test via `scripts/report_shortlist.py` and keep `tests/regression` (manifest gating + shortlist) green in CI.
-- Forward gate audit: replay `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` through `models/oos_replay_summary_latest.json` to confirm deployable masks retain coverage (base regained 12 gate hits, blender ≈16 % coverage; TCN manifests still idle, so plan a fallback/tune-up before shipping).
+- Leverage the refreshed `scripts/run_oos_eval.py --family {base_xgb,tcn,blender}` interface to generate consistent forward replay diagnostics across all manifests (the CI guardrail wraps the TCN family; blender support keeps ensemble audits in sync).
+- Forward gate audit: replay `datasets/blender_matrix_2025-10_to-2025-11_with_preds.parquet` through `models/oos_replay_summary_latest.json` to confirm deployable masks retain coverage (base logs 12 gate hits, blender sustains ≈15.8 % coverage, and the relaxed TCN manifests now clear the guardrail with `gate_coverage 4.73e-4/7.71e-4/4.23e-4` for horizons 60/120/180); keep the archived zero-coverage snapshot for regression.
 - Experiment tracking (MLflow/W&B) and reproducible pipelines.
 - Capture `gate_smoothing_stride` from blender reports (default 30) and use the stride‑1 sandbox runs (`models/blender_h120_gate_test`, `blender_h120_stride1`, `blender_h120_stride1_v2`) to benchmark turnover ceilings before relaxing manifests further.
 
@@ -78,5 +79,5 @@ Serving & Ops
 - Real-time scoring path that mirrors training transformations (avoid skew).
 - Feature monitoring: drift detection, data availability SLAs; hook `app/monitoring/model_metrics.py` gauges (`model_gate_coverage_ratio`, `model_rss_minute_spike_share`, `model_probability_sigma`) into dashboards and alert when thresholds (from manifests) are breached.
 - Hardening: retries/circuit breakers, backpressure on ingest, structured logging.
-- CI hygiene: `.github/workflows/ci.yml` now runs ingestion service E2E tests and KPI regressions; extend it with environment-specific smoke checks as needed.
+- CI hygiene: `.github/workflows/ci.yml` now runs ingestion service E2E tests, KPI regressions, and a forward replay guardrail that calls `scripts/run_oos_eval.py --family tcn --stride 30` for h60/h120/h180 (fails if `gate_fraction < 5e-4` or `final_equity < 1.2`); extend it with environment-specific smoke checks as needed.
 - Exercise the stride-aware batching in `training/infer.predict_tcn` during staging runs so smaller strides do not exhaust memory when evaluating new gates.

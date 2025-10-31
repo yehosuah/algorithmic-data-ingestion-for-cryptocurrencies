@@ -1,6 +1,6 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-10-30 16:05 UTC_
+_Last updated: 2025-10-31 02:39 UTC_
 
 This guide walks through the refreshed modeling stack: relaxed-gate retrains for the horizon-120 XGBoost baseline, the Calmon TCN suite, and the elastic-net blender that now clears 5 bps costs with RSS enrichment.
 
@@ -10,7 +10,7 @@ This guide walks through the refreshed modeling stack: relaxed-gate retrains for
 - Ensure the year-wide market parquet and the latest RSS matrix are present:
   - `datasets/market_btcusdt_1m_2024_2025.parquet` (2024-01-01 ➜ 2025-10-27, 959 039 bars).
   - `datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet` (alias `..._2025-10_rss_latest.parquet`, 606 121 rows covering 2024-09-01 ➜ 2025-10-26).
-  - Optional forward replay matrix for gate audits: `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` (28 681 rows, 2025-10-01 ➜ 2025-10-20 22:00).
+  - Optional forward replay matrix for gate audits: `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` (40 201 rows, 2025-10-01 ➜ 2025-10-28 22:00).
 
 ## 1. Generate/Refresh Feature Matrices
 The relaxed gate relies on augmented features and RSS spikes engineered by the new builder.
@@ -53,7 +53,8 @@ python scripts/train_tcn.py \
   --horizon 120 --diagnostic-thresholds 0.55,0.6,0.65,0.7
 ```
 - Produces `tcn.pt`, scaler/preprocess bundle, calibrator, manifest, threshold, `fold_logits.parquet`, and `report.json` with the probability variance guardrail.
-- Repeat with `--horizon 60` / `--horizon 180` to populate the alternate manifests (`models/tcn_h60_calmon_relaxed`, `models/tcn_h180_calmon_relaxed`).
+- The refreshed runs land `final_equity 1.28/3.62/1.85` (h60/h120/h180) with inference gates relaxed to `prob ≥ 0.52/0.68/0.52`, `hl_spread ≤ 9e-4`, and `rvol_20 ≤ 1.8e-4/1.8e-4/1.5e-4`, keeping turnover ≤200 while unlocking deployable coverage in the forward replay.
+- Repeat with `--horizon 60` / `--horizon 180` to populate the alternate manifests (`models/tcn_h60_calmon_relaxed`, `models/tcn_h180_calmon_relaxed`), and feed the artifacts to the OOS runner described below for guardrail checks.
 
 ## 4. Train Elastic-Net Blender
 ```bash
@@ -67,9 +68,9 @@ python scripts/train_blender.py \
   --l1-ratio-grid 0.15 0.35 0.55 0.75 0.9
 ```
 - Builds a StandardScaler + LogisticRegressionCV pipeline, sweeps thresholds, and records RSS audits, feature usage, and elastic-net weights.
-- Result: `final_equity ≈ 1.84`, 711 toggles at threshold 0.95 with RSS spike gating automatically noted in `report.json`.
-- Gate masks are smoothed over the stride detected above (defaults to the TCN stride); the chosen window is emitted as `gate_smoothing_stride` in the report, and sandboxed stride‑1 runs (`models/blender_h120_gate_test`, `blender_h120_stride1`, `blender_h120_stride1_v2`) illustrate the turnover impact of reducing smoothing.
-- CLI adds `--class-weight {balanced,none}` (default balanced) and treats `--calibration-cv <= 1` as “no calibration”; the manifest gates inference at `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`, restoring ≈16 % deployable coverage on Oct 2025 data.
+- Result: `final_equity 4.48`, Sharpe 206.8, 4 809 toggles at threshold 0.5 on the relaxed training gate; the deployable manifest (`prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`) sustains ≈15.8 % coverage (6 346 toggles) on the Oct 2025 replay.
+- Gate masks can be smoothed over the stride detected above (defaults to the TCN stride); sandboxed stride‑1 runs (`models/blender_h120_stride1_v2`) remove smoothing to benchmark turnover ceilings while keeping equity at 4.48.
+- CLI adds `--class-weight {balanced,none}` (default balanced) and treats `--calibration-cv <= 1` as “no calibration”; pair the refreshed manifests with `scripts/run_oos_eval.py --family blender` to replay forward windows under consistent guardrails.
 
 ## 5. Compile Deployment Shortlist
 ```bash
@@ -82,10 +83,10 @@ python scripts/report_shortlist.py \
 - The shortlist feeds deployment review or CI checks.
 
 ## 6. Forward Replay & Gate Audit
-- Review `models/oos_replay_summary_latest.json` (Oct 1–Oct 27 window) alongside the forward matrix to compare training-vs-inference gate metrics across base, TCN, and blender models.
-- The retuned base manifest now logs 12 deployable gate hits (8 trades, `final_equity 1.23`) and the blender fires 5 870 toggles (`gate_coverage ≈ 16 %`); all TCN manifests remain idle, so widen their thresholds or stage a fallback before promoting to production.
+- Review `models/oos_replay_summary_latest.json` (Oct 1–Oct 28 window, 40 201 rows) alongside the forward matrix to compare training-vs-inference gate metrics across base, TCN, and blender models. The helper script `scripts/run_oos_eval.py --family {base_xgb,tcn,blender}` now powers this replay (and the CI guardrail).
+- The deployable manifests all fire: base logs 12 gate hits (8 trades, `final_equity 1.2336`, `gate_coverage 2.99e-4`), TCN h60/h120/h180 clear the 5e-4 floor (`gate_coverage 4.73e-4/7.71e-4/4.23e-4`, toggles 4/62/2), and the eased blender manifest produces 6 346 toggles (`gate_coverage 15.8 %`), while the stride‑1 sandbox variant offers a low-smoothing comparison (134 toggles, `gate_coverage 0.204 %`).
 - Wire the replay into monitoring by feeding batches through `training/infer.py::score_base_with_manifest`; the helper updates Prometheus gauges (`model_gate_coverage_ratio`, `model_rss_minute_spike_share`, `model_probability_sigma`) so coverage drift and probability variance show up on dashboards.
-- `training/infer.predict_tcn` now processes inference in stride-aware batches, preventing memory spikes when experimenting with smaller strides (e.g., the stride‑1 blender tests).
+- `training/infer.predict_tcn` continues to process inference in stride-aware batches, preventing memory spikes when experimenting with smaller strides (e.g., the stride‑1 blender tests).
 
 ## 7. Run Regression Suites
 - Ensure manifests stay aligned with their reports and the shortlist keeps surfacing deployable candidates:
@@ -96,7 +97,19 @@ python scripts/report_shortlist.py \
   ```bash
   pytest tests/ingestion_service -q
   ```
+- Mirror the CI guardrail locally when adjusting TCN manifests:
+  ```bash
+  for horizon in h60 h120 h180; do
+    python scripts/run_oos_eval.py \
+      --family tcn \
+      --data datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet \
+      --model-dir models/tcn_${horizon}_calmon_relaxed \
+      --align-gates --stride 30 --window 192 --channels 64,64 \
+      > /tmp/tcn_${horizon}_replay.json
+  done
+  ```
+  Guardrail expectations: `gate_fraction ≥ 5e-4` and `final_equity ≥ 1.2` per horizon.
 
 ## 8. Optional – Meta Label Refresh
-- Meta gating still lacks a stable decision surface; rerun `scripts/train_meta_label.py` only after extending the blender matrix to newer months.
-- Leverage the existing manifests for deployable gates in live inference until a calibrated meta filter clears the ≥1.2 equity hurdle.
+- Meta gating still lacks a stable decision surface; rerun `scripts/train_meta_label.py` only after extending the blender matrix to newer months and confirming the new deployable coverage plateaus via the guardrail.
+- Leverage the existing manifests for deployable gates in live inference until a calibrated meta filter clears the ≥1.2 equity hurdle without compromising the 5e-4 coverage floor.

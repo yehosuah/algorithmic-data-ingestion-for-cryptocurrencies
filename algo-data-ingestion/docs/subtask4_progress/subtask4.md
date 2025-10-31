@@ -1,6 +1,6 @@
 # Subtask 4 – Meta-Label Training Refresh
 
-_Last updated: 2025-10-30 16:05 UTC_
+_Last updated: 2025-10-31 02:39 UTC_
 
 ## Run
 ```
@@ -19,11 +19,11 @@ python scripts/train_meta_label.py \
 - `label_pos_frac` ≈0.54 after barrier generation
 
 ## Findings
-- Even with the forward replay matrix (`datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`), filtering to rows that satisfy deployable gates still collapses to a single dominant class—base now contributes only 12 gate hits (8 trades) and TCN/blender probabilities offer limited overlap despite the blender manifest firing 5 870 trades.
-- Blender stride experiments (`models/blender_h120_gate_test`, `blender_h120_stride1`, `blender_h120_stride1_v2`) indicate that shrinking the smoothing window can flood coverage (>50 %) but pushes turnover beyond deployable limits, so the meta layer still sees imbalanced labels.
+- Even with the forward replay matrix (`datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`, 40 201 rows), filtering to rows that satisfy deployable gates still collapses to a single dominant class—base contributes only 12 gate hits (8 trades), TCN horizons add sparse coverage (`gate_hits 4/31/2`), and the blender manifest dominates with 6 346 trades.
+- Blender stride experiments (`models/blender_h120_stride1_v2`) indicate that shrinking the smoothing window can reduce turnover to 134 toggles while maintaining equity, yet the meta layer still sees imbalanced labels.
 - The relaxed gate already suppresses most trades; additional meta gating adds no value until deployable thresholds are retuned to yield meaningful overlap.
 
 ## Next Steps
-1. Wait for deployable gate retuning (especially on the TCN suite) to restore meaningful overlap on forward windows before attempting further meta training; the current stride‑1 sandbox runs are for analysis only.
+1. Wait for deployable gate expansion beyond the current 5e-4 floor (especially on the TCN suite) to restore meaningful overlap on forward windows before attempting further meta training; the current stride‑1 sandbox runs are for analysis only.
 2. Once coverage stabilises, explore asymmetric barrier settings or longer holding periods to diversify labels.
 3. Defer deployment of meta models; rely on manifest gates + blender until a refreshed matrix demonstrates ≥1.2 equity and meaningful turnover after meta filtering.
