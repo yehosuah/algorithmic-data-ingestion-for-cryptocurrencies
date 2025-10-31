@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
@@ -12,6 +13,7 @@ from sklearn.metrics import roc_auc_score
 from .data import ensure_labels
 from .data import sliding_windows
 from .feature_eng import augment_market_features
+from .blender import build_blender_features
 from .infer import (
     DEFAULT_GATE_CONFIG,
     compute_gate_mask,
@@ -311,6 +313,174 @@ def evaluate_base_xgb_oos(
         inference_report=report_infer,
         gate_config=gate_cfg,
         auc=float(auc),
+        diagnostics=diagnostics,
+    )
+
+
+def evaluate_blender_oos(
+    df: pd.DataFrame,
+    *,
+    model_dir: Path,
+    gate_config: Optional[Dict[str, Any]] = None,
+    align_gates: bool = True,
+    cost_bps: float = 5.0,
+    slippage_bps: float = 0.0,
+    spread_col: Optional[str] = "hl_spread",
+    spread_scale: float = 0.0,
+) -> EvaluationSummary:
+    """
+    Evaluate a pre-trained blender model against an OOS dataset using the persisted manifest.
+    """
+    if df.empty:
+        raise ValueError("Input dataframe is empty; cannot run OOS evaluation.")
+
+    model_dir = Path(model_dir)
+    feat_path = model_dir / "blender_features.txt"
+    if not feat_path.exists():
+        raise FileNotFoundError(f"Blender feature list missing: {feat_path}")
+    feature_list = [line.strip() for line in feat_path.read_text().splitlines() if line.strip()]
+    if not feature_list:
+        raise ValueError(f"No blender feature columns declared in {feat_path}")
+
+    model_path = model_dir / "blender.joblib"
+    if not model_path.exists():
+        raise FileNotFoundError(f"Blender model artifact missing: {model_path}")
+    blender_model = joblib.load(model_path)
+
+    threshold_path = model_dir / "threshold.txt"
+    try:
+        threshold_value = float(threshold_path.read_text().strip()) if threshold_path.exists() else 0.5
+    except ValueError:
+        threshold_value = 0.5
+
+    df_proc = ensure_labels(df).copy()
+    if "timestamp" not in df_proc.columns:
+        raise KeyError("Dataset must include a timestamp column for leak-proof folds.")
+    df_proc = augment_market_features(df_proc)
+    df_proc = df_proc.sort_values("timestamp").reset_index(drop=True)
+    rss_audit = social_signal_audit(df_proc)
+
+    X, cols = build_blender_features(df_proc, candidate_cols=feature_list)
+    if X.empty:
+        raise ValueError("Blender feature frame is empty after preprocessing.")
+    prob = blender_model.predict_proba(X.values)[:, 1]
+    prob_series = pd.Series(prob, index=df_proc.index, name="blender_prob")
+    df_proc["blender_prob"] = prob_series
+
+    gate_cfg = _resolve_gate_config(
+        gate_config,
+        align_training_with_inference=align_gates,
+    )
+
+    ret_series = df_proc["ret_next"].astype(float)
+    y_series = df_proc["y_dir"].astype(int)
+    timestamps = pd.to_datetime(df_proc["timestamp"], utc=True, errors="coerce")
+
+    gate_train_series = _build_gate_series(
+        df_proc,
+        prob_series,
+        gate_cfg,
+        mode="training",
+    )
+    gate_infer_series = _build_gate_series(
+        df_proc,
+        prob_series,
+        gate_cfg,
+        mode="inference",
+    )
+
+    spread_series = None
+    if spread_scale != 0.0 and spread_col and spread_col in df_proc.columns:
+        spread_series = df_proc[spread_col].astype(float)
+
+    train_min_hold = int(max(1, gate_cfg.get("training", {}).get("min_hold_bars", 1)))
+    infer_min_hold = int(max(1, gate_cfg.get("inference", {}).get("min_hold_bars", 1)))
+
+    eq_train = equity_curve(
+        ret_series,
+        prob_series,
+        threshold=float(threshold_value),
+        cost_bps=cost_bps,
+        spread_series=spread_series,
+        spread_scale=spread_scale,
+        slippage_bps=slippage_bps,
+        long_only=bool(gate_cfg.get("training", {}).get("long_only", True)),
+        gate_mask=gate_train_series,
+        min_hold_bars=train_min_hold,
+    )
+    eq_infer = equity_curve(
+        ret_series,
+        prob_series,
+        threshold=float(threshold_value),
+        cost_bps=cost_bps,
+        spread_series=spread_series,
+        spread_scale=spread_scale,
+        slippage_bps=slippage_bps,
+        long_only=bool(gate_cfg.get("inference", {}).get("long_only", True)),
+        gate_mask=gate_infer_series,
+        min_hold_bars=infer_min_hold,
+    )
+
+    report_train = summary_stats(eq_train)
+    report_train["gate_fraction"] = float(gate_train_series.mean())
+    report_train["rss_audit"] = rss_audit
+    report_train["oos_count"] = int(len(df_proc))
+    report_train["selected_threshold"] = float(threshold_value)
+    report_train["criterion"] = report_train.get("criterion", "final_equity")
+    report_train["cost_bps"] = float(cost_bps)
+    report_train["spread_scale"] = float(spread_scale)
+    report_train["slippage_bps"] = float(slippage_bps)
+    report_train["long_only"] = bool(gate_cfg.get("training", {}).get("long_only", True))
+    report_train["min_hold_bars"] = train_min_hold
+    if spread_series is not None and spread_col:
+        report_train["spread_column"] = spread_col
+    report_train = ensure_kpi_schema(report_train)
+
+    report_infer = summary_stats(eq_infer)
+    report_infer["gate_fraction"] = float(gate_infer_series.mean())
+    report_infer["rss_audit"] = rss_audit
+    report_infer["oos_count"] = int(len(df_proc))
+    report_infer["selected_threshold"] = float(threshold_value)
+    report_infer["criterion"] = report_infer.get("criterion", "final_equity")
+    report_infer["cost_bps"] = float(cost_bps)
+    report_infer["spread_scale"] = float(spread_scale)
+    report_infer["slippage_bps"] = float(slippage_bps)
+    report_infer["long_only"] = bool(gate_cfg.get("inference", {}).get("long_only", True))
+    report_infer["min_hold_bars"] = infer_min_hold
+    if spread_series is not None and spread_col:
+        report_infer["spread_column"] = spread_col
+    report_infer = ensure_kpi_schema(report_infer)
+
+    try:
+        auc = float(roc_auc_score(y_series, prob_series))
+    except ValueError:
+        auc = float("nan")
+
+    oos_frame = pd.DataFrame(
+        {
+            "timestamp": timestamps.to_numpy(),
+            "prob_calibrated": prob_series.to_numpy(),
+            "prob_uncalibrated": prob_series.to_numpy(),
+            "label": y_series.to_numpy(),
+            "ret_next": ret_series.to_numpy(),
+            "gate_training": gate_train_series.to_numpy(dtype=bool),
+            "gate_inference": gate_infer_series.to_numpy(dtype=bool),
+        }
+    )
+
+    diagnostics: Dict[str, Any] = {
+        "feature_cols": cols,
+        "model_dir": str(model_dir),
+        "threshold": float(threshold_value),
+    }
+
+    return EvaluationSummary(
+        oos_frame=oos_frame,
+        threshold=float(threshold_value),
+        training_report=report_train,
+        inference_report=report_infer,
+        gate_config=gate_cfg,
+        auc=auc,
         diagnostics=diagnostics,
     )
 

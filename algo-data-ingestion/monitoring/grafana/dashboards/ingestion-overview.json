@@ -36,6 +36,31 @@
         { "format": "s" },
         { "format": "short" }
       ]
+    },
+    {
+      "type": "graph",
+      "title": "TCN Deployable Gate Coverage",
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 16 },
+      "lines": true,
+      "targets": [
+        {
+          "expr": "model_gate_coverage_ratio{model=~\"tcn_h(60|120|180)_calmon_relaxed\", mode=\"inference\"}",
+          "legendFormat": "{{model}}"
+        }
+      ],
+      "thresholds": [
+        {
+          "colorMode": "critical",
+          "fill": true,
+          "line": true,
+          "op": "gt",
+          "value": 0.0005
+        }
+      ],
+      "yaxes": [
+        { "format": "percentunit", "label": "coverage" },
+        { "format": "short" }
+      ]
     }
   ]
 }

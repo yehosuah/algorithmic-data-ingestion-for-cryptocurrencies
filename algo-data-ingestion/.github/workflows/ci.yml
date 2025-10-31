@@ -26,6 +26,55 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio
           pip install --extra-index-url https://download.pytorch.org/whl/cpu torch
+      - name: Forward replay guardrail (TCN relaxed suite)
+        run: |
+          set -euo pipefail
+          COMMON_ARGS="--align-gates --stride 30 --window 192 --channels 64,64"
+          for horizon in h60 h120 h180; do
+            model_dir="models/tcn_${horizon}_calmon_relaxed"
+            out_file="tcn_${horizon}_replay.json"
+            echo "Running guardrail for ${model_dir}"
+            python3 scripts/run_oos_eval.py \
+              --family tcn \
+              --data datasets/blender_matrix_2025-10_to-2025-11_with_preds.parquet \
+              --model-dir "${model_dir}" \
+              ${COMMON_ARGS} \
+              > "${out_file}"
+          done
+          python3 - <<'PY' tcn_h60_replay.json tcn_h120_replay.json tcn_h180_replay.json
+import json
+import sys
+from pathlib import Path
+
+THRESHOLD_COV = 5e-4
+THRESHOLD_EQUITY = 1.2
+failures = []
+
+for path_str in sys.argv[1:]:
+    path = Path(path_str)
+    if not path.exists():
+        failures.append(f"{path} did not generate; replay step likely failed.")
+        continue
+    payload = json.loads(path.read_text())
+    label = payload.get("model_dir", path.stem)
+    report = payload.get("inference_report") or {}
+    gate_fraction = report.get("gate_fraction")
+    final_equity = report.get("final_equity")
+    missing = [field for field, value in (("gate_fraction", gate_fraction), ("final_equity", final_equity)) if value is None]
+    if missing:
+        failures.append(f"{label}: missing fields: {', '.join(missing)}")
+        continue
+    if gate_fraction < THRESHOLD_COV:
+        failures.append(f"{label}: gate_fraction {gate_fraction:.6g} fell below {THRESHOLD_COV}")
+    if final_equity < THRESHOLD_EQUITY:
+        failures.append(f"{label}: final_equity {final_equity:.6g} fell below {THRESHOLD_EQUITY}")
+
+if failures:
+    print("Forward replay guardrail failures:", file=sys.stderr)
+    for msg in failures:
+        print(f"- {msg}", file=sys.stderr)
+    sys.exit(1)
+PY
 
       - name: Run manifest gating checks
         run: pytest tests/regression/test_manifest_gating.py

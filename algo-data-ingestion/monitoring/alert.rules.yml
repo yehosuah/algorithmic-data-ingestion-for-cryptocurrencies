@@ -51,3 +51,11 @@ groups:
     annotations:
       summary: "Probability sigma guardrail breached ({{ $labels.model }})"
       description: "Probability sigma fell below the configured guardrail for model={{ $labels.model }}. Investigate calibration drift before deploying."
+
+  - alert: TCNGateCoverageUnexpected
+    expr: model_gate_coverage_ratio{model=~"tcn_h(60|120|180)_calmon_relaxed", mode="inference"} > 0.0005
+    for: 15m
+    labels: { severity: warning }
+    annotations:
+      summary: "TCN deployable gate fired ({{ $labels.model }})"
+      description: "Deployable gate coverage for model={{ $labels.model }} exceeded the zero-coverage baseline (>0.05%) despite the tightened manifest. Revisit the thresholds or confirm this activity is expected."

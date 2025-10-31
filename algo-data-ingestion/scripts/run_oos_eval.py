@@ -20,6 +20,7 @@ from training.eval_pipeline import (
     EvaluationSummary,
     compare_oos_frames,
     evaluate_base_xgb_oos,
+    evaluate_blender_oos,
     evaluate_tcn_oos,
     load_model_gate_config,
 )
@@ -71,10 +72,10 @@ def _sanitize(obj):
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        description="Run leak-proof out-of-sample evaluation for base_xgb or TCN model families.",
+        description="Run leak-proof out-of-sample evaluation for base_xgb, blender, or TCN model families.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    ap.add_argument("--family", choices=("base_xgb", "tcn"), required=True, help="Model family to evaluate.")
+    ap.add_argument("--family", choices=("base_xgb", "tcn", "blender"), required=True, help="Model family to evaluate.")
     ap.add_argument("--data", required=True, help="Path to the evaluation dataset parquet.")
     ap.add_argument("--model-dir", required=True, help="Directory containing the trained model artifacts.")
     ap.add_argument("--save-oos", help="Optional path to save the generated oos_eval parquet.")
@@ -157,7 +158,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             min_total_turnover=float(args.min_total_turnover),
             max_total_turnover=args.max_total_turnover,
         )
-    else:
+    elif args.family == "tcn":
         summary = evaluate_tcn_oos(
             df,
             gate_config=gate_cfg,
@@ -183,6 +184,17 @@ def main(argv: Optional[list[str]] = None) -> int:
             min_total_turnover=float(args.min_total_turnover),
             max_total_turnover=args.max_total_turnover,
             series_cols_override=_parse_series_cols(args.series_cols),
+        )
+    else:
+        summary = evaluate_blender_oos(
+            df,
+            model_dir=model_dir,
+            gate_config=gate_cfg,
+            align_gates=args.align_gates,
+            cost_bps=float(args.cost_bps),
+            slippage_bps=float(args.slippage_bps),
+            spread_col=args.spread_col,
+            spread_scale=float(args.spread_scale),
         )
 
     saved_oos = None
