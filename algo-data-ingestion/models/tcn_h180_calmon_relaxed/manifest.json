@@ -13,16 +13,16 @@
     "training": {
       "hl_spread_max": null,
       "hl_spread_z_max": 0.25,
-      "rvol20_max": 0.0002,
+      "rvol20_max": 0.00025,
       "prob_gate_min": null,
       "min_hold_bars": 10,
       "long_only": true
     },
     "inference": {
-      "hl_spread_max": 0.0007,
-      "hl_spread_z_max": 2.0,
-      "rvol20_max": 0.0012,
-      "prob_gate_min": 0.72,
+      "hl_spread_max": 0.0009,
+      "hl_spread_z_max": 0.0,
+      "rvol20_max": 0.00025,
+      "prob_gate_min": 0.5,
       "min_hold_bars": 10,
       "long_only": true
     }

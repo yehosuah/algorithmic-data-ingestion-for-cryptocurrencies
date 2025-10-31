@@ -272,12 +272,32 @@
       "threshold_penalty": 0.0
     }
   ],
-  "gate_mask_share": 0.7043421833162364,
+  "gate_mask_share": 0.0020398009950248755,
   "gate_smoothing_stride": 1,
   "rss_gate": {
     "enabled": true,
     "column": "rss_spike_decay_fast",
     "threshold": 0.08,
-    "share": 0.7043421833162364
+    "share": 0.0020398009950248755
+  },
+  "gate_config": {
+    "prob_column": "blender_prob",
+    "spread_column": "hl_spread",
+    "training": {
+      "hl_spread_max": null,
+      "hl_spread_z_max": null,
+      "prob_gate_min": 0.45,
+      "rvol20_max": 0.001,
+      "min_hold_bars": 1,
+      "long_only": true
+    },
+    "inference": {
+      "hl_spread_max": null,
+      "hl_spread_z_max": null,
+      "prob_gate_min": 0.5133,
+      "rvol20_max": 0.00018,
+      "min_hold_bars": 10,
+      "long_only": true
+    }
   }
 }

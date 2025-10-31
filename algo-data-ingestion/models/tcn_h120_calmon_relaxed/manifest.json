@@ -3,7 +3,7 @@
   "calibrator_path": "tcn_calibrator.joblib",
   "preprocess_path": "tcn_preproc.joblib",
   "threshold": {
-    "value": 0.6000000000000001,
+    "value": 0.55,
     "path": "threshold.json"
   },
   "report_path": "report.json",
@@ -13,16 +13,16 @@
     "training": {
       "hl_spread_max": null,
       "hl_spread_z_max": 0.25,
-      "rvol20_max": 0.0002,
+      "rvol20_max": 0.00025,
       "prob_gate_min": null,
       "min_hold_bars": 10,
       "long_only": true
     },
     "inference": {
-      "hl_spread_max": 0.0007,
-      "hl_spread_z_max": -0.25,
-      "rvol20_max": 8e-05,
-      "prob_gate_min": 0.72,
+      "hl_spread_max": 0.0009,
+      "hl_spread_z_max": 0.25,
+      "rvol20_max": 0.00025,
+      "prob_gate_min": 0.55,
       "min_hold_bars": 10,
       "long_only": true
     }

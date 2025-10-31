@@ -1,0 +1,86 @@
+{
+  "mean_pnl": 0.00022275163656282877,
+  "std_pnl": 0.0013442134164925012,
+  "sharpe": 99.82382207082175,
+  "max_drawdown": 0.34073614960224585,
+  "final_equity": 3.623668771203621,
+  "avg_turnover": 0.022053756030323914,
+  "total_turnover": 128.0,
+  "toggle_count": 128,
+  "selected_threshold": 0.6000000000000001,
+  "criterion": "final_equity",
+  "cost_bps": 5.0,
+  "spread_scale": 0.0,
+  "slippage_bps": 0.0,
+  "long_only": true,
+  "min_hold_bars": 10,
+  "min_total_turnover": 4.0,
+  "max_total_turnover": 200.0,
+  "kpi_schema_version": 1,
+  "oof_count": 5804,
+  "gate_fraction": 0.08390764989662301,
+  "max_spread_z": 0.25,
+  "max_rvol20": 0.0002,
+  "gate_config": {
+    "spread_column": "hl_spread",
+    "prob_column": "tcn_prob",
+    "training": {
+      "hl_spread_max": null,
+      "hl_spread_z_max": 0.25,
+      "rvol20_max": 0.0002,
+      "prob_gate_min": null,
+      "min_hold_bars": 10,
+      "long_only": true
+    },
+    "inference": {
+      "hl_spread_max": 0.0007,
+      "hl_spread_z_max": -0.25,
+      "rvol20_max": 8e-05,
+      "prob_gate_min": 0.72,
+      "min_hold_bars": 10,
+      "long_only": true
+    }
+  },
+  "rss_audit": {
+    "min_daily_coverage": 0.8,
+    "min_minute_spike_share": 0.0005,
+    "daily_coverage": 0.8516146637381427,
+    "minute_spike_share": 0.0006488041966182035,
+    "passed": true,
+    "reasons": [],
+    "minute_indicator_column": "rss_count_minute",
+    "minute_spike_share_candidates": {
+      "rss_count_minute": 0.0006488041966182035
+    },
+    "fallback_to_no_rss": false
+  },
+  "diagnostic_final_equity": {
+    "0.55": {
+      "final_equity": 3.618380411442159,
+      "total_turnover": 130.0
+    },
+    "0.6": {
+      "final_equity": 3.623668771203621,
+      "total_turnover": 128.0
+    },
+    "0.65": {
+      "final_equity": 3.623668771203621,
+      "total_turnover": 128.0
+    },
+    "0.7": {
+      "final_equity": 3.5214882794331257,
+      "total_turnover": 126.0
+    }
+  },
+  "validation_prob_std_by_month": {
+    "2025-07": 0.4340058581848912,
+    "2025-08": 0.4427397750472214,
+    "2025-09": 0.4282737851589664,
+    "2025-10": 0.44161911107183216
+  },
+  "prob_sigma_guardrail": {
+    "threshold": 0.03,
+    "months_below_threshold": []
+  },
+  "fold_logits_path": "fold_logits.parquet"
+}
