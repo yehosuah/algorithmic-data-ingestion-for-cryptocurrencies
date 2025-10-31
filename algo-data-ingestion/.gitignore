@@ -3,6 +3,10 @@
 # Python virtual environments
 .venv/
 venv/
+.venv_ci/
+venv_ci/
+.venv_ci311/
+venv_ci311/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
