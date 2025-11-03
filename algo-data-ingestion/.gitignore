@@ -19,6 +19,7 @@ __pycache__/
 
 # Environment variables file
 .env
+env
 
 # IDE/editor directories
 .idea/
