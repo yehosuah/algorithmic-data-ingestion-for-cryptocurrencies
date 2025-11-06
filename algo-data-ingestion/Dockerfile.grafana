@@ -1,0 +1,4 @@
+FROM grafana/grafana:10.4.5
+COPY monitoring/grafana/provisioning/datasources /etc/grafana/provisioning/datasources
+COPY monitoring/grafana/provisioning/dashboards /etc/grafana/provisioning/dashboards
+COPY monitoring/grafana/dashboards /var/lib/grafana/dashboards

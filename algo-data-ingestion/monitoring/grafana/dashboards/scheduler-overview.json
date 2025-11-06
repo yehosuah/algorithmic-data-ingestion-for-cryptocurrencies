@@ -1,193 +1,785 @@
 {
-  "uid": "sched-overview",
-  "title": "Scheduler Overview",
-  "schemaVersion": 38,
-  "version": 1,
-  "refresh": "10s",
-  "timezone": "",
-  "panels": [
-    {
-      "type": "stat",
-      "title": "API Up",
-      "id": 1,
-      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 0 },
-      "targets": [
-        { "expr": "scheduler_api_up", "legendFormat": "api_up", "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" } }
-      ],
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "orientation": "horizontal",
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "auto",
-        "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": 0 }, { "color": "green", "value": 1 } ] }
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Job runs /s",
-      "id": 2,
-      "gridPos": { "h": 8, "w": 10, "x": 4, "y": 0 },
-      "targets": [
-        {
-          "expr": "sum by (job_id) (rate(scheduler_job_runs_total[$__rate_interval]))",
-          "legendFormat": "{{job_id}}",
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" }
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Failures /s (by reason)",
-      "id": 3,
-      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 0 },
-      "targets": [
-        {
-          "expr": "sum by (job_id,reason) (rate(scheduler_job_failure_total[$__rate_interval]))",
-          "legendFormat": "{{job_id}} • {{reason}}",
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" }
-        }
-      ]
-    },
-    {
-      "type": "stat",
-      "title": "Success rate (range)",
-      "id": 4,
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 5 },
-      "targets": [
-        {
-          "expr": "100 * sum by (job_id) (increase(scheduler_job_success_total[$__range])) / clamp_min(sum by (job_id) (increase(scheduler_job_success_total[$__range]) + increase(scheduler_job_failure_total[$__range])), 1)",
-          "legendFormat": "{{job_id}}",
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" }
-        }
-      ],
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "orientation": "horizontal",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "textMode": "value_and_name",
-        "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": 0 }, { "color": "yellow", "value": 80 }, { "color": "green", "value": 95 } ] },
-        "fieldOptions": { "defaults": { "unit": "percent" }, "overrides": [] }
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Duration p50 / p95 (s)",
-      "id": 5,
-      "gridPos": { "h": 8, "w": 14, "x": 6, "y": 5 },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.5, sum by (le,job_id) (rate(scheduler_job_duration_seconds_bucket[$__rate_interval])))",
-          "legendFormat": "p50 {{job_id}}",
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" }
-        },
-        {
-          "expr": "histogram_quantile(0.95, sum by (le,job_id) (rate(scheduler_job_duration_seconds_bucket[$__rate_interval])))",
-          "legendFormat": "p95 {{job_id}}",
-          "refId": "B",
-          "datasource": { "type": "prometheus", "uid": "prometheus" }
-        }
-      ],
-      "options": { "legend": { "showLegend": true }, "tooltip": { "mode": "single" }, "fieldOptions": { "defaults": { "unit": "s" }, "overrides": [] } }
-    },
-    {
-      "type": "stat",
-      "title": "Avg duration (5m)",
-      "id": 6,
-      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 5 },
-      "targets": [
-        {
-          "expr": "sum by (job_id) (rate(scheduler_job_duration_seconds_sum[5m])) / sum by (job_id) (rate(scheduler_job_duration_seconds_count[5m]))",
-          "legendFormat": "{{job_id}}",
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" }
-        }
-      ],
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "fieldOptions": { "defaults": { "unit": "s" }, "overrides": [] }
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Last run age (min)",
-      "id": 7,
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 10 },
-      "targets": [
-        {
-          "expr": "(time() - scheduler_job_last_run_timestamp) / 60",
-          "legendFormat": "{{job_id}}",
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" }
-        }
-      ],
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "fieldOptions": { "defaults": { "unit": "m" }, "overrides": [] },
-        "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 }, { "color": "red", "value": 10 } ] }
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Last success age (min)",
-      "id": 8,
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 10 },
-      "targets": [
-        {
-          "expr": "(time() - scheduler_job_last_success_timestamp) / 60",
-          "legendFormat": "{{job_id}}",
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" }
-        }
-      ],
-      "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "fieldOptions": { "defaults": { "unit": "m" }, "overrides": [] },
-        "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 }, { "color": "red", "value": 20 } ] }
-      }
-    },
-    {
-      "type": "table",
-      "title": "Recent failures (5m) — top 5",
-      "id": 9,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
-      "targets": [
-        {
-          "expr": "topk(5, sum by (job_id,reason) (increase(scheduler_job_failure_total[5m])))",
-          "legendFormat": "{{job_id}} • {{reason}}",
-          "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" }
-        }
-      ],
-      "options": { "showHeader": true },
-      "transformations": [ { "id": "organize" } ]
-    }
-  ],
-  "templating": {
+  "annotations": {
     "list": [
       {
-        "name": "job",
-        "label": "Job",
-        "type": "query",
-        "hide": 0,
-        "datasource": { "type": "prometheus", "uid": "prometheus" },
-        "query": "label_values(scheduler_job_runs_total, job_id)",
-        "refresh": 2,
-        "multi": true,
-        "includeAll": true,
-        "allValue": ".*",
-        "current": {}
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "enable": true,
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
       }
     ]
   },
-  "annotations": { "list": [ { "type": "dashboard", "name": "Annotations & Alerts", "enable": true } ] },
-  "time": { "from": "now-6h", "to": "now" },
-  "timepicker": { "refresh_intervals": [ "5s", "10s", "30s", "1m", "5m" ] }
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 2,
+        "w": 2,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "color": "red",
+              "value": 0
+            },
+            {
+              "color": "green",
+              "value": 1
+            }
+          ]
+        },
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "scheduler_api_up",
+          "legendFormat": "api_up",
+          "refId": "A"
+        }
+      ],
+      "title": "API Up",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 2,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (job_id) (rate(scheduler_job_runs_total[$__rate_interval]))",
+          "legendFormat": "{{job_id}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Job runs /s",
+      "type": "timeseries"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 14,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (job_id,reason) (rate(scheduler_job_failure_total[$__rate_interval]))",
+          "legendFormat": "{{job_id}} • {{reason}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Failures /s (by reason)",
+      "type": "timeseries"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 2,
+        "x": 0,
+        "y": 2
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value_and_name",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "color": "red",
+              "value": 0
+            },
+            {
+              "color": "yellow",
+              "value": 80
+            },
+            {
+              "color": "green",
+              "value": 95
+            }
+          ]
+        },
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "100 * sum by (job_id) (increase(scheduler_job_success_total[$__range])) / clamp_min(sum by (job_id) (increase(scheduler_job_success_total[$__range]) + increase(scheduler_job_failure_total[$__range])), 1)",
+          "legendFormat": "{{job_id}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Success rate (range)",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 14,
+        "x": 0,
+        "y": 8
+      },
+      "id": 5,
+      "options": {
+        "fieldOptions": {
+          "defaults": {
+            "unit": "s"
+          },
+          "overrides": []
+        },
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le,job_id) (rate(scheduler_job_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p50 {{job_id}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le,job_id) (rate(scheduler_job_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "p95 {{job_id}}",
+          "refId": "B"
+        }
+      ],
+      "title": "Duration p50 / p95 (s)",
+      "type": "timeseries"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 14,
+        "y": 8
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (job_id) (rate(scheduler_job_duration_seconds_sum[5m])) / sum by (job_id) (rate(scheduler_job_duration_seconds_count[5m]))",
+          "legendFormat": "{{job_id}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg duration (5m)",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "m"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 16
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "color": "green",
+              "value": 0
+            },
+            {
+              "color": "red",
+              "value": 10
+            }
+          ]
+        },
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(time() - scheduler_job_last_run_timestamp) / 60",
+          "legendFormat": "{{job_id}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Last run age (min)",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "m"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 16
+      },
+      "id": 8,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "color": "green",
+              "value": 0
+            },
+            {
+              "color": "red",
+              "value": 20
+            }
+          ]
+        },
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(time() - scheduler_job_last_success_timestamp) / 60",
+          "legendFormat": "{{job_id}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Last success age (min)",
+      "type": "stat"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 9,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "10.4.5",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "topk(5, sum by (job_id,reason) (increase(scheduler_job_failure_total[5m])))",
+          "legendFormat": "{{job_id}} • {{reason}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent failures (5m) — top 5",
+      "transformations": [
+        {
+          "id": "organize"
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Job",
+        "multi": true,
+        "name": "job",
+        "options": [],
+        "query": "label_values(scheduler_job_runs_total, job_id)",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "timezone": "",
+  "title": "Scheduler Overview",
+  "uid": "sched-overview",
+  "version": 1,
+  "weekStart": ""
 }

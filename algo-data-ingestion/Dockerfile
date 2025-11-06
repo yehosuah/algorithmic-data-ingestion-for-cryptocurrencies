@@ -51,6 +51,7 @@ RUN pip install --no-cache-dir \
     tzlocal \
     s3fs \
     gcsfs \
+    xgboost \
     sentence-transformers || true
 
 # Optionally add transformers/torch if requested
@@ -58,6 +59,10 @@ RUN if [ "$INSTALL_ML" = "1" ]; then \
       pip install --no-cache-dir transformers && \
       pip install --no-cache-dir torch || true ; \
     fi
+
+# Stage inference models inside the image so runtime code can operate even when
+# bind mounts are unavailable or flaky.
+COPY models /opt/models
 
 # Copy application code
 COPY . .

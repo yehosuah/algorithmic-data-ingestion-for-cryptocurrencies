@@ -34,7 +34,7 @@ services:
       - HF_HOME=/app/.cache/huggingface
       - SOCIAL_SENTIMENT_ENRICH=0
     volumes:
-      - ./data_lake:/app/data_lake
+      - market-data:/app/data_lake
       - hf-cache:/app/.cache/huggingface
       # - ./secrets:/secrets:ro  # mount GCP SA JSON here and set GOOGLE_APPLICATION_CREDENTIALS
     ports:
@@ -61,11 +61,12 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.prometheus
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring:/etc/prometheus:ro
       - prometheus-data:/prometheus
     depends_on:
       ingestion-api:
@@ -76,16 +77,14 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.grafana
     ports:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-    volumes:
-      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       prometheus:
         condition: service_started
@@ -95,7 +94,7 @@ services:
     build:
       context: .
       args:
-        INSTALL_ML: 0
+        INSTALL_ML: 1
     command: python -m app.scheduler.main
     depends_on:
       ingestion-api:
@@ -108,25 +107,65 @@ services:
       - RUN_ON_START=1
       - SCHED_TZ=UTC
       - SCHED_METRICS_PORT=9002
+      - MODELS_ROOT=/opt/models
+      - DATA_LAKE_ROOT=/app/data_lake/market
+      - DECISION_QUEUE_URL=redis://redis:6379/0
+      - DECISION_QUEUE_KEY=trading:decisions
+      - INFER_DEFAULT_STRIDE=30
+      - INFER_JOBS=[
+          {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":120,"history_minutes":240,"base_model":"base_xgb_h120_calmon_spread0","tcn_model":"tcn_h120_calmon_relaxed","stride":30,"include_features":false,"queue_key":"trading:decisions","cron":"*/1 * * * *"},
+          {"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":120,"history_minutes":240,"base_model":"base_xgb_h120_calmon_spread0","tcn_model":"tcn_h120_calmon_relaxed","stride":30,"include_features":false,"queue_key":"trading:decisions","cron":"*/1 * * * *"},
+          {"exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":120,"history_minutes":240,"base_model":"base_xgb_h120_calmon_spread0","tcn_model":"tcn_h120_calmon_relaxed","stride":30,"include_features":false,"queue_key":"trading:decisions","cron":"*/1 * * * *"}
+        ]
       - MARKET_JOBS=[
-          {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":60,"cron":"*/5 * * * *"},
+          {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":240,"cron":"*/5 * * * *"},
           {"exchange":"binance","symbol":"BTC/USDT","timeframe":"5m","lookback_minutes":360,"cron":"*/15 * * * *"},
-          {"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":60,"cron":"*/5 * * * *"}
+          {"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":240,"cron":"*/5 * * * *"},
+          {"exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":240,"cron":"*/5 * * * *"}
         ]
       - MARKET_INGEST_JOBS=[
-          {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","limit":500,"cron":"*/10 * * * *"},
-          {"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","limit":500,"cron":"*/10 * * * *"}
+          {"exchange":"binance","symbol":"BTC/USDT","granularity":"1m","limit":360,"cron":"*/10 * * * *"},
+          {"exchange":"binance","symbol":"ETH/USDT","granularity":"1m","limit":360,"cron":"*/10 * * * *"},
+          {"exchange":"binance","symbol":"SOL/USDT","granularity":"1m","limit":360,"cron":"*/10 * * * *"}
         ]
       - TTL_SWEEP_CRON=*/15 * * * *
       - TTL_SWEEP_PATTERN=features:market:*
       - TTL_SWEEP_TTL=3600
     ports:
       - "9002:9002"
+    volumes:
+      - market-data:/app/data_lake
+    restart: unless-stopped
+
+  trading:
+    build:
+      context: .
+      args:
+        INSTALL_ML: 1
+    command: python -m app.trading.main
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DECISION_QUEUE_URL=redis://redis:6379/0
+      - DECISION_QUEUE_KEY=trading:decisions
+      - MODELS_ROOT=/opt/models
+      - TRADING_METRICS_PORT=9010
+      - TRADING_STATE_REDIS_URL=redis://redis:6379/0
+      - TRADING_AUDIT_REDIS_URL=redis://redis:6379/0
+    volumes:
+      - market-data:/app/data_lake
+      - ./logs/trading:/app/logs
+    ports:
+      - "9010:9010"
     restart: unless-stopped
 
 volumes:
   redis-data: {}
   prometheus-data: {}
+  market-data: {}
       # S3/GCS (opt-in)
       # AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       # AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}

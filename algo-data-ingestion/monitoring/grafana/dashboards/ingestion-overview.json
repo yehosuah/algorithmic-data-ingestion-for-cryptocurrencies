@@ -1,51 +1,249 @@
 {
-  "title": "Ingestion Overview",
-  "timezone": "browser",
-  "schemaVersion": 39,
-  "version": 1,
-  "refresh": "10s",
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
   "panels": [
     {
-      "type": "stat",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
+      "targets": [
+        {
+          "expr": "rate(parquet_writes_total[5m])",
+          "legendFormat": "writes/s",
+          "refId": "A"
+        }
+      ],
       "title": "Parquet Writes /s",
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
-      "targets": [
-        { "expr": "rate(parquet_writes_total[5m])", "legendFormat": "writes/s" }
-      ]
+      "type": "stat"
     },
     {
-      "type": "stat",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
+      "targets": [
+        {
+          "expr": "rate(parquet_write_errors_total[5m])",
+          "legendFormat": "errors/s",
+          "refId": "A"
+        }
+      ],
       "title": "Parquet Write Errors /s",
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 0 },
-      "targets": [
-        { "expr": "rate(parquet_write_errors_total[5m])", "legendFormat": "errors/s" }
-      ]
+      "type": "stat"
     },
     {
-      "type": "graph",
-      "title": "Parquet Write Latency p95",
-      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 6 },
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "hiddenSeries": false,
+      "id": 3,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
       "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "10.4.5",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(parquet_write_latency_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p95"
+          "legendFormat": "p95",
+          "refId": "A"
         }
       ],
+      "thresholds": [],
+      "timeRegions": [],
+      "title": "Parquet Write Latency p95",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
       "yaxes": [
-        { "format": "s" },
-        { "format": "short" }
-      ]
+        {
+          "format": "s"
+        },
+        {
+          "format": "short"
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
     },
     {
-      "type": "graph",
-      "title": "TCN Deployable Gate Coverage",
-      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 16 },
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 18,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "hiddenSeries": false,
+      "id": 4,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
       "lines": true,
+      "linewidth": 1,
+      "nullPointMode": "null",
+      "options": {
+        "alertThreshold": true
+      },
+      "percentage": false,
+      "pluginVersion": "10.4.5",
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
       "targets": [
         {
           "expr": "model_gate_coverage_ratio{model=~\"tcn_h(60|120|180)_calmon_relaxed\", mode=\"inference\"}",
-          "legendFormat": "{{model}}"
+          "legendFormat": "{{model}}",
+          "refId": "A"
         }
       ],
       "thresholds": [
@@ -57,10 +255,47 @@
           "value": 0.0005
         }
       ],
+      "timeRegions": [],
+      "title": "TCN Deployable Gate Coverage",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "mode": "time",
+        "show": true,
+        "values": []
+      },
       "yaxes": [
-        { "format": "percentunit", "label": "coverage" },
-        { "format": "short" }
-      ]
+        {
+          "format": "percentunit",
+          "label": "coverage"
+        },
+        {
+          "format": "short"
+        }
+      ],
+      "yaxis": {
+        "align": false
+      }
     }
-  ]
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Ingestion Overview",
+  "uid": "af2x3qbkn99moe",
+  "version": 1,
+  "weekStart": ""
 }

@@ -1,0 +1,3 @@
+FROM prom/prometheus:latest
+COPY monitoring/prometheus.yml /etc/prometheus/prometheus.yml
+COPY monitoring/alert.rules.yml /etc/prometheus/alert.rules.yml

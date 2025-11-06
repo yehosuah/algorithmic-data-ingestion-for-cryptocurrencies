@@ -4,58 +4,71 @@ groups:
   - alert: FeatureWritesStalled
     expr: sum by (domain) (rate(feature_writes_total[10m])) <= 0
     for: 10m
-    labels: { severity: warning }
+    labels:
+      severity: warning
     annotations:
-      summary: "Feature writes stalled ({{ $labels.domain }})"
-      description: "No feature writes recorded for domain={{ $labels.domain }} in the last 10 minutes."
-
+      summary: Feature writes stalled ({{ $labels.domain }})
+      description: No feature writes recorded for domain={{ $labels.domain }} in the
+        last 10 minutes.
   - alert: FeatureStoreHighLatencyP99
-    expr: histogram_quantile(
-            0.99,
-            sum by (le, op) (rate(feature_op_latency_seconds_bucket[5m]))
-          ) > 0.25
+    expr: histogram_quantile( 0.99, sum by (le, op) (rate(feature_op_latency_seconds_bucket[5m]))
+      ) > 0.25
     for: 5m
-    labels: { severity: critical }
+    labels:
+      severity: critical
     annotations:
-      summary: "High p99 store latency ({{ $labels.op }})"
-      description: "p99 > 250ms for op={{ $labels.op }} over the last 5 minutes."
-
+      summary: High p99 store latency ({{ $labels.op }})
+      description: p99 > 250ms for op={{ $labels.op }} over the last 5 minutes.
   - alert: FeatureStoreLowHitRatio
-    expr: (
-            sum by (domain) (rate(feature_hits_total[15m])) /
-            clamp_min(sum by (domain) (rate(feature_reads_total[15m])), 1)
-          ) < 0.2
+    expr: ( sum by (domain) (rate(feature_hits_total[15m])) / clamp_min(sum by (domain)
+      (rate(feature_reads_total[15m])), 1) ) < 0.2
     for: 15m
-    labels: { severity: warning }
+    labels:
+      severity: warning
     annotations:
-      summary: "Low cache hit ratio ({{ $labels.domain }})"
-      description: "Hit ratio < 20% over 15m for domain={{ $labels.domain }}."
+      summary: Low cache hit ratio ({{ $labels.domain }})
+      description: Hit ratio < 20% over 15m for domain={{ $labels.domain }}.
 - name: model-inference
   rules:
   - alert: ModelRSSCoverageDegraded
-    expr: (model_rss_minute_spike_threshold > 0)
-          and on(model)
-          (model_rss_minute_spike_share / model_rss_minute_spike_threshold < 0.98)
+    expr: (model_rss_minute_spike_threshold > 0) and on(model) (model_rss_minute_spike_share
+      / model_rss_minute_spike_threshold < 0.98)
     for: 30m
-    labels: { severity: warning }
+    labels:
+      severity: warning
     annotations:
-      summary: "RSS coverage below manifest floor ({{ $labels.model }})"
-      description: "RSS minute spike share is tracking below the manifest floor for model={{ $labels.model }}."
-
+      summary: RSS coverage below manifest floor ({{ $labels.model }})
+      description: RSS minute spike share is tracking below the manifest floor for
+        model={{ $labels.model }}.
   - alert: ModelProbabilitySigmaLow
-    expr: (model_probability_sigma_threshold > 0)
-          and on(model)
-          (model_probability_sigma < model_probability_sigma_threshold)
+    expr: (model_probability_sigma_threshold > 0) and on(model) (model_probability_sigma
+      < model_probability_sigma_threshold)
     for: 1h
-    labels: { severity: critical }
+    labels:
+      severity: critical
     annotations:
-      summary: "Probability sigma guardrail breached ({{ $labels.model }})"
-      description: "Probability sigma fell below the configured guardrail for model={{ $labels.model }}. Investigate calibration drift before deploying."
-
-  - alert: TCNGateCoverageUnexpected
-    expr: model_gate_coverage_ratio{model=~"tcn_h(60|120|180)_calmon_relaxed", mode="inference"} > 0.0005
-    for: 15m
-    labels: { severity: warning }
+      summary: Probability sigma guardrail breached ({{ $labels.model }})
+      description: Probability sigma fell below the configured guardrail for model={{
+        $labels.model }}. Investigate calibration drift before deploying.
+  - alert: TCNGateCoverageLow
+    expr: model_gate_coverage_ratio{model=~"tcn_h(60|120|180)_calmon_relaxed", mode="inference"}
+      < 5e-4
+    for: 30m
+    labels:
+      severity: warning
     annotations:
-      summary: "TCN deployable gate fired ({{ $labels.model }})"
-      description: "Deployable gate coverage for model={{ $labels.model }} exceeded the zero-coverage baseline (>0.05%) despite the tightened manifest. Revisit the thresholds or confirm this activity is expected."
+      summary: TCN gate coverage collapsed ({{ $labels.model }})
+      description: Deployable gate coverage for model={{ $labels.model }} has fallen
+        below the manifest floor for 30 minutes. Investigate recent inference changes
+        or data gaps before routing orders.
+  - alert: TCNGateCoverageLowBySymbol
+    expr: model_gate_coverage_ratio{mode="inference",model=~"tcn_h(60|120|180)_calmon_relaxed:.*"}
+      < 5e-4
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: TCN gate coverage collapsed ({{ $labels.model }})
+      description: Deployable gate coverage for {{ $labels.model }} has been below
+        the manifest floor for 30m. Check symbol-level data ingestion or manifest
+        thresholds.

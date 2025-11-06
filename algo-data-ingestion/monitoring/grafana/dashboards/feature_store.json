@@ -1,152 +1,694 @@
 {
-  "id": null,
-  "title": "Feature Store (Redis) — Batch 2.4",
-  "uid": "feature-store",
-  "timezone": "browser",
-  "schemaVersion": 36,
-  "version": 2,
-  "refresh": "10s",
-  "tags": ["features", "redis", "ingestion"],
-  "templating": {
+  "annotations": {
     "list": [
       {
-        "type": "query",
-        "name": "domain",
-        "label": "Domain",
-        "datasource": "Prometheus",
-        "refresh": 1,
-        "query": "label_values(feature_writes_total, domain)",
-        "includeAll": true,
-        "multi": true
-      },
-      {
-        "type": "query",
-        "name": "op",
-        "label": "Operation",
-        "datasource": "Prometheus",
-        "refresh": 1,
-        "query": "label_values(feature_op_latency_seconds_bucket, op)",
-        "includeAll": true,
-        "multi": true
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
       }
     ]
   },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
   "panels": [
     {
-      "type": "stat",
-      "title": "API Up",
-      "id": 0,
       "datasource": "Prometheus",
-      "targets": [
-        { "expr": "up{job=\"ingestion-api\"}", "legendFormat": "ingestion-api" }
-      ],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
       "fieldConfig": {
         "defaults": {
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
-            "steps": [{ "color": "red", "value": 0 }, { "color": "green", "value": 1 }]
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
           }
-        }
+        },
+        "overrides": []
       },
-      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 0 }
+      "gridPos": {
+        "h": 3,
+        "w": 2,
+        "x": 0,
+        "y": 0
+      },
+      "id": 9,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
+      "targets": [
+        {
+          "expr": "up{job=\"ingestion-api\"}",
+          "legendFormat": "ingestion-api",
+          "refId": "A"
+        }
+      ],
+      "title": "API Up",
+      "type": "stat"
     },
     {
-      "type": "stat",
-      "title": "Writes/sec",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 2,
+        "y": 0
+      },
       "id": 1,
-      "datasource": "Prometheus",
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
       "targets": [
-        { "expr": "sum(rate(feature_writes_total{domain=~\"$domain\"}[5m]))", "legendFormat": "writes/sec" }
+        {
+          "expr": "sum(rate(feature_writes_total{domain=~\"$domain\"}[5m]))",
+          "legendFormat": "writes/sec",
+          "refId": "A"
+        }
       ],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+      "title": "Writes/sec",
+      "type": "stat"
     },
     {
-      "type": "stat",
-      "title": "Reads/sec",
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 10,
+        "y": 0
+      },
       "id": 2,
-      "datasource": "Prometheus",
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
       "targets": [
-        { "expr": "sum(rate(feature_reads_total{domain=~\"$domain\"}[5m]))", "legendFormat": "reads/sec" }
+        {
+          "expr": "sum(rate(feature_reads_total{domain=~\"$domain\"}[5m]))",
+          "legendFormat": "reads/sec",
+          "refId": "A"
+        }
       ],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
+      "title": "Reads/sec",
+      "type": "stat"
     },
     {
-      "type": "stat",
-      "title": "Hit Ratio (5m)",
-      "id": 3,
       "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
       "targets": [
         {
           "expr": "sum(rate(feature_hits_total{domain=~\"$domain\"}[5m])) / (sum(rate(feature_hits_total{domain=~\"$domain\"}[5m])) + sum(rate(feature_misses_total{domain=~\"$domain\"}[5m])))",
-          "legendFormat": "hit_ratio"
+          "legendFormat": "hit_ratio",
+          "refId": "A"
         }
       ],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Hit Ratio (5m)",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
       "fieldConfig": {
-        "defaults": { "unit": "percentunit", "min": 0, "max": 1 }
-      }
-    },
-    {
-      "type": "stat",
-      "title": "Misses/sec",
-      "id": 4,
-      "datasource": "Prometheus",
-      "targets": [
-        { "expr": "sum(rate(feature_misses_total{domain=~\"$domain\"}[5m]))", "legendFormat": "misses/sec" }
-      ],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
-    },
-    {
-      "type": "timeseries",
-      "title": "Latency p50 / p90 / p99 by op",
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
       "id": 5,
-      "datasource": "Prometheus",
-      "fieldConfig": { "defaults": { "unit": "s" } },
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
       "targets": [
         {
           "expr": "histogram_quantile(0.5, sum(rate(feature_op_latency_seconds_bucket{op=~\"$op\"}[5m])) by (le, op))",
-          "legendFormat": "p50 {{op}}"
+          "legendFormat": "p50 {{op}}",
+          "refId": "A"
         },
         {
           "expr": "histogram_quantile(0.9, sum(rate(feature_op_latency_seconds_bucket{op=~\"$op\"}[5m])) by (le, op))",
-          "legendFormat": "p90 {{op}}"
+          "legendFormat": "p90 {{op}}",
+          "refId": "B"
         },
         {
           "expr": "histogram_quantile(0.99, sum(rate(feature_op_latency_seconds_bucket{op=~\"$op\"}[5m])) by (le, op))",
-          "legendFormat": "p99 {{op}}"
+          "legendFormat": "p99 {{op}}",
+          "refId": "C"
         }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Redis Memory Used",
-      "id": 6,
-      "datasource": "Prometheus",
-      "targets": [
-        { "expr": "redis_memory_used_bytes", "legendFormat": "used" }
       ],
-      "fieldConfig": { "defaults": { "unit": "bytes" } }
+      "title": "Latency p50 / p90 / p99 by op",
+      "type": "timeseries"
     },
     {
-      "type": "stat",
-      "title": "Redis Uptime (days)",
-      "id": 7,
       "datasource": "Prometheus",
-      "targets": [
-        { "expr": "redis_uptime_in_seconds / 86400", "legendFormat": "uptime_days" }
-      ],
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } }
-    },
-    {
-      "type": "timeseries",
-      "title": "Writes (1h increase) by domain",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 12
+      },
       "id": 8,
-      "datasource": "Prometheus",
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
       "targets": [
-        { "expr": "increase(feature_writes_total{domain=~\"$domain\"}[1h])", "legendFormat": "{{domain}}" }
+        {
+          "expr": "increase(feature_writes_total{domain=~\"$domain\"}[1h])",
+          "legendFormat": "{{domain}}",
+          "refId": "A"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "short" } }
+      "title": "Writes (1h increase) by domain",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 12
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "redis_memory_used_bytes",
+          "legendFormat": "used",
+          "refId": "A"
+        }
+      ],
+      "title": "Redis Memory Used",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 12
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
+      "targets": [
+        {
+          "expr": "sum(rate(feature_misses_total{domain=~\"$domain\"}[5m]))",
+          "legendFormat": "misses/sec",
+          "refId": "A"
+        }
+      ],
+      "title": "Misses/sec",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 12
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.4.5",
+      "targets": [
+        {
+          "expr": "redis_uptime_in_seconds / 86400",
+          "legendFormat": "uptime_days",
+          "refId": "A"
+        }
+      ],
+      "title": "Redis Uptime (days)",
+      "type": "stat"
     }
-  ]
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [
+    "features",
+    "redis",
+    "ingestion"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Domain",
+        "multi": true,
+        "name": "domain",
+        "options": [],
+        "query": "label_values(feature_writes_total, domain)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Operation",
+        "multi": true,
+        "name": "op",
+        "options": [],
+        "query": "label_values(feature_op_latency_seconds_bucket, op)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Feature Store (Redis) — Batch 2.4",
+  "uid": "feature-store",
+  "version": 1,
+  "weekStart": ""
 }
