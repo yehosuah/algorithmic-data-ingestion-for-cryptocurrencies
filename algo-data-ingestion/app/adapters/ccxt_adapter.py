@@ -1,13 +1,16 @@
 # Status: ✅ Exists & wired into async pipeline
 
-import ccxt.async_support as ccxt
 import asyncio
-from typing import Dict, Any, Optional
-import pandas as pd
-from datetime import datetime
+import contextlib
 import logging
-from app.common.time_norm import to_utc_dt, add_dt_partition, coerce_schema
-from typing import Union
+import os
+from datetime import datetime
+from typing import Any, Dict, Optional, Union
+
+import ccxt.async_support as ccxt
+import pandas as pd
+
+from app.common.time_norm import add_dt_partition, coerce_schema, to_utc_dt
 
 
 def _since_to_millis(since: Optional[Union[int, float, datetime]]) -> Optional[int]:
@@ -56,16 +59,59 @@ async def _retry_async(func, *args, retries: int = 3, backoff_factor: float = 1.
 
 logger = logging.getLogger("app.adapters.ccxt_adapter")
 
+
+def _env_to_bool(value: Optional[Union[str, int, float, bool]]) -> Optional[bool]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value).strip().lower()
+    if not text:
+        return None
+    if text in {"0", "false", "no", "off"}:
+        return False
+    return True
+
 class CCXTAdapter:
-    def __init__(self, exchange_id: str = "binance"):
+    def __init__(
+        self,
+        exchange_id: str = "binance",
+        *,
+        api_key: Optional[str] = None,
+        secret: Optional[str] = None,
+        password: Optional[str] = None,
+        sandbox: Optional[bool] = None,
+    ):
         self.exchange_id = exchange_id
         exchange_cls = getattr(ccxt, exchange_id)
-        self.client = exchange_cls({
-            "enableRateLimit": True,
-            # you can inject your API keys here if needed
-            # "apiKey": "...",
-            # "secret": "..."
-        })
+        prefix = exchange_id.upper().replace("-", "_")
+
+        api_key = api_key or os.getenv(f"{prefix}_API_KEY") or os.getenv("EXCHANGE_API_KEY")
+        secret = secret or os.getenv(f"{prefix}_API_SECRET") or os.getenv("EXCHANGE_API_SECRET")
+        password = password or os.getenv(f"{prefix}_API_PASSWORD") or os.getenv("EXCHANGE_API_PASSWORD")
+
+        sandbox_env = os.getenv(f"{prefix}_SANDBOX_MODE")
+        if sandbox_env is None:
+            sandbox_env = os.getenv("EXCHANGE_SANDBOX_MODE")
+        sandbox = sandbox if sandbox is not None else _env_to_bool(sandbox_env)
+
+        config: Dict[str, Any] = {"enableRateLimit": True}
+        if api_key:
+            config["apiKey"] = api_key
+        if secret:
+            config["secret"] = secret
+        if password:
+            config["password"] = password
+
+        self.client = exchange_cls(config)
+        self._markets_loaded = False
+
+        if sandbox:
+            with contextlib.suppress(Exception):
+                self.client.set_sandbox_mode(True)
+                logger.debug("Sandbox mode enabled for %s", exchange_id)
 
     async def fetch_ticker(self, symbol: str) -> Dict[str, Any]:
         """
@@ -178,6 +224,44 @@ class CCXTAdapter:
 
     async def close(self):
         await self.client.close()
+
+    async def ensure_markets(self) -> None:
+        """
+        Lazily load market metadata (precision, limits) required for order placement.
+        """
+        if self._markets_loaded:
+            return
+        await _retry_async(self.client.load_markets)
+        self._markets_loaded = True
+
+    async def create_market_order(
+        self,
+        symbol: str,
+        side: str,
+        amount: float,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Submit a market order. The caller is responsible for ensuring amount precision.
+        """
+        await self.ensure_markets()
+        return await _retry_async(
+            self.client.create_order,
+            symbol,
+            "market",
+            side,
+            float(amount),
+            None,
+            params or {},
+        )
+
+    def amount_to_precision(self, symbol: str, amount: float) -> float:
+        """
+        Round the provided base amount using the exchange precision metadata.
+        """
+        if not self._markets_loaded:
+            raise RuntimeError("Market metadata not loaded; call ensure_markets() first")
+        return float(self.client.amount_to_precision(symbol, amount))
 
 # Convenience function if you prefer not to manage client lifecycles
 async def get_ticker_raw(symbol: str) -> Dict[str, Any]:

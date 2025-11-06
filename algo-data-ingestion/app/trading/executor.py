@@ -1,0 +1,145 @@
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
+from app.adapters.ccxt_adapter import CCXTAdapter
+
+logger = logging.getLogger("app.trading.executor")
+
+
+@dataclass
+class OrderDecision:
+    executed: bool
+    price_used: Optional[float] = None
+    amount: Optional[float] = None
+    spread_bps: Optional[float] = None
+    reason: Optional[str] = None
+    order_payload: Optional[Dict[str, Any]] = None
+
+
+class OrderExecutor:
+    """
+    Thin wrapper that encapsulates CCXT order submission with spread guardrails.
+    """
+
+    def __init__(self, *, dry_run: bool = True) -> None:
+        self.dry_run = dry_run
+        self._adapters: Dict[str, CCXTAdapter] = {}
+
+    async def _get_adapter(self, exchange: str) -> CCXTAdapter:
+        adapter = self._adapters.get(exchange)
+        if adapter is None:
+            adapter = CCXTAdapter(exchange)
+            self._adapters[exchange] = adapter
+        return adapter
+
+    async def submit(
+        self,
+        *,
+        exchange: str,
+        symbol: str,
+        side: str,
+        order_amount: Optional[float],
+        order_notional: Optional[float],
+        max_spread_bps: float,
+    ) -> OrderDecision:
+        adapter = await self._get_adapter(exchange)
+        ticker = await adapter.fetch_ticker(symbol)
+        bid = float(ticker.get("bid") or 0.0)
+        ask = float(ticker.get("ask") or 0.0)
+        if bid <= 0 or ask <= 0:
+            return OrderDecision(
+                executed=False,
+                reason="invalid_bid_ask",
+            )
+        spread = ask - bid
+        mid = (ask + bid) / 2.0
+        spread_bps = (spread / mid) * 1e4 if mid > 0 else None
+        if spread_bps is not None and spread_bps > max_spread_bps:
+            return OrderDecision(
+                executed=False,
+                spread_bps=spread_bps,
+                price_used=ask if side.lower() == "buy" else bid,
+                reason="spread_threshold",
+            )
+
+        price = ask if side.lower() == "buy" else bid
+        amount = order_amount
+        if amount is None and order_notional is not None and price > 0:
+            amount = order_notional / price
+        if amount is None or amount <= 0:
+            return OrderDecision(
+                executed=False,
+                price_used=price,
+                spread_bps=spread_bps,
+                reason="invalid_amount",
+            )
+
+        if self.dry_run:
+            logger.info(
+                "DRY RUN %s order for %s %s @ %s (amount %.6f, spread %.4f bps)",
+                side.upper(),
+                exchange,
+                symbol,
+                price,
+                amount,
+                spread_bps or 0.0,
+            )
+            return OrderDecision(
+                executed=True,
+                price_used=price,
+                amount=amount,
+                spread_bps=spread_bps,
+                reason="dry_run",
+                order_payload={"status": "dry_run"},
+            )
+
+        try:
+            await adapter.ensure_markets()
+            amount_precise = adapter.amount_to_precision(symbol, amount)
+            if amount_precise <= 0:
+                return OrderDecision(
+                    executed=False,
+                    price_used=price,
+                    spread_bps=spread_bps,
+                    reason="zero_amount_after_precision",
+                )
+
+            order = await adapter.create_market_order(
+                symbol=symbol,
+                side=side,
+                amount=amount_precise,
+            )
+            logger.info(
+                "Executed %s order on %s %s amount %.6f (spread %.4f bps)",
+                side.upper(),
+                exchange,
+                symbol,
+                amount_precise,
+                spread_bps or 0.0,
+            )
+            return OrderDecision(
+                executed=True,
+                price_used=price,
+                amount=amount_precise,
+                spread_bps=spread_bps,
+                order_payload=order,
+            )
+        except Exception as exc:  # pragma: no cover - trade submission failure path
+            logger.exception("Live trade submission failed: %s", exc)
+            return OrderDecision(
+                executed=False,
+                price_used=price,
+                spread_bps=spread_bps,
+                reason=f"order_error:{exc.__class__.__name__}",
+            )
+
+    async def close(self) -> None:
+        for adapter in self._adapters.values():
+            try:
+                await adapter.close()
+            except Exception:
+                continue
+        self._adapters.clear()

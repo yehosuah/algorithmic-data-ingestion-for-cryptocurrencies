@@ -16,6 +16,9 @@ tenacity>=8.2.3
 # --- Redis (async) ---
 redis>=5.0.1
 
+# --- Databases ---
+psycopg[binary]>=3.1
+
 # --- Metrics ---
 prometheus-client>=0.20.0
 

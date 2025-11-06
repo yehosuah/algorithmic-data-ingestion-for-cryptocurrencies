@@ -1,11 +1,16 @@
 from __future__ import annotations
+import errno
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import json
 import copy
+import shutil
+import tempfile
+import time
 import joblib
 import numpy as np
 import pandas as pd
@@ -76,12 +81,41 @@ class ManifestArtifacts:
     prob_sigma_threshold: Optional[float]
 
 
+def _read_text_retry(path: Path, attempts: int = 5, delay: float = 0.1) -> str:
+    last_exc: Optional[OSError] = None
+    for idx in range(max(1, attempts)):
+        try:
+            return path.read_text()
+        except OSError as exc:
+            if getattr(exc, "errno", None) == errno.EDEADLK and idx + 1 < attempts:
+                time.sleep(delay * (idx + 1))
+                continue
+            last_exc = exc
+            break
+    if last_exc is not None and getattr(last_exc, "errno", None) == errno.EDEADLK:
+        # Fallback: copy to a temp file on the container filesystem before reading.
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        try:
+            shutil.copyfile(path, tmp_path)
+            return tmp_path.read_text()
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+    if last_exc is not None:
+        raise last_exc
+    # Should not reach here, but keep mypy happy.
+    return path.read_text()
+
+
 def _load_manifest_payload(base_dir: Path) -> Optional[Dict[str, Any]]:
     manifest_path = base_dir / "manifest.json"
     if not manifest_path.exists():
         return None
     try:
-        payload = json.loads(manifest_path.read_text())
+        payload = json.loads(_read_text_retry(manifest_path))
         if isinstance(payload, dict):
             return payload
         logger.warning("Manifest at %s is not a JSON object", manifest_path)
@@ -108,7 +142,7 @@ def _load_report_payload(base_dir: Path, manifest: Dict[str, Any]) -> Dict[str, 
     if not report_path:
         return {}
     try:
-        payload = json.loads(report_path.read_text())
+        payload = json.loads(_read_text_retry(report_path))
         if isinstance(payload, dict):
             return payload
         logger.warning("Report at %s is not a JSON object", report_path)
@@ -217,7 +251,7 @@ def _update_inference_metrics(
     observe_probability_sigma(artifacts.model_label, sigma)
 
 def load_base_predictor(base_dir: Path):
-    feat_cols = json.loads((base_dir / "feature_list.json").read_text())
+    feat_cols = json.loads(_read_text_retry(base_dir / "feature_list.json"))
     calib_path = base_dir / "calibrator.joblib"
     if calib_path.exists():
         calib = joblib.load(calib_path)

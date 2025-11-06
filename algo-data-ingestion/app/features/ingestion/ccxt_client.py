@@ -5,8 +5,12 @@ import inspect
 import pandas as pd
 from tenacity import retry, stop_after_attempt, wait_exponential
 from app.common.async_infra import retry_httpx
+import logging
 
 from app.adapters.ccxt_adapter import CCXTAdapter
+from ccxt.base.errors import ExchangeNotAvailable, NetworkError
+
+logger = logging.getLogger(__name__)
 
 # Keeping these constants for tests that reference them, but
 # we no longer use blocking decorators in async code.
@@ -93,7 +97,18 @@ class CCXTClient:
             timeframe = "1m"
         if self.adapter is None:
             return pd.DataFrame()
-        return await self.adapter.fetch_ohlcv(symbol, timeframe, since, limit)
+        try:
+            return await self.adapter.fetch_ohlcv(symbol, timeframe, since, limit)
+        except (ExchangeNotAvailable, NetworkError) as exc:
+            logger.warning(
+                "CCXT historical fetch failed (exchange=%s symbol=%s timeframe=%s limit=%s): %s",
+                getattr(self.adapter, "exchange_id", "unknown"),
+                symbol,
+                timeframe,
+                limit,
+                exc,
+            )
+            return pd.DataFrame()
 
     @retry_httpx(max_attempts=5)
     async def fetch_orderbook(self, symbol: str, limit: int = 100) -> pd.DataFrame:

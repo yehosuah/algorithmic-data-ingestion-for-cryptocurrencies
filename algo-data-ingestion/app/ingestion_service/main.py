@@ -3,11 +3,14 @@ import asyncio
 from prometheus_client import make_asgi_app
 from fastapi.middleware.cors import CORSMiddleware
 import logging
-from app.ingestion_service.config import settings
-from app.features.jobs.backfill import backfill_market_once, ttl_sweep_once
+from pathlib import Path
 from contextlib import asynccontextmanager
 import os
 import redis.asyncio as redis
+
+from app.ingestion_service.config import settings
+from app.ingestion_service.manifests import get_manifest_registry, parse_model_specs
+from app.features.jobs.backfill import backfill_market_once, ttl_sweep_once
 from app.common.async_infra import get_http, close_http
 from app.features.ingestion.news_client import NewsClient
 from app.features.ingestion.ccxt_client import CCXTClient
@@ -71,6 +74,21 @@ async def lifespan(app: FastAPI):
     )
     app.state.onchain_client = OnchainClient()
     app.state.social_client = SocialClient()
+    # Preload manifest artifacts for deployable models (if configured)
+    try:
+        manifest_specs = parse_model_specs(getattr(settings, "DEPLOYABLE_MODELS", None))
+        if manifest_specs:
+            models_root = Path(getattr(settings, "MODELS_ROOT", "models")).expanduser().resolve()
+            registry = get_manifest_registry()
+            loaded_specs = registry.preload(models_root=models_root, specs=manifest_specs, clear=True)
+            app.state.manifest_registry = registry
+            loaded_labels = ", ".join(spec.label for spec in loaded_specs)
+            logging.info("Preloaded %d deployable manifest(s): %s", len(loaded_specs), loaded_labels)
+        else:
+            logging.info("No deployable models configured; manifest preload skipped")
+    except Exception as exc:
+        logging.error("Failed to preload manifest artifacts: %s", exc, exc_info=True)
+        raise
     try:
         # Optionally warm ML in background (avoid blocking startup)
         if settings.ML_SENTIMENT_ENABLED:

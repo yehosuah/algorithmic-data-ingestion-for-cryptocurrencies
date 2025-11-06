@@ -110,7 +110,13 @@ def write_to_parquet(df, base_path, partitions, filename=None):
     # Ensure a single dt per write (split upstream if needed)
     unique_dt = df["dt"].dropna().unique().tolist()
     if len(unique_dt) != 1:
-        raise ValueError(f"Normalization error: multiple dt values in batch: {unique_dt}")
+        results = []
+        for dt_value in unique_dt:
+            sub_df = df[df["dt"] == dt_value].copy()
+            parts_dict = dict(partitions or {})
+            parts_dict["dt"] = dt_value
+            results.append(write_to_parquet(sub_df, base_path, parts_dict, filename=None))
+        return results[-1] if results else None
     dt_value = unique_dt[0]
 
     # Schema validation before write

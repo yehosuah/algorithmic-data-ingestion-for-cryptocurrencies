@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Optional
 
 from prometheus_client import REGISTRY, CollectorRegistry, Gauge
@@ -16,10 +17,21 @@ def _resolve_registry() -> CollectorRegistry:
     Fallback to the global registry when the service layer is not imported
     (e.g. offline training scripts or unit tests).
     """
+    use_ingest = os.getenv("USE_INGEST_METRICS_REGISTRY", "1").strip().lower()
+    if use_ingest in {"0", "false", "no"}:
+        return REGISTRY
     return _INGEST_REGISTRY or REGISTRY
 
 
 _REGISTRY: CollectorRegistry = _resolve_registry()
+
+
+def get_metrics_registry() -> CollectorRegistry:
+    """
+    Expose the registry used by the inference metrics so external services
+    (e.g., scheduler) can serve it via Prometheus endpoints.
+    """
+    return _REGISTRY
 
 
 def _gauge(name: str, documentation: str, *, labelnames: tuple[str, ...]) -> Gauge:
