@@ -1,6 +1,6 @@
 # Subtask 3 – Blender Refresh
 
-_Last updated: 2025-10-31 02:39 UTC_
+_Last updated: 2025-11-05 14:56 UTC_
 
 ## Run
 ```
@@ -33,8 +33,10 @@ python scripts/train_blender.py \
 - Forward audit artifact `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` (40 201 rows) is captured for gate analysis; regenerate by re-running the builder over the target window before packaging.
 - Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) now fires 6 346 deployable trades (`gate_fraction ≈ 0.158`), confirming the eased manifest stays aligned with the retuned base thresholds.
 - Smoothing follows the stride specified in training; sandbox runs (`models/blender_h120_stride1_v2`) collapse it to 1 bar, dropping gate share to ≈0.2 % (134 toggles) while preserving equity, mapping the turnover ceiling for production manifests.
+- Scheduler inference emits blender decisions alongside base/TCN; check `scheduler_decision_messages_enqueued_total` and the trading dashboard when experimenting with stride or smoothing tweaks so the queue volume mirrors the 6 346 deployable trades.
 
 ## Follow-ups
 1. Keep the deployable gate aligned with the base manifest so Oct–Nov 2025 maintains ≈15.8 % coverage and turnover within ±25 % of the 4 809-toggle baseline; use the stride‑1 sandbox runs as the upper bound when adjusting smoothing.
 2. Expose RSS audit metrics, gate share, and `gate_smoothing_stride` to monitoring; implement automatic fallback to a no-RSS blender when coverage drops below thresholds.
 3. Document inference feature pipeline (StandardScaler + selected columns) to mirror training behaviour in production.
+4. Validate the trading dry run captures faux P&L for blender decisions (`trading_realized_pnl_total`) and that audit stream entries enumerate gate toggles when smoothing changes.

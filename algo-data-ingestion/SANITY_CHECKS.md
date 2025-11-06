@@ -1,6 +1,6 @@
 # Sanity Checks and Optional Improvements
 
-_Last updated: 2025-10-31 02:39 UTC_
+_Last updated: 2025-11-05 14:56 UTC_
 
 This document summarizes quick validation steps for a 2‑week backfill (market + RSS) and tracks optional improvements to reference during iteration.
 
@@ -58,6 +58,32 @@ python scripts/build_training_matrix.py \
   --out datasets/training_matrix_two_weeks.parquet
 ```
 
+## Trading Dry Run Validation
+
+With manifests refreshed and the Docker stack running, validate the scheduler → Redis → trading loop:
+1. Ensure `INFER_JOBS` is populated (see `.env.example`) and restart `scheduler` so it reloads manifests from `MODELS_ROOT`.
+2. Watch scheduler metrics and logs:
+   ```bash
+   curl -s http://localhost:9002/metrics | grep scheduler_decision
+   docker compose logs -f scheduler | grep decision
+   ```
+3. Confirm Redis queue health:
+   ```bash
+   redis-cli -u redis://localhost:6379/0 llen trading:decisions
+   ```
+   The value should oscillate around 0 as the trading service drains decisions.
+4. Inspect trading metrics:
+   ```bash
+   curl -s http://localhost:9010/metrics | egrep 'trading_trade_attempts_total|trading_position_active'
+   ```
+   Run for a few minutes and ensure counters advance while positions toggle as expected.
+5. Audit persisted state:
+   ```bash
+   python scripts/verify_trading_redis.py
+   ```
+   Review the `trading:positions` hash and `trading:audit` stream for gate/trade entries.
+6. Grafana dashboards `scheduler-overview` and `trading-overview` visualise queue depth, coverage, trade attempts, and dry-run P&L; keep Prometheus alert rules green throughout the exercise.
+
 ## Optional Improvements (Backlog)
 
 Data & Features
@@ -81,3 +107,4 @@ Serving & Ops
 - Hardening: retries/circuit breakers, backpressure on ingest, structured logging.
 - CI hygiene: `.github/workflows/ci.yml` now runs ingestion service E2E tests, KPI regressions, and a forward replay guardrail that calls `scripts/run_oos_eval.py --family tcn --stride 30` for h60/h120/h180 (fails if `gate_fraction < 5e-4` or `final_equity < 1.2`); extend it with environment-specific smoke checks as needed.
 - Exercise the stride-aware batching in `training/infer.predict_tcn` during staging runs so smaller strides do not exhaust memory when evaluating new gates.
+- Trading dry-run ops: document how `app/trading/state.py` swaps between file/Redis/Postgres backends, keep `scripts/verify_trading_redis.py` in the runbook, and add smoke tests for `tests/trading/test_service.py` when tweaking queue formats.

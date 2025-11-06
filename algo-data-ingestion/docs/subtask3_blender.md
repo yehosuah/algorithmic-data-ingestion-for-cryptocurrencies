@@ -1,6 +1,6 @@
 # Subtask 3 – Elastic-Net Blender Refresh
 
-_Last updated: 2025-10-31 02:39 UTC_
+_Last updated: 2025-11-05 14:56 UTC_
 
 ## Goal
 Train an elastic-net logistic blender that combines Calmon relaxed base and TCN probabilities with RSS spike features, clearing 5 bps transaction costs while maintaining actionable turnover.
@@ -39,8 +39,10 @@ python scripts/train_blender.py \
 - CLI exposes `--class-weight {balanced,none}` and treats `--calibration-cv <= 1` as “no calibration”, matching production’s deterministic requirements. The refreshed `scripts/run_oos_eval.py --family blender` keeps forward replay checks aligned with base/TCN guardrails.
 - Oct 2025 replay (`models/oos_replay_summary_latest.json`) confirms the eased manifest now delivers 6 346 deployable trades while maintaining `final_equity 4.48`; keep blender aligned with base thresholds as they evolve.
 - Sandbox runs (`models/blender_h120_stride1_v2`) collapse the smoothing window to 1 bar to stress turnover—relaxed equity stays at 4.48 while gate share drops to ≈0.2 % with 134 toggles, giving a ceiling for production manifests when smoothing is reduced.
+- Scheduler + trading dry run metrics should mirror this coverage: watch `scheduler_decision_messages_enqueued_total` and `trading_trade_attempts_total` after retraining to ensure redispatched blender decisions match the expected trade volume.
 
 ## Next Steps
 1. Keep blender gating in lockstep with the base manifest so Oct–Nov 2025 maintains equity ≥1.2 with turnover within ±25 % of the 4 809-toggle baseline; use the stride‑1 sandbox results as the turnover ceiling when coverage dips below ≈15.8 %.
 2. Integrate RSS audit thresholds into monitoring; automatically switch to a no-RSS fallback when coverage dips below requirements.
 3. Document feature preprocessing in inference code to mirror StandardScaler + selected columns from the manifest.
+4. Capture Grafana `trading-overview` snapshots during the dry run after each blender refresh to validate faux P&L and gate toggles line up with the replay stats.

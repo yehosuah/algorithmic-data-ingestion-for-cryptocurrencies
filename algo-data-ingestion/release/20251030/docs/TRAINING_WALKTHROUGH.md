@@ -1,8 +1,10 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-10-30 16:05 UTC_
+_Last updated: 2025-11-05 14:56 UTC (archival snapshot)_
 
 This guide walks through the refreshed modeling stack: relaxed-gate retrains for the horizon-120 XGBoost baseline, the Calmon TCN suite, and the elastic-net blender that now clears 5 bps costs with RSS enrichment.
+
+_Update 2025-11-05_: The active branch adds scheduler-managed inference (`INFER_JOBS`) and a trading dry run (`app/trading/service.py`). Consult `TRAINING_WALKTHROUGH.md` at repo root for the augmented steps covering Redis decision queues, Prometheus trading metrics, and dry-run validation.
 
 ## Prerequisites
 - Python 3.12 virtualenv: `python -m venv .venv && source .venv/bin/activate`

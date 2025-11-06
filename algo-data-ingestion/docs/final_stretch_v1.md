@@ -1,6 +1,6 @@
 # Final Stretch – Production Checklist (Calmon Stack)
 
-Last updated: 2025-10-31 02:39 UTC
+Last updated: 2025-11-05 14:56 UTC
 
 Scope: Align the relaxed-gate Horizon-120 XGB, Calmon TCN suite, and elastic-net blender for a deployable release, with manifest-driven governance and monitoring.
 
@@ -10,9 +10,10 @@ Scope: Align the relaxed-gate Horizon-120 XGB, Calmon TCN suite, and elastic-net
 - Persist monthly gate coverage snapshots for base and TCN (`live_gate_coverage.csv`), forward replay diagnostics (`models/oos_replay_summary_latest.json` with the archived `...oct_nov_2025.json` for regression), and attach to the release package.
 - Ensure manifests include deployable gates, thresholds, feature lists, and RSS audits; treat them as the contract between training and inference.
 - Keep `.github/workflows/ci.yml` green so manifest gating and shortlist regressions (`tests/regression`) stay enforced ahead of release tagging.
+- Dry-run the scheduler `INFER_JOBS` → Redis queue → trading service pipeline, capturing Prometheus metrics (`scheduler_decision_messages_enqueued_total`, `trading_trade_attempts_total`, `trading_position_active`) and Redis audit logs for the release window.
 
 ## 2. Base XGBoost (H120 Calmon)
-- **Status**: `final_equity 4.48`, Sharpe 117, relaxed gate coverage 9.4 %. Oct 1–Oct 28 2025 replay now logs 12 deployable gate hits (8 trades, `final_equity 1.2336`, `gate_coverage 2.99e-4`) under the widened manifest (`hl_spread ≤ 7e-4`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`).
+- **Status**: `final_equity 4.48`, Sharpe 117, relaxed gate coverage 9.4 %. Oct 1–Oct 28 2025 replay now logs 12 deployable gate hits (8 trades, `final_equity 1.2336`, `gate_coverage 2.99e-4`) under the simplified manifest (`prob ≥ 0.2`, `min_hold 10`, `long_only`) while spread/rvol guardrails are enforced downstream in the trading service.
 - **Actions**
   1. Lock the retuned manifest into the release bundle (document thresholds + coverage floor) and schedule a weekly replay to confirm coverage stays above the minimal target.
   2. Extend regression tests to call `training/infer.py::score_base_with_manifest`, asserting gate alignment against `report.json` and the Prometheus gauges emitted by `app/monitoring/model_metrics.py`.
@@ -45,13 +46,16 @@ Scope: Align the relaxed-gate Horizon-120 XGB, Calmon TCN suite, and elastic-net
 
 ## 7. Monitoring Rollout
 - Metrics to expose: equity curve, turnover, gate activation rate (`model_gate_coverage_ratio`), RSS coverage (`model_rss_minute_spike_share`), probability σ (`model_probability_sigma`), and the recorded `gate_smoothing_stride`, plus their manifest thresholds.
+- Trading-specific metrics: queue depth (Redis `trading:decisions`), Prometheus counters/gauges (`trading_trade_attempts_total`, `trading_trade_notional_total`, `trading_gate_toggles_total`, `trading_position_active`, `trading_realized_pnl_total`), and audit stream freshness.
 - Alert thresholds:
   - Gate coverage outside ±2× baseline for two consecutive days.
   - RSS minute spike share <5e-4 or audit `passed=false`.
   - Probability σ <0.03 for any validation window.
+  - Trading metrics stuck (no `trading_trade_attempts_total` increments for >15 min, `trading_position_active` stale beyond max hold, or Redis audit stream idle).
 - Document remediation runbooks (e.g., rerun relaxed retrain, switch to backup model, disable blender).
 
 ## 8. Post-Launch Tasks
 - Schedule monthly retrain cadence with automated shortlist generation.
 - Expand dataset coverage (additional symbols/timeframes) using the same relaxed gate framework.
 - Continue meta-label R&D with the longer matrix and event definitions tuned for Calmon coverage.
+- Formalise the trading dry-run retrospective (queue depth, audit volume, faux P&L) and schedule the go-live rehearsal (flip `TRADING_DRY_RUN=0` behind feature flag) once monitoring stays green for seven consecutive days.

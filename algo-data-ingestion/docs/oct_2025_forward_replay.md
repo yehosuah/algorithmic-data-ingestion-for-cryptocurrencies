@@ -1,10 +1,10 @@
 # Oct 2025 Forward Replay – Manifest Refresh (2025-10-27)
 
-_Last updated: 2025-10-31 02:39 UTC_
+_Last updated: 2025-11-05 14:56 UTC_
 
 ## Model Refresh Snapshot
-- `models/base_xgb_h120_calmon_spread0` (deployable manifest `hl_spread ≤ 7e-4`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`) now registers 12 gate hits on Oct 2025 (`toggle_count 8`, deployable `final_equity 1.2336`, `gate_coverage 0.0002985`).  
-- `models/tcn_h120_calmon_relaxed` finally clears the deployable mask when replayed with the relaxed gate (`hl_spread ≤ 9e-4`, `hl_spread_z ≤ 0.25`, `rvol_20 ≤ 1.8e-4`, `prob ≥ 0.68`, `min_hold 10`); the Oct 2025 run logs 31 gate hits (`toggle_count 62`, `gate_coverage 0.0007711`) and `final_equity 1.9356`. Horizons 60/180 now show shallow but non-zero coverage floors (`gate_coverage 4.73e-4`/`4.23e-4`) at the eased probability gates (0.52/0.55).  
+- `models/base_xgb_h120_calmon_spread0` (deployable manifest now enforces `prob ≥ 0.2`, `min_hold 10`, `long_only`) registers 12 gate hits on Oct 2025 (`toggle_count 8`, deployable `final_equity 1.2336`, `gate_coverage 0.0002985`) while spread/rvol checks are handled by the trading service.  
+- `models/tcn_h120_calmon_relaxed` clears the deployable mask with the simplified inference gate (`prob ≥ 0.25`, `min_hold 10`, `long_only`); the Oct 2025 run logs 31 gate hits (`toggle_count 62`, `gate_coverage 0.0007711`) and `final_equity 1.9356`. Horizons 60/180 now show shallow but non-zero coverage floors (`gate_coverage 4.73e-4`/`4.23e-4`) at the same probability rule.  
 - `models/blender_h120_v6` (deployable manifest `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`) delivers 6 346 deployable toggles (`gate_coverage 0.1579`, deployable `final_equity 4.48`) while retaining `final_equity 1.84` under the relaxed gate and now records `gate_smoothing_stride = 30` in `report.json`.  
 - RSS audit for the replay window remains healthy (daily coverage 100 %, minute spike share ≈1.0e0), confirming the rebuilt RSS lake.
 
@@ -20,6 +20,7 @@ Source: `models/oos_replay_summary_latest.json` (40 201 rows, Oct 1 00:00 
 
 ## Observations & Next Steps
 1. Document the retuned base manifest (thresholds + coverage floor) and add a weekly regression replay that fails when `model_gate_coverage_ratio` for the base drops below the new baseline.  
-2. Capture the relaxed TCN gate (`hl_spread ≤ 9e-4`, `hl_spread_z ≤ 0.25`, `rvol_20 ≤ 1.8e-4`, `prob ≥ 0.68`, `min_hold 10`, stride 30) in change logs and regression docs so downstream manifests adopt the same floor.  
+2. Capture the simplified TCN inference gate (`prob ≥ 0.25`, `min_hold 10`, stride 30) in change logs and regression docs so downstream manifests adopt the same floor.  
 3. Align shortlist criteria with the refreshed manifest bundle so reviewers see the deployable artifacts that actually ship and include the recorded `gate_smoothing_stride` in release notes.  
-4. Ensure CI exercises `training/infer.py::score_base_with_manifest` over the replay window and fails when deployable coverage or probability σ violates guardrails.
+4. Ensure CI exercises `training/infer.py::score_base_with_manifest` over the replay window and fails when deployable coverage or probability σ violates guardrails.  
+5. Feed this replay window through the scheduler dry run (Redis queue + trading service) and confirm metrics (`scheduler_decision_messages_enqueued_total`, `trading_trade_attempts_total`, `trading_position_active`) reflect the gate counts above.

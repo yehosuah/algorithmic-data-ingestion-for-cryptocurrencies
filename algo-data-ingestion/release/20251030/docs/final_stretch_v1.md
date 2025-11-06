@@ -1,8 +1,10 @@
 # Final Stretch – Production Checklist (Calmon Stack)
 
-Last updated: 2025-10-30 16:05 UTC
+Last updated: 2025-11-05 14:56 UTC (archival snapshot)
 
 Scope: Align the relaxed-gate Horizon-120 XGB, Calmon TCN suite, and elastic-net blender for a deployable release, with manifest-driven governance and monitoring.
+
+Update 2025-11-05: The current branch adds scheduler-driven inference and a trading dry run (`app/trading/service.py`); see the live `docs/final_stretch_v1.md` for the extended checklist covering Redis decision queues, Prometheus metrics, and audit expectations.
 
 ## 1. Pre-Flight
 - Freeze `datasets/market_btcusdt_1m_2024_2025.parquet`, `datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet`, and the forward replay matrix `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` (record commit hash + SHA in release notes).

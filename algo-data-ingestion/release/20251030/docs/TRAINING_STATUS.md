@@ -1,8 +1,9 @@
 # Model Training Status (XGB · TCN · Blender)
 
-_Last updated: 2025-10-30 16:05 UTC_
+_Last updated: 2025-11-05 14:56 UTC (archival snapshot)_
 
 ## Quick Status
+- _Update 2025-11-05_: The active branch now includes scheduler-driven inference and a trading dry run (`app/trading/service.py`). Refer to the root `TRAINING_STATUS.md` for the latest metrics covering Redis decision queues and Prometheus trading counters.
 - **Base XGB (Calmon relaxed gate)** – `models/base_xgb_h120_calmon_spread0` retains `final_equity 4.48`, Sharpe 108, 3.6 k toggles under the relaxed mask, and the manifest now ships a widened deployable profile (`hl_spread ≤ 7e-4`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`). The refreshed Oct 1 – Oct 27 2025 replay (`models/oos_replay_summary_latest.json`) records 12 gate hits, 8 toggles, and `final_equity 1.23`, restoring minimal live coverage.
 - **TCN suite (Calmon relaxed)** – horizons 60/120/180 still clear 5 bps costs (`final_equity` 1.05/1.33/1.19 with ≤200 toggles); the deployable manifest mirrors the base thresholds and remains idle in the latest replay (zero toggles, gate coverage <0.001 %), but `training/infer.predict_tcn` now batches by stride so stride-1 experiments no longer exhaust memory.
 - **Logistic blender (elastic-net)** – `models/blender_h120_v6` continues to post `final_equity 1.84`, Sharpe 28.7, 711 toggles at threshold 0.95; the run now records `gate_smoothing_stride` (defaults to the TCN stride) and fresh stride‑1 prototypes (`models/blender_h120_gate_test`, `blender_h120_stride1`, `blender_h120_stride1_v2`) highlight how collapsing the smoothing window drives gate share into the 52–70 % band while keeping relaxed equity at 4.48.

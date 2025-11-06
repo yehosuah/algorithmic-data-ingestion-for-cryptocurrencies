@@ -1,6 +1,6 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-10-31 02:39 UTC_
+_Last updated: 2025-11-05 14:56 UTC_
 
 End-to-end ingestion for **market**, **on-chain**, **social**, and **news** data with a Redis feature store, admin backfills/TTL sweeps, a scheduler, and monitoring (Prometheus + Grafana).
 
@@ -36,11 +36,15 @@ docker compose up -d --build
   ```
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3000 (default: admin/admin)
+- Trading metrics exporter:
+  ```bash
+  curl -s http://localhost:9010/metrics | grep trading_trade_attempts_total
+  ```
 
 > Notes
 > - La imagen se construye “lean” por defecto (sin instalar `torch`/`transformers`) para acelerar el build. Si necesitas ML dentro del contenedor, puedes construir con `--build-arg INSTALL_ML=1`.
 > - Sin llaves API, social/news y on-chain pueden devolver `no_data` o errores 401 del proveedor. Con llaves, funcionará scraping real.
-> - Update 2025-10-31: CI now gates relaxed TCN manifests with a forward replay step (`scripts/run_oos_eval.py --family tcn --stride 30`) that fails when deployable coverage <5e-4 or `final_equity < 1.2`, and the OOS runner supports `--family blender` so baseline, TCN, and blender manifests can be audited with a single interface.
+> - Update 2025-11-05: Scheduler inference jobs now publish trading decisions to Redis, the new `trading` service consumes them with dry-run order execution, and Prometheus/Grafana ship with a `trading-overview.json` dashboard plus alert coverage for the new metrics.
 
 ---
 
@@ -52,6 +56,26 @@ docker compose up -d --build
 - **scheduler** – Calls admin endpoints on cron (market backfill, TTL sweep); exposes `/metrics` on port 9002.
 - **prometheus** – Scrapes API, scheduler, redis-exporter.
 - **grafana** – Dashboards in `monitoring/grafana/dashboards`.
+- **trading** – Consumes `trading:decisions`, enforces manifest gates, emits Prometheus metrics, and persists state/audit trails.
+
+---
+
+## Trading Dry Run
+
+The scheduler now orchestrates three job types:
+- Market maintenance (backfills + TTL sweeps).
+- Live ingest loops (`MARKET_INGEST_JOBS`) that keep Redis feature TTL topped up.
+- **Inference jobs (`INFER_JOBS`)** that replay the latest parquet window, score base/TCN manifests, and enqueue trading payloads to Redis (`DECISION_QUEUE_KEY`, default `trading:decisions`).
+
+Each payload carries manifest metadata, side, and probability, so the trading worker can:
+- Stream and dedupe decisions from Redis (`DECISION_QUEUE_URL`), caching artifacts via `training.infer.load_manifest_artifacts`.
+- Apply min-hold and stale-position guards per `TRADING_MODELS`, using spread checks before routing orders with the CCXT adapter. Set `TRADING_DRY_RUN=0` when moving to live execution.
+- Persist per-symbol state with the configured backend (`file`, `redis`, `postgres`) and mirror audit events (`gate_toggle`, `trade`) to Redis streams or Postgres tables.
+- Expose Prometheus counters/gauges (`trading_trade_attempts_total`, `trading_trade_notional_total`, `trading_gate_toggles_total`, `trading_position_active`, `trading_realized_pnl_total`) on `TRADING_METRICS_PORT` (default 9010).
+
+Useful helpers:
+- `python scripts/verify_trading_redis.py` inspects the Redis position hash and audit stream.
+- Grafana dashboard `monitoring/grafana/dashboards/trading-overview.json` surfaces queue depth, gate coverage, and trade attempt metrics; alert rules now include stale decision queue detection.
 
 ---
 
@@ -505,7 +529,7 @@ Notes
 
 - `scripts/build_blender_matrix.py` now emits a 606 121-row matrix (`datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet`) covering 2024‑09‑01 ➜ 2025‑10‑26 with intraday RSS aggregations, probability momentum (`prob_diff*`), and spread-aware regime labels; the JSON stats include window start/end for sanity checks.
 - Refreshed TCN suite (`models/tcn_h{60,120,180}_calmon_relaxed`) still clears 5 bps costs under the relaxed gate; `tcn_h120_calmon_relaxed` reports `final_equity 1.33`, `total_turnover 180`, and persists fold logits for downstream recalibration.
-- Horizon-120 XGB baseline (`models/base_xgb_h120_calmon_spread0`) keeps `final_equity 4.48` under the relaxed gate and now publishes a deployable manifest mask (`hl_spread ≤ 7e-4`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`) that restores a trickle of live coverage (Oct 2025 replay: 12 gate hits, 8 toggles, `final_equity 1.23`).
+- Horizon-120 XGB baseline (`models/base_xgb_h120_calmon_spread0`) keeps `final_equity 4.48` under the relaxed gate and now publishes a deployable manifest that only enforces `prob ≥ 0.2`, `min_hold 10`, `long_only`; spread and rvol guardrails are delegated to the trading service (Oct 2025 replay: 12 gate hits, 8 toggles, `final_equity 1.23`).
 - `training/blender.py` + `blender_h120_v6` add optional class weighting and calibration control; the elastic-net stack (711 toggles, `final_equity 1.84`) leans on the richer RSS signals and its manifest now gates inference at `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`, delivering `gate_coverage ≈ 16 %` on the Oct 2025 replay.
 - `training/reporting.ensure_kpi_schema` and `scripts/report_shortlist.py` standardise KPI fields and emit `models/report_shortlist.json`, making it easy to bubble up deployable candidates without manual report diffing.
 - Forward validation for Oct 1 – Oct 27 2025 is tracked in `models/oos_replay_summary_latest.json` (paired with `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`); base regained minimal coverage under the deployable mask while TCNs remain idle, signalling the need for further gate tuning before launch.

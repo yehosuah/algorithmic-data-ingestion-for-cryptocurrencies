@@ -1,6 +1,6 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-10-31 02:39 UTC_
+_Last updated: 2025-11-05 14:56 UTC_
 
 This guide walks through the refreshed modeling stack: relaxed-gate retrains for the horizon-120 XGBoost baseline, the Calmon TCN suite, and the elastic-net blender that now clears 5 bps costs with RSS enrichment.
 
@@ -37,7 +37,7 @@ python scripts/train_base_gbdt.py \
   --threshold-criterion final_equity --diagnostic-thresholds 0.5,0.55,0.6,0.65 \
   --calmon-gate
 ```
-- Artifacts: booster (`model.json`), calibrator, feature list, threshold, manifest (`gates.training` vs `gates.inference`), `report.json`; the deployable mask now defaults to `hl_spread ≤ 7e-4`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`.
+- Artifacts: booster (`model.json`), calibrator, feature list, threshold, manifest (`gates.training` vs `gates.inference`), `report.json`; the deployable mask now keeps `prob ≥ 0.2`, `min_hold 10`, and `long_only` while leaving spread/rvol enforcement to the trading layer.
 - `report.json` captures monthly diagnostics, RSS audits, and spread stress-test metadata.
 
 ## 3. Train Calmon TCN Variants
@@ -53,7 +53,7 @@ python scripts/train_tcn.py \
   --horizon 120 --diagnostic-thresholds 0.55,0.6,0.65,0.7
 ```
 - Produces `tcn.pt`, scaler/preprocess bundle, calibrator, manifest, threshold, `fold_logits.parquet`, and `report.json` with the probability variance guardrail.
-- The refreshed runs land `final_equity 1.28/3.62/1.85` (h60/h120/h180) with inference gates relaxed to `prob ≥ 0.52/0.68/0.52`, `hl_spread ≤ 9e-4`, and `rvol_20 ≤ 1.8e-4/1.8e-4/1.5e-4`, keeping turnover ≤200 while unlocking deployable coverage in the forward replay.
+- The refreshed runs land `final_equity 1.28/3.62/1.85` (h60/h120/h180) with inference gates now pared back to `prob ≥ 0.25` (min-hold 10, long-only); spread and volatility guards remain in manifests for training diagnostics but live enforcement happens in the trading service.
 - Repeat with `--horizon 60` / `--horizon 180` to populate the alternate manifests (`models/tcn_h60_calmon_relaxed`, `models/tcn_h180_calmon_relaxed`), and feed the artifacts to the OOS runner described below for guardrail checks.
 
 ## 4. Train Elastic-Net Blender
@@ -113,3 +113,21 @@ python scripts/report_shortlist.py \
 ## 8. Optional – Meta Label Refresh
 - Meta gating still lacks a stable decision surface; rerun `scripts/train_meta_label.py` only after extending the blender matrix to newer months and confirming the new deployable coverage plateaus via the guardrail.
 - Leverage the existing manifests for deployable gates in live inference until a calibrated meta filter clears the ≥1.2 equity hurdle without compromising the 5e-4 coverage floor.
+
+## 9. Wire Into Scheduler + Trading Dry Run
+- Copy refreshed manifests and reports to the models directory mounted by Docker (`MODELS_ROOT`). The scheduler reads them when parsing `INFER_JOBS`.
+- Configure `INFER_JOBS` (env JSON list) with exchange/symbol/timeframe, lookback/history windows, and manifest names. Example:
+  ```json
+  [{"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":120,
+    "history_minutes":240,"base_model":"base_xgb_h120_calmon_spread0",
+    "tcn_model":"tcn_h120_calmon_relaxed","stride":30,"queue_key":"trading:decisions",
+    "cron":"*/1 * * * *"}]
+  ```
+- Bring up `docker compose up scheduler trading` (or the full stack). The scheduler publishes decisions to Redis, and the trading service consumes them, enforcing min-hold/coverage constraints before issuing dry-run orders via the CCXT adapter.
+- Observe metrics:
+  ```bash
+  curl -s http://localhost:9002/metrics | grep scheduler_decision
+  curl -s http://localhost:9010/metrics | egrep 'trading_trade_attempts_total|trading_position_active'
+  ```
+  Grafana dashboards `ingestion-overview`, `scheduler-overview`, and `trading-overview` ship pre-wired panels for queue depth, gate coverage, and audit throughput.
+- Use `python scripts/verify_trading_redis.py` to inspect the Redis-backed trading state (`trading:positions`) and audit stream (`trading:audit`) during the dry run. Flip `TRADING_DRY_RUN=0` only after compliance/ops sign-off and update the runbook with observed gate coverage + P&L metrics.

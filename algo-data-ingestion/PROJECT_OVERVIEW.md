@@ -1,13 +1,13 @@
 # Algo Data Ingestion – Comprehensive Project Dossier
 
-_Last updated: 2025-10-31 02:39 UTC_
+_Last updated: 2025-11-05 14:56 UTC_
 
 ---
 
 ## 1. Executive Summary
 - **Mission**: Deliver an end-to-end ingestion and modeling platform that converts high-frequency market, social, and news data into actionable trading signals and deploys them through a monitored production stack.
 - **Scope**: Covers data acquisition (API ingest, backfills), feature engineering, supervised learning (XGBoost baseline, Temporal Convolutional Networks), ensemble/meta-label strategies, backtesting & diagnostics, and deployment readiness (FastAPI service, Redis store, scheduler, monitoring).
-- **Current State**: Data pipelines and infrastructure are operational with async route coverage under `tests/ingestion_service` and manifest regression checks in CI. The relaxed-gate Horizon-120 XGB (`final_equity 4.48`), Calmon TCN suite (`final_equity 1.28/3.62/1.85` for horizons 60/120/180), and elastic-net blender (`final_equity 4.48`) all clear 5 bps costs after the latest retrains. The Oct 1–Oct 28 2025 forward replay (40 201 rows) confirms deployable masks now fire across the stack: the base manifest posts 12 gate hits (8 toggles, `final_equity 1.2336`, `gate_coverage 2.99e-4`), the TCN relaxed gates finally cross the coverage floor (`gate_coverage 4.73e-4/7.71e-4/4.23e-4`, `final_equity 1.03/1.94/1.01` at inference for h60/h120/h180), and the eased blender manifest sustains `gate_coverage 15.8 %` (`toggle_count 6 346`). Blender stride‑1 sandbox runs (`gate_coverage ≈0.2 %`, 134 toggles) still bound turnover expectations, and stride-aware batching in inference keeps relaxed experiments production-safe.
+- **Current State**: Data pipelines and infrastructure are operational with async route coverage under `tests/ingestion_service` and manifest regression checks in CI. The relaxed-gate Horizon-120 XGB (`final_equity 4.48`), Calmon TCN suite (`final_equity 1.28/3.62/1.85` for horizons 60/120/180), and elastic-net blender (`final_equity 4.48`) all clear 5 bps costs after the latest retrains. The Oct 1–Oct 28 2025 forward replay (40 201 rows) confirms deployable masks now fire across the stack: the base manifest posts 12 gate hits (8 toggles, `final_equity 1.2336`, `gate_coverage 2.99e-4`), the TCN relaxed gates finally cross the coverage floor (`gate_coverage 4.73e-4/7.71e-4/4.23e-4`, `final_equity 1.03/1.94/1.01` at inference for h60/h120/h180), and the eased blender manifest sustains `gate_coverage 15.8 %` (`toggle_count 6 346`). Blender stride‑1 sandbox runs (`gate_coverage ≈0.2 %`, 134 toggles) still bound turnover expectations, stride-aware batching in inference keeps relaxed experiments production-safe, and the new scheduler-driven inference lane feeds a Redis decision queue that the trading dry-run service consumes with Prometheus/Grafana coverage.
 - **Immediate Goal**: Harden the forward replay guardrails (now part of CI for the TCN suite), ship deployability runbooks that capture the widened manifests, and decide on rollout sequencing (base + blender vs full trio) once monitoring confirms the new coverage floor persists.
 
 ---
@@ -34,7 +34,8 @@ _Last updated: 2025-10-31 02:39 UTC_
 ### 3.1 Services (Docker Compose)
 - **ingestion-api**: FastAPI app (`app/ingestion_service/main.py`) that pre-warms CCXT/News/Social/Onchain clients, mounts a custom `/metrics`, and lazily loads HuggingFace sentiment models when `ML_SENTIMENT_ENABLED=1`.
 - **redis** + **redis-exporter**: Redis feature store with metrics exporter; persistent volumes include `redis-data` and the optional HuggingFace cache (`hf-cache`).
-- **scheduler**: APScheduler worker calling admin endpoints (`MARKET_JOBS`, `MARKET_INGEST_JOBS`, TTL sweeps) sourced from env vars; publishes metrics on port `9002`.
+- **scheduler**: APScheduler worker calling admin endpoints (`MARKET_JOBS`, `MARKET_INGEST_JOBS`, TTL sweeps) sourced from env vars; publishes metrics on port `9002` and now owns manifest-driven inference jobs that enqueue decisions to Redis.
+- **trading**: Async consumer of the decision queue (`trading:decisions` by default) that enforces manifest gates, performs dry-run order execution, persists state/audit logs, and exports Prometheus metrics on `TRADING_METRICS_PORT`.
 - **prometheus** & **grafana**: Monitoring stack fronting the ingestion API, scheduler, Redis exporter, and custom dashboards under `monitoring/grafana`.
 
 ### 3.2 Configuration (`app/ingestion_service/config.py`)
@@ -48,6 +49,12 @@ _Last updated: 2025-10-31 02:39 UTC_
 - **News** (`app/features/ingestion/news_client.py` + `app/adapters/news_adapter.py`): API/RSS ingestion with schema guards, normalized partitions under `data_lake/news`; `fetch_news_rss_once` powers both the FastAPI route and CLI, and the `/ingest/news` endpoint now persists Parquet partitions (`dt` + `source`) and mirrors rows into Redis (covered by `tests/ingestion_service/test_routes.py::test_post_news_rss_success`).
 - **On-chain** (`app/features/ingestion/onchain_client.py` + `app/adapters/onchain_adapter.py`): Glassnode/Covalent surfaces into `data_lake/onchain` (populates once API keys are supplied) while returning schema-stable frames on failure.
 - **Feature Store** (`app/features/store/redis_store.py`): Async Redis cache with Prometheus counters/histograms reused by ingestion endpoints, backfill jobs, and scheduler TTL sweeps.
+
+### 3.4 Scheduler Inference & Trading Dry Run
+- `app/scheduler/main.py` now parses `INFER_JOBS`, loads deployable manifests via `training.infer`, replays a rolling parquet window, and enqueues decision payloads to Redis (`DECISION_QUEUE_KEY`, default `trading:decisions`). Metrics track gate coverage per model/symbol via `observe_gate_coverage` plus new counters for queue throughput.
+- `app/trading/service.py` consumes that queue, keeps per-symbol state (`app/trading/state.py`) with file/Redis/Postgres backends, logs audit events (`app/trading/audit.py`), and routes orders through the CCXT adapter with spread guardrails and dry-run toggles.
+- Prometheus integration ships with dedicated metrics (`trading_trade_attempts_total`, `trading_trade_notional_total`, `trading_gate_toggles_total`, `trading_position_active`, `trading_realized_pnl_total`), surfaced on port 9010 and wiring into `monitoring/grafana/dashboards/trading-overview.json` plus new alert rules for stale queues/state drift.
+- Helper CLI `scripts/verify_trading_redis.py` inspects the Redis-backed state/audit artefacts so ops can verify dry-run behaviour without hitting the database.
 
 ---
 

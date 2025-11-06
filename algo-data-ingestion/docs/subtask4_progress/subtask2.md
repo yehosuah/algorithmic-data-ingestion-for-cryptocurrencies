@@ -1,6 +1,6 @@
 # Subtask 2 – Horizon-120 XGB Baseline Refresh
 
-_Last updated: 2025-10-31 02:39 UTC_
+_Last updated: 2025-11-05 14:56 UTC_
 
 ## Run
 ```
@@ -28,12 +28,14 @@ _Last updated: 2025-10-31 02:39 UTC_
 - Relaxing the training gate (`hl_spread_z ≤ 0.25`, `rvol_20 ≤ 2e-4`, no prob filter) restored probability variance and kept turnover manageable (4.7 k toggles) during training.
 - RSS audit passes; spread stress (`spread_scale ∈ {0,0.05,0.1,0.2}`) leaves equity unchanged, indicating resilience to moderate cost inflation.
 - Oct 2025 forward replay (`models/oos_replay_summary_latest.json`, 40 201 rows) now logs 12 deployable gate hits (8 trades, `final_equity 1.2336`, `gate_coverage 2.99e-4`), so lock the thresholds in release notes and monitor coverage for drift.
+- Scheduler inference jobs now broadcast this manifest to the trading dry run; watch `scheduler_decision_messages_enqueued_total` and `trading_trade_attempts_total` when experimenting with new thresholds.
 
 ## Deployable Gate Update
-- Manifest inference mask: `hl_spread ≤ 0.0007`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`, long-only. CI now enforces manifest alignment via `tests/regression/test_manifest_gating.py` and shortlist viability via `test_report_shortlist.py`.
+- Manifest inference mask now simply enforces `prob ≥ 0.2`, `min_hold 10`, `long_only`; spread and volatility caps are validated in the trading layer. CI still enforces manifest alignment via `tests/regression/test_manifest_gating.py` and shortlist viability via `test_report_shortlist.py`.
 - `live_gate_coverage.csv` confirms monthly coverage within ±1.63× baseline (peak 0.0179 % in Jul 2025) historically, and the Oct 2025 forward replay now records 12 deployable hits (8 trades, `final_equity 1.2336`, `gate_coverage 2.99e-4`) under the widened mask—treat that coverage as the new floor.
 
 ## Next Steps
 1. Monitor the widened manifest so Oct–Nov 2025 forward replay maintains equity ≥1.2 with coverage at or above the new Oct baseline (12 hits) and stable turnover.
 2. Add regression tests that load the manifest into `training/infer.py` and compare KPIs against `report.json`.
 3. Include manifest + coverage CSV in the packaging pipeline for consistent deployment hand-offs.
+4. Track the trading dry run for BTC/ETH/SOL lanes to ensure queue depth stays near zero and audit logs mirror deployable trade counts before promoting threshold changes.

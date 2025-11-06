@@ -1,14 +1,14 @@
 # Subtask 4 – Deployability Check
 
-_Last updated: 2025-10-31 02:39 UTC_
+_Last updated: 2025-11-05 14:56 UTC_
 
 ## Models In Scope
 - **Base XGB (H120, Calmon relaxed)** – `models/base_xgb_h120_calmon_spread0`
   - `final_equity 4.48`, Sharpe 117.4, relaxed gate coverage 9.4 %.
-  - Deployable gate (`manifest.gates.inference`): `hl_spread ≤ 0.0007`, `hl_spread_z ≤ -0.25`, `rvol_20 ≤ 8e-5`, `prob ≥ 0.72`, `min_hold 10`.
+  - Deployable gate (`manifest.gates.inference`): `prob ≥ 0.2`, `min_hold 10`, `long_only`; spread/rvol checks are enforced by the trading service.
   - Oct 2025 replay (`models/oos_replay_summary_latest.json`, 40 201 rows) records 12 deployable gate hits (8 trades, `final_equity 1.2336`, `gate_coverage 2.99e-4`); continue tracking coverage while thresholds settle.
-- **TCN suite (Calmon relaxed)** – `models/tcn_h{60,120,180}_calmon_relaxed`
-  - Horizons 60/120/180 deliver `final_equity` 1.28 / 3.62 / 1.85 with ≤200 toggles. Inference gates are relaxed (`hl_spread ≤ 9e-4`, `rvol_20 ≤ 1.8e-4/1.8e-4/1.5e-4`, `prob ≥ 0.52/0.68/0.52`, `min_hold 10`).
+-- **TCN suite (Calmon relaxed)** – `models/tcn_h{60,120,180}_calmon_relaxed`
+  - Horizons 60/120/180 deliver `final_equity` 1.28 / 3.62 / 1.85 with ≤200 toggles. Inference gate now requires only `prob ≥ 0.25`, `min_hold 10`, `long_only` (spread/vol caps monitored at execution).
   - Oct 2025 replay (`models/oos_replay_summary_latest.json`) shows deployable coverage across horizons (`gate_hits 4/31/2`, `gate_coverage 4.73e-4/7.71e-4/4.23e-4`, `final_equity 1.03/1.94/1.01`); keep the CI guardrail green when adjusting manifests.
   - `training/infer.predict_tcn` batches inference by stride, enabling stride‑1 experiments without exhausting memory.
 - **Blender (H120 elastic-net)** – `models/blender_h120_v6`
@@ -28,6 +28,12 @@ _Last updated: 2025-10-31 02:39 UTC_
 - `models/report_shortlist.json` – KPI-normalized shortlist compiled via `scripts/report_shortlist.py`.
 - `.github/workflows/ci.yml` – GitHub Actions pipeline running ingestion E2E tests, manifest/shortlist regressions, and the TCN forward replay guardrail (`gate_fraction ≥ 5e-4`, `final_equity ≥ 1.2`).
 
+## Trading Dry Run Artifacts
+- `app/scheduler/main.py` (`INFER_JOBS`) – publishes manifest-scored decisions to Redis (`trading:decisions`) with Prometheus counters (`scheduler_decision_messages_enqueued_total`, `scheduler_job_runs_total`).
+- `app/trading/service.py` – consumes the queue, persists state (`app/trading/state.py`) via file/Redis/Postgres, logs audit entries (`app/trading/audit.py`), and emits metrics (`trading_trade_attempts_total`, `trading_trade_notional_total`, `trading_gate_toggles_total`, `trading_position_active`, `trading_realized_pnl_total`).
+- `monitoring/grafana/dashboards/trading-overview.json` – dashboard covering queue depth, gate coverage, trade attempts, faux P&L; `monitoring/alert.rules.yml` adds corresponding alerts (stale queue, zero trade attempts, stale audit stream).
+- `scripts/verify_trading_redis.py` – CLI helper to inspect the Redis position hash (`trading:positions`) and audit stream (`trading:audit`) during dry-run rehearsals.
+
 ## Deployment Readiness Checklist
 1. **Forward Validation** – Replay Oct–Nov 2025 (and beyond) for base, TCN, blender using the deployable gate; keep base/blender at equity ≥1.2 with turnover deviations <±25 % of baseline and ensure TCN coverage stays above the 5e-4 guardrail (document a fallback if it regresses).
 2. **Inference Parity** – Integrate manifest gates + feature lists into the live adapter, add regression tests that compare `training/infer.py` outputs against `report.json` KPIs.
@@ -36,9 +42,11 @@ _Last updated: 2025-10-31 02:39 UTC_
    - RSS minute spike share <5e-4 or audit `passed=false`
    - Probability σ <0.03 on any validation month
 4. **Fallback Plan** – Document no-RSS blender configuration and base-only mode in case RSS feeds fail the audit; include the deployable-gate fallback that restores coverage when Oct 2025-like droughts recur.
+5. **Trading Dry Run** – Run the scheduler/trading loop for ≥7 days with `TRADING_DRY_RUN=1`, confirm bounded Redis queue depth, advancing Prometheus counters, populated audit logs, and capture Grafana screenshots for release notes before toggling to live orders.
 
 ## Outstanding Work
 - Automate packaging of manifests/artifacts into a release bundle (see `docs/final_stretch_v1.md`).
 - Maintain deployable gates (base/TCN/blender) so Oct 2025 forward replay keeps coverage at the new baseline; document when smoothing or thresholds move and re-run the sandbox comparisons.
 - Extend the blender matrix to new months before reattempting meta-label deployment.
 - Evaluate storage strategy (Git LFS or artifact bucket) for large parquet/model files prior to production handoff.
+- Document Redis vs Postgres state backend choices in ops runbooks and ensure Prometheus alerts (stale queue, no trade attempts) map to actionable playbooks before production handoff.

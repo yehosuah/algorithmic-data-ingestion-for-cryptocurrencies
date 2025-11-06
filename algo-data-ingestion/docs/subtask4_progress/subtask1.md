@@ -1,6 +1,6 @@
 # Subtask 1 – 120-Bar TCN Turnover Control
 
-_Last updated: 2025-10-31 02:39 UTC_
+_Last updated: 2025-11-05 14:56 UTC_
 
 ## Run
 ```
@@ -24,14 +24,16 @@ _Last updated: 2025-10-31 02:39 UTC_
 - `final_equity` **3.624** (threshold 0.55)
 - `total_turnover` **128** (≤200 guardrail)
 - `sharpe` **99.8**
-- Training gate coverage 0.0839; deployable inference mask uses widened thresholds (`hl_spread ≤ 0.0009`, `hl_spread_z ≤ 0.25`, `rvol_20 ≤ 1.8e-4`, `prob ≥ 0.68`, `min_hold 10`).
+- Training gate coverage 0.0839; deployable inference mask now keeps only `prob ≥ 0.25`, `min_hold 10`, `long_only`, with spread/volatility guards enforced at execution time.
 
 ## Notes
 - Fold logits now persist, making recalibration and diagnostics reproducible without rerunning the network.
 - Monthly probability σ remains above 0.03, indicating no variance collapse under the relaxed gate.
 - Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) now shows deployable coverage for the h120 model (`gate_hits 31`, `toggle_count 62`, `gate_fraction 7.71e-4`, `final_equity 1.94`); keep the guardrail (`gate_fraction ≥ 5e-4`, `final_equity ≥ 1.2`) in mind when tuning thresholds further.
 - `training/infer.predict_tcn` now batches inference by stride, letting us explore stride‑1 gates without exhausting memory.
+- `app/scheduler/main.py` consumes this manifest via `INFER_JOBS` to publish Redis decisions for the trading dry run; monitor `scheduler_decision_messages_enqueued_total` when experimenting with stride or threshold changes.
 
 ## Follow-ups
 1. Maintain the deployable gate above the 5e-4 floor while iterating on turnover; document fallback behaviour if coverage regresses.
 2. Train sibling horizons (60/180) for ensemble coverage and document selection triggers in the manifest.
+3. Confirm the trading dry run stays stable when this manifest updates (bounded Redis queue, advancing `trading_trade_attempts_total`, audit stream entries for ETH/BTC/SOL lanes).

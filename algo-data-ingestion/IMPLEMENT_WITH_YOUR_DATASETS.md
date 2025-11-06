@@ -1,6 +1,6 @@
 # Walkthrough: Implement with Your Datasets
 
-_Last updated: 2025-10-31 02:39 UTC_
+_Last updated: 2025-11-05 14:56 UTC_
 
 This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your own instruments once you have equivalent market + RSS coverage.
 
@@ -51,3 +51,19 @@ This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your
 - Run regression guardrails before deployment: `pytest tests/regression -q` keeps manifests aligned with reports and verifies the shortlist; `pytest tests/ingestion_service -q` exercises the async API.
 - Inspect your forward replay equivalent of `models/oos_replay_summary_latest.json`; aim for at least the current baseline (base: 12 gate hits, `final_equity 1.2336`, gate coverage 2.99e-4; TCN h60/h120/h180: gate coverage 4.73e-4/7.71e-4/4.23e-4 with toggles 4/62/2; blender: ≈15.8 % coverage with 6 346 toggles). If deployable masks fall back to zero, widen thresholds or stage a fallback gate prior to launch (keep an archived zero-coverage snapshot like `...oct_nov_2025.json` for regression).
 - Ensure your inference path uses the updated stride-aware batching in `training/infer.predict_tcn` so experiments with smaller strides do not overload memory.
+
+## Step 7 – Scheduler & Trading Dry Run
+- Populate `INFER_JOBS` with your symbols/timeframes and manifest names (base/TCN optional). Pair each job with a `lookback_minutes` window large enough to reconstruct features plus a `history_minutes` margin for warm-up.
+- Update `TRADING_MODELS` to reflect your manifolds, sizing strategy (`order_amount` or `order_notional`), and optional hold overrides. Paths are resolved relative to `MODELS_ROOT` (defaults to the repo `models/` mount).
+- Spin up the Docker stack and monitor:
+  ```bash
+  curl -s http://localhost:9002/metrics | grep scheduler_decision
+  curl -s http://localhost:9010/metrics | egrep 'trading_trade_attempts_total|trading_position_active'
+  python scripts/verify_trading_redis.py
+  ```
+  Verify the Redis queue drains quickly, trading metrics increment, and audit/state logs reflect your symbol set.
+- Decide on the persistence backend:
+  - File (`TRADING_STATE_BACKEND=file`) keeps `data_lake/trading/state.json` updated on disk (default).
+  - Redis (`TRADING_STATE_BACKEND=redis`) mirrors state to `TRADING_STATE_REDIS_HASH`; useful when multiple workers share a queue.
+  - Postgres (`TRADING_STATE_BACKEND=postgres`) materialises `trading_positions` / `trading_audit_events` tables with automatic schema creation; supply DSNs via env.
+- Keep Grafana dashboards (`scheduler-overview`, `trading-overview`) open during the dry run and capture deviations in your deployment notes. Flip `TRADING_DRY_RUN=0` only after rehearsing the checklist with ops/compliance.
