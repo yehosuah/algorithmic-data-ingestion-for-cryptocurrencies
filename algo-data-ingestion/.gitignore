@@ -7,6 +7,16 @@ venv/
 venv_ci/
 .venv_ci311/
 venv_ci311/
+.venv_paper
+venv_paper/
+.venv_paper311/
+venv_paper311/
+.env/
+logs/
+trading.log
+
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
