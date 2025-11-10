@@ -374,6 +374,25 @@
       ],
       "title": "Realized P&L (cumulative)",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "datasource",
+        "uid": "grafana"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 5,
+      "options": {
+        "content": "## Manual Metrics Check\nUse these shell commands once the trading service is up to confirm trades are clearing the manifest gate after throttling:\n\n```bash\ncurl -s localhost:9010/metrics | rg 'trading_(trade_attempts_total|realized_pnl_sum)'\n```\n\n```bash\nredis-cli -u $TRADING_AUDIT_REDIS_URL XREAD COUNT 5 STREAMS trading:audit 0\n```\n\nThe Prom query surfaces attempt and P&L counters, and the Redis read samples the audit stream for confirmation.",
+        "mode": "markdown"
+      },
+      "title": "Manual Metrics Check",
+      "type": "text"
     }
   ],
   "refresh": "10s",

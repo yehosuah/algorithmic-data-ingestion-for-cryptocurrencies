@@ -111,11 +111,11 @@ services:
       - DATA_LAKE_ROOT=/app/data_lake/market
       - DECISION_QUEUE_URL=redis://redis:6379/0
       - DECISION_QUEUE_KEY=trading:decisions
-      - INFER_DEFAULT_STRIDE=30
+      - INFER_DEFAULT_STRIDE=2
       - INFER_JOBS=[
-          {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":120,"history_minutes":240,"base_model":"base_xgb_h120_calmon_spread0","tcn_model":"tcn_h120_calmon_relaxed","stride":30,"include_features":false,"queue_key":"trading:decisions","cron":"*/1 * * * *"},
-          {"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":120,"history_minutes":240,"base_model":"base_xgb_h120_calmon_spread0","tcn_model":"tcn_h120_calmon_relaxed","stride":30,"include_features":false,"queue_key":"trading:decisions","cron":"*/1 * * * *"},
-          {"exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":120,"history_minutes":240,"base_model":"base_xgb_h120_calmon_spread0","tcn_model":"tcn_h120_calmon_relaxed","stride":30,"include_features":false,"queue_key":"trading:decisions","cron":"*/1 * * * *"}
+          {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":240,"history_minutes":720,"base_model":"base_xgb_h120_calmon_spread0","tcn_model":"tcn_h120_calmon_relaxed","blender_model":"blender_h120_v6","stride":2,"include_features":false,"queue_key":"trading:decisions","cron":"*/1 * * * *"},
+          {"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":240,"history_minutes":720,"base_model":"base_xgb_h120_calmon_spread0","tcn_model":"tcn_h120_calmon_relaxed","blender_model":"blender_h120_v6","stride":2,"include_features":false,"queue_key":"trading:decisions","cron":"*/1 * * * *"},
+          {"exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":240,"history_minutes":720,"base_model":"base_xgb_h120_calmon_spread0","tcn_model":"tcn_h120_calmon_relaxed","blender_model":"blender_h120_v6","stride":2,"include_features":false,"queue_key":"trading:decisions","cron":"*/1 * * * *"}
         ]
       - MARKET_JOBS=[
           {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":240,"cron":"*/5 * * * *"},
@@ -135,6 +135,11 @@ services:
       - "9002:9002"
     volumes:
       - market-data:/app/data_lake
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9002/metrics >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   trading:
@@ -153,13 +158,20 @@ services:
       - DECISION_QUEUE_KEY=trading:decisions
       - MODELS_ROOT=/opt/models
       - TRADING_METRICS_PORT=9010
+      - TRADING_STATE_PATH=/app/trading_state/state.json
       - TRADING_STATE_REDIS_URL=redis://redis:6379/0
       - TRADING_AUDIT_REDIS_URL=redis://redis:6379/0
     volumes:
       - market-data:/app/data_lake
+      - trading-state:/app/trading_state
       - ./logs/trading:/app/logs
     ports:
       - "9010:9010"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9010/metrics >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 volumes:
@@ -173,3 +185,4 @@ volumes:
       # GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}
       # FSSPEC_STORAGE_OPTIONS=${FSSPEC_STORAGE_OPTIONS}
   hf-cache: {}
+  trading-state: {}

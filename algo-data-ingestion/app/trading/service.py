@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import logging
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -41,14 +42,58 @@ def _parse_timestamp(raw: object) -> Optional[datetime]:
     return ts.astimezone(timezone.utc)
 
 
+def _extract_price_from_item(item: Dict[str, object]) -> Optional[float]:
+    if not isinstance(item, dict):
+        return None
+    features = item.get("features")
+    feature_dict = features if isinstance(features, dict) else {}
+    for key in ("price", "close", "mid_price", "last_price", "bid", "ask"):
+        value = item.get(key)
+        if value is None:
+            value = feature_dict.get(key)
+            if value is None and key == "price":
+                value = feature_dict.get("close")
+        if value is None:
+            continue
+        try:
+            price = float(value)
+        except (TypeError, ValueError):
+            continue
+        if price > 0.0:
+            return price
+    return None
+
+
+def _extract_spread_from_item(item: Dict[str, object]) -> Optional[float]:
+    if not isinstance(item, dict):
+        return None
+    features = item.get("features")
+    if not isinstance(features, dict):
+        return None
+    for key in ("hl_spread", "spread", "bid_ask_spread", "spread_bps"):
+        raw_value = features.get(key)
+        if raw_value is None:
+            continue
+        try:
+            spread = float(raw_value)
+        except (TypeError, ValueError):
+            continue
+        return spread
+    return None
+
+
 @dataclass(frozen=True)
 class ManifestSnapshot:
-    threshold: float
+    entry_threshold: float
+    exit_threshold: float
+    exit_prob_drop: float
     min_hold_bars: int
     long_only: bool
 
 
 class TradingService:
+    TELEMETRY_SAMPLE_LIMIT = 5
+
     def __init__(self, config: TradingConfig) -> None:
         self.config = config
         self.state_store = TradingStateStore(
@@ -85,6 +130,14 @@ class TradingService:
         self._redis: Optional[aioredis.Redis] = None
         self._running = False
         self._poll_task: Optional[asyncio.Task] = None
+        self._telemetry_samples: Dict[Tuple[str, Optional[str], str], int] = defaultdict(int)
+
+    def _create_queue_client(self) -> aioredis.Redis:
+        return aioredis.from_url(
+            self.config.decision_queue_url,
+            encoding="utf-8",
+            decode_responses=True,
+        )
 
     async def start(self) -> None:
         if self._running:
@@ -97,11 +150,7 @@ class TradingService:
             configured_models,
             self.config.dry_run,
         )
-        self._redis = aioredis.from_url(
-            self.config.decision_queue_url,
-            encoding="utf-8",
-            decode_responses=True,
-        )
+        self._redis = self._create_queue_client()
         try:
             await self._redis.ping()
         except Exception as exc:
@@ -178,11 +227,93 @@ class TradingService:
         if dirty:
             await self.state_store.flush()
 
+    async def _reconnect_redis(self) -> None:
+        if self._redis is not None:
+            with contextlib.suppress(Exception):
+                await self._redis.close()
+        if not self._running:
+            self._redis = None
+            return
+        client = self._create_queue_client()
+        try:
+            await client.ping()
+        except Exception as exc:
+            logger.error(
+                "Redis reconnect failed for %s: %s",
+                self.config.decision_queue_url,
+                exc,
+            )
+            with contextlib.suppress(Exception):
+                await client.close()
+            self._redis = None
+            raise
+        self._redis = client
+
+    async def _read_last_processed_ts(self, state_key: str) -> Optional[datetime]:
+        if not self.config.last_timestamp_hash or self._redis is None:
+            return None
+        try:
+            raw = await self._redis.hget(self.config.last_timestamp_hash, state_key)
+        except Exception as exc:
+            logger.warning("Failed to read last processed timestamp for %s: %s", state_key, exc)
+            return None
+        if not raw:
+            return None
+        return _parse_timestamp(raw)
+
+    async def _write_last_processed_ts(self, state_key: str, ts: datetime) -> None:
+        if not self.config.last_timestamp_hash or self._redis is None or ts is None:
+            return
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        payload = ts.astimezone(timezone.utc).isoformat()
+        try:
+            await self._redis.hset(self.config.last_timestamp_hash, state_key, payload)
+        except Exception as exc:
+            logger.warning("Failed to persist last processed timestamp for %s: %s", state_key, exc)
+
+    async def _filter_stale_decisions(
+        self,
+        model_cfg: TradingModelConfig,
+        state: PositionState,
+        items: List[Tuple[datetime, Dict[str, object]]],
+    ) -> List[Tuple[datetime, Dict[str, object]]]:
+        if not items:
+            return items
+        cutoff = state.last_timestamp
+        redis_cutoff = await self._read_last_processed_ts(model_cfg.state_key)
+        if redis_cutoff is not None and (cutoff is None or redis_cutoff > cutoff):
+            cutoff = redis_cutoff
+        if cutoff is None:
+            return items
+        fresh: List[Tuple[datetime, Dict[str, object]]] = []
+        for ts, payload in items:
+            if ts > cutoff:
+                fresh.append((ts, payload))
+        dropped = len(items) - len(fresh)
+        if dropped:
+            logger.info(
+                "Dropping %s stale decision(s) for %s %s (<= %s)",
+                dropped,
+                model_cfg.model,
+                model_cfg.symbol,
+                cutoff.isoformat(),
+            )
+        return fresh
+
     async def _poll_loop(self) -> None:
-        assert self._redis is not None
         timeout = max(1, int(self.config.redis_poll_timeout))
         while self._running:
+            if self._redis is None:
+                try:
+                    await self._reconnect_redis()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    await asyncio.sleep(timeout)
+                    continue
             try:
+                assert self._redis is not None
                 result = await self._redis.blpop(
                     self.config.decision_queue_key,
                     timeout=timeout,
@@ -191,6 +322,12 @@ class TradingService:
                 raise
             except Exception as exc:
                 logger.exception("Redis BLPOP failed: %s", exc)
+                try:
+                    await self._reconnect_redis()
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    pass
                 await asyncio.sleep(timeout)
                 continue
             if result is None:
@@ -258,6 +395,12 @@ class TradingService:
             return
         parsed.sort(key=lambda pair: pair[0])
 
+        state = self.state_store.get(model_cfg.state_key)
+        set_position_active(model_cfg.model, model_cfg.symbol, state.in_position)
+        parsed = await self._filter_stale_decisions(model_cfg, state, parsed)
+        if not parsed:
+            return
+
         min_hold_bars = int(model_cfg.min_hold_bars_override or manifest.min_hold_bars or 1)
         min_hold_seconds = max(1, min_hold_bars) * model_cfg.bar_seconds
         max_hold_minutes_cfg = model_cfg.max_hold_minutes
@@ -275,11 +418,28 @@ class TradingService:
                     model_cfg.symbol,
                 )
                 max_hold_seconds = min_hold_seconds
-        threshold = float(manifest.threshold)
-
-        state = self.state_store.get(model_cfg.state_key)
-        set_position_active(model_cfg.model, model_cfg.symbol, state.in_position)
+        entry_threshold = float(manifest.entry_threshold)
+        exit_threshold = float(manifest.exit_threshold)
+        exit_prob_drop = float(manifest.exit_prob_drop)
         dirty = False
+        try:
+            stop_loss_pct = (
+                float(model_cfg.stop_loss_pct) if getattr(model_cfg, "stop_loss_pct", None) is not None else None
+            )
+        except (TypeError, ValueError):
+            stop_loss_pct = None
+        try:
+            take_profit_pct = (
+                float(model_cfg.take_profit_pct)
+                if getattr(model_cfg, "take_profit_pct", None) is not None
+                else None
+            )
+        except (TypeError, ValueError):
+            take_profit_pct = None
+        if stop_loss_pct is not None and stop_loss_pct <= 0.0:
+            stop_loss_pct = None
+        if take_profit_pct is not None and take_profit_pct <= 0.0:
+            take_profit_pct = None
 
         for ts, item in parsed:
             probability = float(item.get("probability") or 0.0)
@@ -296,11 +456,41 @@ class TradingService:
                     timestamp=ts,
                     gate_pass=gate_pass,
                     probability=probability,
-                    threshold=threshold,
+                    threshold=entry_threshold,
                     previous_gate=previous_gate,
                 )
                 record_gate_toggle(model_cfg.model, model_cfg.symbol, gate_pass)
             state.last_gate = gate_pass
+
+            stored_entry_prob: Optional[float] = None
+            if state.metadata.get("open_entry_prob") is not None:
+                try:
+                    stored_entry_prob = float(state.metadata["open_entry_prob"])
+                except (TypeError, ValueError):
+                    stored_entry_prob = None
+
+            entry_price: Optional[float] = None
+            if state.metadata.get("open_price") is not None:
+                try:
+                    entry_price = float(state.metadata["open_price"])
+                except (TypeError, ValueError):
+                    entry_price = None
+                else:
+                    if entry_price <= 0.0:
+                        entry_price = None
+            current_price = _extract_price_from_item(item)
+            exit_due_to_stop_loss = False
+            exit_due_to_take_profit = False
+            if (
+                state.in_position
+                and entry_price is not None
+                and current_price is not None
+            ):
+                if stop_loss_pct is not None and current_price <= entry_price * (1.0 - stop_loss_pct):
+                    exit_due_to_stop_loss = True
+                elif take_profit_pct is not None and current_price >= entry_price * (1.0 + take_profit_pct):
+                    exit_due_to_take_profit = True
+
             force_time_exit = False
             if (
                 state.in_position
@@ -313,25 +503,46 @@ class TradingService:
             ready_for_exit = state.ready_for_exit(ts)
             if force_time_exit and not ready_for_exit:
                 ready_for_exit = True
+            if (exit_due_to_stop_loss or exit_due_to_take_profit) and not ready_for_exit:
+                ready_for_exit = True
 
             should_enter = (
                 gate_pass
-                and probability >= threshold
+                and probability >= entry_threshold
                 and manifest.long_only
                 and state.ready_for_entry(ts)
             )
 
-            exit_due_to_gate = (not gate_pass) or (probability < threshold)
+            exit_due_to_prob_floor = probability < exit_threshold
+            exit_due_to_gate = (not gate_pass) or exit_due_to_prob_floor
+            exit_due_to_trailing = False
+            if state.in_position and stored_entry_prob is not None:
+                exit_due_to_trailing = (stored_entry_prob - probability) >= exit_prob_drop
+
             exit_trigger: Optional[str] = None
-            if exit_due_to_gate:
-                exit_trigger = "gate_close"
             if force_time_exit:
                 exit_trigger = "time_limit"
+            elif exit_due_to_stop_loss:
+                exit_trigger = "stop_loss"
+            elif exit_due_to_take_profit:
+                exit_trigger = "take_profit"
+            elif exit_due_to_prob_floor:
+                exit_trigger = "prob_floor"
+            elif not gate_pass:
+                exit_trigger = "gate_close"
+            elif exit_due_to_trailing:
+                exit_trigger = "prob_trailing"
 
             should_exit = (
                 state.in_position
                 and ready_for_exit
-                and (exit_due_to_gate or force_time_exit)
+                and (
+                    exit_due_to_gate
+                    or exit_due_to_trailing
+                    or force_time_exit
+                    or exit_due_to_stop_loss
+                    or exit_due_to_take_profit
+                )
             )
 
             if should_enter:
@@ -358,7 +569,7 @@ class TradingService:
                     side="buy",
                     gate_pass=gate_pass,
                     probability=probability,
-                    threshold=threshold,
+                    threshold=entry_threshold,
                     decision=decision,
                 )
                 if decision.executed:
@@ -368,6 +579,7 @@ class TradingService:
                         state.metadata["open_amount"] = f"{float(decision.amount):.10f}"
                     state.metadata["open_side"] = "long"
                     state.mark_entry(ts, min_hold_seconds)
+                    state.metadata["open_entry_prob"] = f"{probability:.10f}"
                     state.metadata["last_entry_reason"] = decision.reason or ""
                     state.metadata["last_entry_spread_bps"] = (
                         f"{decision.spread_bps:.4f}" if decision.spread_bps is not None else ""
@@ -375,15 +587,28 @@ class TradingService:
                     state.metadata.pop("last_exit_trigger", None)
                     set_position_active(model_cfg.model, model_cfg.symbol, True)
                     dirty = True
+                    self._log_trade_telemetry(
+                        kind="entry",
+                        model_cfg=model_cfg,
+                        probability=probability,
+                        entry_threshold=entry_threshold,
+                        exit_threshold=exit_threshold,
+                        gate_pass=gate_pass,
+                        decision=decision,
+                        item=item,
+                        entry_prob=probability,
+                        current_price=current_price,
+                    )
                 else:
                     logger.info(
                         "Entry order skipped for %s %s (prob=%.4f threshold=%.4f reason=%s)",
                         model_cfg.model,
                         model_cfg.symbol,
                         probability,
-                        threshold,
+                        entry_threshold,
                         decision.reason or "unknown",
                     )
+                    state.metadata.pop("open_entry_prob", None)
                     state.metadata["last_entry_reason"] = decision.reason or ""
                     state.metadata["last_entry_spread_bps"] = (
                         f"{decision.spread_bps:.4f}" if decision.spread_bps is not None else ""
@@ -396,6 +621,24 @@ class TradingService:
                         model_cfg.model,
                         model_cfg.symbol,
                         ((ts - (state.entry_ts or ts)).total_seconds() / 60.0),
+                    )
+                elif exit_trigger == "stop_loss":
+                    logger.info(
+                        "Stop-loss exit triggered for %s %s at price %.6f (entry %.6f, threshold %.3f%%)",
+                        model_cfg.model,
+                        model_cfg.symbol,
+                        (current_price or 0.0),
+                        (entry_price or 0.0),
+                        (stop_loss_pct or 0.0) * 100.0,
+                    )
+                elif exit_trigger == "take_profit":
+                    logger.info(
+                        "Take-profit exit triggered for %s %s at price %.6f (entry %.6f, threshold %.3f%%)",
+                        model_cfg.model,
+                        model_cfg.symbol,
+                        (current_price or 0.0),
+                        (entry_price or 0.0),
+                        (take_profit_pct or 0.0) * 100.0,
                     )
                 decision = await self.executor.submit(
                     exchange=model_cfg.exchange,
@@ -420,7 +663,7 @@ class TradingService:
                     side="sell",
                     gate_pass=gate_pass,
                     probability=probability,
-                    threshold=threshold,
+                    threshold=exit_threshold if exit_trigger in {"prob_floor", "prob_trailing"} else entry_threshold,
                     decision=decision,
                 )
                 if decision.executed:
@@ -447,15 +690,30 @@ class TradingService:
                         f"{decision.spread_bps:.4f}" if decision.spread_bps is not None else ""
                     )
                     state.metadata["last_exit_trigger"] = exit_trigger or ""
+                    state.metadata.pop("open_entry_prob", None)
                     set_position_active(model_cfg.model, model_cfg.symbol, False)
                     dirty = True
+                    self._log_trade_telemetry(
+                        kind="exit",
+                        model_cfg=model_cfg,
+                        probability=probability,
+                        entry_threshold=entry_threshold,
+                        exit_threshold=exit_threshold,
+                        gate_pass=gate_pass,
+                        decision=decision,
+                        item=item,
+                        entry_prob=stored_entry_prob,
+                        current_price=current_price,
+                        entry_price=entry_price,
+                        exit_trigger=exit_trigger,
+                    )
                 else:
                     logger.info(
                         "Exit order skipped for %s %s (prob=%.4f threshold=%.4f reason=%s)",
                         model_cfg.model,
                         model_cfg.symbol,
                         probability,
-                        threshold,
+                        exit_threshold if exit_trigger in {"prob_floor", "prob_trailing"} else entry_threshold,
                         decision.reason or "unknown",
                     )
                     state.metadata["last_exit_reason"] = decision.reason or ""
@@ -468,6 +726,58 @@ class TradingService:
         if dirty:
             self.state_store.update(model_cfg.state_key, state)
             await self.state_store.flush()
+            if state.last_timestamp is not None:
+                await self._write_last_processed_ts(model_cfg.state_key, state.last_timestamp)
+
+    def _log_trade_telemetry(
+        self,
+        *,
+        kind: str,
+        model_cfg: TradingModelConfig,
+        probability: float,
+        entry_threshold: float,
+        exit_threshold: float,
+        gate_pass: bool,
+        decision: OrderDecision,
+        item: Dict[str, object],
+        entry_prob: Optional[float] = None,
+        current_price: Optional[float] = None,
+        entry_price: Optional[float] = None,
+        exit_trigger: Optional[str] = None,
+    ) -> None:
+        key = (model_cfg.model, model_cfg.symbol, kind)
+        count = self._telemetry_samples[key]
+        if count >= self.TELEMETRY_SAMPLE_LIMIT:
+            return
+        self._telemetry_samples[key] = count + 1
+
+        feature_spread = _extract_spread_from_item(item)
+
+        def _fmt(value: Optional[float], precision: int = 4) -> str:
+            return f"{value:.{precision}f}" if value is not None else "na"
+
+        logger.info(
+            "Trade telemetry [%s #%d] %s %s gate=%s prob=%s entry_thr=%.4f exit_thr=%.4f "
+            "entry_prob=%s exit_prob=%s market_price=%s execution_price=%s entry_price=%s "
+            "feature_spread=%s exec_spread_bps=%s exit_trigger=%s reason=%s",
+            kind,
+            count + 1,
+            model_cfg.model,
+            model_cfg.symbol or "<none>",
+            gate_pass,
+            _fmt(probability),
+            entry_threshold,
+            exit_threshold,
+            _fmt(entry_prob),
+            _fmt(probability if kind == "exit" else None),
+            _fmt(current_price, precision=6),
+            _fmt(decision.price_used, precision=6),
+            _fmt(entry_price, precision=6),
+            _fmt(feature_spread, precision=6),
+            _fmt(decision.spread_bps),
+            exit_trigger or "",
+            decision.reason or "",
+        )
 
     def _resolve_manifest(self, payload: Dict[str, object], model_label: str) -> Optional[ManifestSnapshot]:
         artifact = payload.get("artifact_dir")
@@ -484,17 +794,25 @@ class TradingService:
             logger.exception("Failed to load manifest for %s: %s", model_label, exc)
             return None
         infer_cfg = artifacts.gate_config.get("inference") or {}
-        threshold = infer_cfg.get("prob_gate_min")
-        if threshold is None:
-            threshold_meta = artifacts.manifest.get("threshold")
-            if isinstance(threshold_meta, dict):
-                threshold = threshold_meta.get("value")
-        if threshold is None:
-            threshold = 0.5
+        entry_threshold = infer_cfg.get("prob_gate_min")
+        threshold_meta = artifacts.manifest.get("threshold")
+        exit_threshold = None
+        if isinstance(threshold_meta, dict):
+            exit_threshold = threshold_meta.get("value")
+        if entry_threshold is None and exit_threshold is not None:
+            entry_threshold = exit_threshold
+        if entry_threshold is None:
+            entry_threshold = 0.5
+        if exit_threshold is None:
+            exit_threshold = entry_threshold
+        metadata = artifacts.manifest.get("metadata") or {}
+        exit_prob_drop = float(metadata.get("exit_prob_drop", 0.15))
         min_hold_bars = int(infer_cfg.get("min_hold_bars") or 1)
         long_only = bool(infer_cfg.get("long_only", True))
         snapshot = ManifestSnapshot(
-            threshold=float(threshold),
+            entry_threshold=float(entry_threshold),
+            exit_threshold=float(exit_threshold),
+            exit_prob_drop=float(exit_prob_drop),
             min_hold_bars=min_hold_bars,
             long_only=long_only,
         )

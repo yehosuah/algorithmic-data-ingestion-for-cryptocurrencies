@@ -199,7 +199,7 @@ def test_score_base_with_manifest_uses_gate(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         "training.infer.load_base_predictor",
-        lambda *_: ("calib", ["hl_spread", "hl_spread_z", "rvol_20"]),
+        lambda *args, **kwargs: ("calib", ["hl_spread", "hl_spread_z", "rvol_20"]),
     )
     monkeypatch.setattr(
         "training.infer.predict_base",

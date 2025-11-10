@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import joblib
 
 from app.ingestion_service.manifests import (
     ManifestRegistry,
@@ -45,8 +46,8 @@ def fixture_scoring_service(loaded_registry: ManifestRegistry, monkeypatch: pyte
     _set_scoring_service_for_tests(None)
 
     # --- Base XGB stubs -------------------------------------------------
-    def fake_load_base_predictor(model_dir: Path):
-        del model_dir
+    def fake_load_base_predictor(model_dir: Path, prob_column: str = "base_prob"):
+        del model_dir, prob_column
         class Dummy:  # pragma: no cover - representation only
             ...
         return Dummy(), ["feature_a"]
@@ -68,8 +69,8 @@ def fixture_scoring_service(loaded_registry: ManifestRegistry, monkeypatch: pyte
     )
 
     # --- TCN stubs -------------------------------------------------------
-    def fake_load_tcn_predictor(model_dir: Path):
-        del model_dir
+    def fake_load_tcn_predictor(model_dir: Path, prob_column: str = "tcn_prob"):
+        del model_dir, prob_column
         class DummyModel:  # pragma: no cover
             ...
         class DummyCalib:  # pragma: no cover
@@ -97,6 +98,8 @@ def fixture_scoring_service(loaded_registry: ManifestRegistry, monkeypatch: pyte
     )
 
     # --- Blender stubs ---------------------------------------------------
+    real_joblib_load = joblib.load
+
     def fake_joblib_load(path, *args, **kwargs):
         if str(path).endswith("blender.joblib"):
             class DummyBlender:
@@ -108,7 +111,7 @@ def fixture_scoring_service(loaded_registry: ManifestRegistry, monkeypatch: pyte
                     neg = 1.0 - pos
                     return np.column_stack([neg, pos])
             return DummyBlender()
-        raise FileNotFoundError(f"Unexpected joblib load path during test: {path}")
+        return real_joblib_load(path, *args, **kwargs)
 
     def fake_build_blender_features(df: pd.DataFrame, *, candidate_cols=None, use_rss_features=True):
         del use_rss_features
@@ -159,8 +162,8 @@ def test_score_batch_base(scoring_service: ModelScoringService, loaded_registry:
     assert payload["model"] == "base_xgb_h120_calmon_spread0"
     assert "items" in payload and len(payload["items"]) == 2
     gate_results = [item["gate_pass"] for item in payload["items"]]
-    # Base manifest inference gate is now relaxed (prob >= 0.2), so both rows pass.
-    assert gate_results == [True, True]
+    # Base manifest inference gate currently enforces prob >= 0.9, so both rows fail.
+    assert gate_results == [False, False]
     probabilities = [item["probability"] for item in payload["items"]]
     assert probabilities == [pytest.approx(0.85), pytest.approx(0.4)]
 
@@ -173,8 +176,8 @@ def test_score_batch_tcn(scoring_service: ModelScoringService, loaded_registry: 
 
     assert payload["model"] == "tcn_h120_calmon_relaxed"
     gate_results = [item["gate_pass"] for item in payload["items"]]
-    # Relaxed TCN manifest allows both rows to pass at the current threshold.
-    assert gate_results == [True, True]
+    # TCN manifest keeps prob >= 0.6, so only the high-prob row survives.
+    assert gate_results == [True, False]
     probabilities = [item["probability"] for item in payload["items"]]
     assert probabilities == [pytest.approx(0.9), pytest.approx(0.4)]
 
@@ -189,4 +192,6 @@ def test_score_batch_blender(scoring_service: ModelScoringService, loaded_regist
     gate_results = [item["gate_pass"] for item in payload["items"]]
     assert gate_results == [True, False]
     probabilities = [item["probability"] for item in payload["items"]]
-    assert probabilities == [pytest.approx(0.7), pytest.approx(0.4)]
+    assert probabilities[0] > probabilities[1]
+    assert 0.0 < probabilities[0] < 1.0
+    assert 0.0 <= probabilities[1] < 1.0

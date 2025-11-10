@@ -41,6 +41,8 @@ class TradingModelConfig(BaseModel):
     max_spread_bps: float = Field(default=10.0, gt=0.0)
     min_hold_bars_override: Optional[int] = Field(default=None, ge=1)
     max_hold_minutes: Optional[int] = Field(default=None, ge=1)
+    stop_loss_pct: Optional[float] = Field(default=0.005, ge=0.0)
+    take_profit_pct: Optional[float] = Field(default=None, ge=0.0)
 
     @model_validator(mode="after")
     def ensure_order_sizing(self) -> "TradingModelConfig":
@@ -56,12 +58,13 @@ class TradingModelConfig(BaseModel):
 
     @property
     def state_key(self) -> str:
-        return f"{self.exchange}:{self.symbol}"
+        return f"{self.exchange}:{self.model}:{self.symbol}"
 
 
 class TradingConfig(BaseSettings):
     decision_queue_url: str = Field("redis://localhost:6379/0", alias="DECISION_QUEUE_URL")
     decision_queue_key: str = Field("trading:decisions", alias="DECISION_QUEUE_KEY")
+    last_timestamp_hash: str = Field("trading:last_processed_ts", alias="TRADING_LAST_TS_HASH")
     redis_poll_timeout: int = Field(5, alias="TRADING_QUEUE_POLL_TIMEOUT")
     dry_run: bool = Field(True, alias="TRADING_DRY_RUN")
     models_root: Path = Field(Path("models"), alias="MODELS_ROOT")

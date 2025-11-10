@@ -146,7 +146,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--start-date", default=None, help="Optional ISO date to filter from (e.g., 2024-01-01)")
     ap.add_argument("--end-date", default=None, help="Optional ISO date to filter to (inclusive)")
     ap.add_argument("--horizon", type=int, default=120, help="Return horizon used for labels (default 120)")
-    ap.add_argument("--tcn-stride", type=int, default=30, help="Stride for TCN prediction windows")
+    ap.add_argument("--tcn-stride", type=int, default=2, help="Stride for TCN prediction windows")
     ap.add_argument("--rss-max-files", type=int, default=None, help="Optional cap on RSS parquet files to load")
     ap.add_argument("--include-reddit", action="store_true", help="If set, include Reddit aggregates when available")
     ap.add_argument("--reddit-max-files", type=int, default=None, help="Optional cap on Reddit parquet files to load")

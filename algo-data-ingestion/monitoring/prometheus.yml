@@ -33,6 +33,11 @@ scrape_configs:
       - targets: [ 'scheduler:9002' ]
         labels:
           service: scheduler
+  - job_name: 'blender-replay'
+    static_configs:
+      - targets: [ 'host.docker.internal:9104' ]
+        labels:
+          service: blender-replay
 
   # Trading service metrics (host process exposes Prometheus on 9010)
   - job_name: 'trading'

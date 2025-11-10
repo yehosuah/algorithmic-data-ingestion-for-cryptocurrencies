@@ -6,6 +6,11 @@ from typing import Any, Dict, Optional
 
 from app.adapters.ccxt_adapter import CCXTAdapter
 
+try:
+    from ccxt.base.errors import ExchangeNotAvailable, NetworkError
+except Exception:  # pragma: no cover - ccxt may be missing in some test environments
+    ExchangeNotAvailable = NetworkError = Exception  # type: ignore
+
 logger = logging.getLogger("app.trading.executor")
 
 
@@ -46,7 +51,19 @@ class OrderExecutor:
         max_spread_bps: float,
     ) -> OrderDecision:
         adapter = await self._get_adapter(exchange)
-        ticker = await adapter.fetch_ticker(symbol)
+        try:
+            ticker = await adapter.fetch_ticker(symbol)
+        except (ExchangeNotAvailable, NetworkError) as exc:
+            logger.warning(
+                "Ticker fetch unavailable for %s %s: %s",
+                exchange,
+                symbol,
+                exc,
+            )
+            return OrderDecision(
+                executed=False,
+                reason="ticker_unavailable",
+            )
         bid = float(ticker.get("bid") or 0.0)
         ask = float(ticker.get("ask") or 0.0)
         if bid <= 0 or ask <= 0:

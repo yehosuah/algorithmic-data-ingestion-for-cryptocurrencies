@@ -30,6 +30,7 @@ fsspec>=2024.6.0
 s3fs>=2024.6.1
 gcsfs>=2024.6.1
 numba>=0.59.0
+matplotlib>=3.7,<3.8
 
 # --- Exchanges (async CCXT) ---
 ccxt>=4.3.0

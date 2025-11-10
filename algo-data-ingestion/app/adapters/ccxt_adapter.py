@@ -54,8 +54,17 @@ async def _retry_async(func, *args, retries: int = 3, backoff_factor: float = 1.
                 pass
             if attempt < retries:
                 await asyncio.sleep(backoff_factor * (2 ** (attempt - 1)))
-    # last attempt; let exception propagate if it fails
-    return await func(*args, **kwargs)
+                continue
+            try:
+                logger.error(
+                    "ALERT: CCXT call %s exhausted %s attempts; surfacing error",
+                    getattr(func, "__name__", str(func)),
+                    retries,
+                    exc_info=e,
+                )
+            except Exception:
+                pass
+            raise
 
 logger = logging.getLogger("app.adapters.ccxt_adapter")
 

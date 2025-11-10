@@ -72,3 +72,21 @@ groups:
       description: Deployable gate coverage for {{ $labels.model }} has been below
         the manifest floor for 30m. Check symbol-level data ingestion or manifest
         thresholds.
+  - alert: BlenderGateCoverageOutOfBand
+    expr: |
+      (
+        model_gate_coverage_ratio{model="blender_h120_v6", mode="inference_rolling24h"}
+          < on(model) model_gate_coverage_ratio{model="blender_h120_v6", mode="oos_reference_lower"}
+      )
+      or
+      (
+        model_gate_coverage_ratio{model="blender_h120_v6", mode="inference_rolling24h"}
+          > on(model) model_gate_coverage_ratio{model="blender_h120_v6", mode="oos_reference_upper"}
+      )
+    for: 30m
+    labels:
+      severity: warning
+    annotations:
+      summary: Blender gate coverage drifted ({{ $labels.model }})
+      description: Rolling 24h coverage for the blender gate deviated beyond the calibrated
+        ±3pp band. Regenerate OOS matrices and refresh calibration if coverage stays out of range.

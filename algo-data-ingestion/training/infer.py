@@ -17,12 +17,16 @@ import pandas as pd
 import torch
 
 from .tcn_model import TinyTCN
+from .calibration_store import load_calibrator
+from .calibration_utils import apply_posthoc_calibration
 
 try:
     from app.monitoring.model_metrics import (
         observe_gate_coverage,
         observe_probability_sigma,
         observe_rss_share,
+        record_gate_coverage_sample,
+        set_gate_coverage_reference,
         set_probability_sigma_threshold,
         set_rss_threshold,
     )
@@ -44,6 +48,22 @@ except Exception:  # pragma: no cover - allow training-only environments
 
 
 logger = logging.getLogger(__name__)
+
+
+def _attach_posthoc_calibrator(obj: object, model_dir: Path, prob_column: str) -> None:
+    try:
+        loaded = load_calibrator(model_dir, prob_column)
+    except Exception:
+        loaded = None
+    if loaded is not None:
+        setattr(obj, "_posthoc_calibrator", loaded)
+
+
+def _apply_posthoc_if_available(obj: object, probs: np.ndarray) -> np.ndarray:
+    calibrator = getattr(obj, "_posthoc_calibrator", None)
+    if not calibrator:
+        return probs
+    return apply_posthoc_calibration(probs, method=calibrator.method, estimator=calibrator.estimator)
 
 
 DEFAULT_GATE_CONFIG: Dict[str, Any] = {
@@ -79,6 +99,8 @@ class ManifestArtifacts:
     rss_indicator_column: Optional[str]
     rss_minute_share_threshold: Optional[float]
     prob_sigma_threshold: Optional[float]
+    gate_reference_coverage: Optional[float]
+    gate_reference_tolerance: Optional[float]
 
 
 def _read_text_retry(path: Path, attempts: int = 5, delay: float = 0.1) -> str:
@@ -179,6 +201,16 @@ def load_manifest_artifacts(base_dir: Path, *, model_label: Optional[str] = None
         rss_threshold = rss_audit.get("minute_spike_share")
     prob_guardrail = report.get("prob_sigma_guardrail") or metadata.get("prob_sigma_guardrail") or {}
     prob_sigma_threshold = prob_guardrail.get("threshold")
+    gate_reference = metadata.get("gate_reference_coverage")
+    gate_tolerance = metadata.get("gate_reference_tolerance")
+    try:
+        gate_reference = float(gate_reference) if gate_reference is not None else None
+    except (TypeError, ValueError):
+        gate_reference = None
+    try:
+        gate_tolerance = float(gate_tolerance) if gate_tolerance is not None else None
+    except (TypeError, ValueError):
+        gate_tolerance = None
 
     label = model_label or manifest.get("model_label") or manifest.get("model_name") or manifest.get("model_id") or base_dir.name
 
@@ -192,12 +224,19 @@ def load_manifest_artifacts(base_dir: Path, *, model_label: Optional[str] = None
         rss_indicator_column=rss_indicator_column,
         rss_minute_share_threshold=rss_threshold,
         prob_sigma_threshold=prob_sigma_threshold,
+        gate_reference_coverage=gate_reference,
+        gate_reference_tolerance=gate_tolerance,
     )
 
 
 def _register_metric_thresholds(artifacts: ManifestArtifacts) -> None:
     set_rss_threshold(artifacts.model_label, artifacts.rss_minute_share_threshold)
     set_probability_sigma_threshold(artifacts.model_label, artifacts.prob_sigma_threshold)
+    set_gate_coverage_reference(
+        artifacts.model_label,
+        artifacts.gate_reference_coverage,
+        artifacts.gate_reference_tolerance,
+    )
 
 
 def _compute_min_monthly_sigma(df: pd.DataFrame, prob_series: pd.Series) -> Optional[float]:
@@ -250,7 +289,7 @@ def _update_inference_metrics(
     sigma = _compute_min_monthly_sigma(df, prob_series)
     observe_probability_sigma(artifacts.model_label, sigma)
 
-def load_base_predictor(base_dir: Path):
+def load_base_predictor(base_dir: Path, prob_column: str = "base_prob"):
     feat_cols = json.loads(_read_text_retry(base_dir / "feature_list.json"))
     calib_path = base_dir / "calibrator.joblib"
     if calib_path.exists():
@@ -265,6 +304,7 @@ def load_base_predictor(base_dir: Path):
         calib._le = None
         calib.n_features_in_ = len(feat_cols)
         calib.classes_ = np.array([0, 1])
+    _attach_posthoc_calibrator(calib, base_dir, prob_column or "base_prob")
     return calib, feat_cols
 
 
@@ -281,6 +321,7 @@ def predict_base(df: pd.DataFrame, calib, feat_cols: List[str]) -> pd.Series:
     for c in feat_cols:
         X[c] = df[c].astype(float) if c in df.columns else 0.0
     p = calib.predict_proba(X.values)[:, 1]
+    p = _apply_posthoc_if_available(calib, p)
     return pd.Series(p, index=df.index, name="base_prob")
 
 
@@ -394,9 +435,14 @@ def apply_manifest_gates(
     mask = compute_gate_mask(df, artifacts.gate_config, prob=prob, mode=mode)
     mask = mask.reindex(df.index).fillna(False).astype(bool)
 
+    passed_count = int(mask.astype(bool).sum())
+    total_count = int(len(mask))
+
     if update_metrics:
         _register_metric_thresholds(artifacts)
         _update_inference_metrics(df, prob, mask, artifacts, mode=mode)
+        if mode == "inference":
+            record_gate_coverage_sample(artifacts.model_label, mode, passed_count, total_count)
 
     return mask, artifacts
 
@@ -414,10 +460,10 @@ def score_base_with_manifest(
     annotate the manifest gate decision (gate_pass).
     """
     artifacts = load_manifest_artifacts(model_dir, model_label=model_label)
-    calib, feat_cols = load_base_predictor(model_dir)
+    prob_col = artifacts.prob_column or "base_prob"
+    calib, feat_cols = load_base_predictor(model_dir, prob_column=prob_col)
     prob_series = predict_base(df, calib, feat_cols)
     scored = df.copy()
-    prob_col = artifacts.prob_column or "base_prob"
     scored[prob_col] = prob_series
 
     gate_mask, _ = apply_manifest_gates(
@@ -431,7 +477,7 @@ def score_base_with_manifest(
     return scored
 
 
-def load_tcn_predictor(tcn_dir: Path):
+def load_tcn_predictor(tcn_dir: Path, prob_column: str = "tcn_prob"):
     meta = json.loads((tcn_dir / "tcn_meta.json").read_text())
     pre = joblib.load(tcn_dir / "tcn_preproc.joblib")
     calib = joblib.load(tcn_dir / "tcn_calibrator.joblib")
@@ -444,6 +490,7 @@ def load_tcn_predictor(tcn_dir: Path):
     state = torch.load(tcn_dir / "tcn.pt", map_location="cpu")
     model.load_state_dict(state)
     model.eval()
+    _attach_posthoc_calibrator(calib, tcn_dir, prob_column or "tcn_prob")
     return model, calib, series_cols, scaler, window
 
 
@@ -483,6 +530,7 @@ def predict_tcn(df: pd.DataFrame, model: TinyTCN, calib, series_cols: List[str],
         with torch.no_grad():
             logits_batch = model(torch.from_numpy(X_batch)).view(-1).cpu().numpy()
         prob_batch = calib.predict_proba(logits_batch.reshape(-1, 1))[:, 1]
+        prob_batch = _apply_posthoc_if_available(calib, prob_batch)
         prob_chunks.append(prob_batch)
         ts_idx.extend(ts_batch)
     if not prob_chunks:

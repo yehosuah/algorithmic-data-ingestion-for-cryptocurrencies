@@ -340,9 +340,14 @@ def build_blender_features(
     prepared = _augment_blender_frame(df)
     if candidate_cols is None:
         candidate_cols = DEFAULT_CANDIDATE_COLS
+    candidate_cols = list(candidate_cols)
 
     if not use_rss_features:
         candidate_cols = [c for c in candidate_cols if not c.startswith(RSS_PREFIX)]
+
+    missing_cols = [c for c in candidate_cols if c not in prepared.columns]
+    for col in missing_cols:
+        prepared[col] = 0.0
 
     cols = [c for c in candidate_cols if c in prepared.columns]
     if not cols:

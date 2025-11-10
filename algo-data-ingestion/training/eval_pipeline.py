@@ -21,6 +21,8 @@ from .infer import (
     load_base_predictor,
     predict_base,
 )
+from .calibration_store import load_calibrator
+from .calibration_utils import apply_posthoc_calibration
 from .metrics import equity_curve, summary_stats
 from .model import (
     calibrate,
@@ -353,6 +355,12 @@ def evaluate_blender_oos(
     except ValueError:
         threshold_value = 0.5
 
+    gate_cfg = _resolve_gate_config(
+        gate_config,
+        align_training_with_inference=align_gates,
+    )
+    prob_col = str(gate_cfg.get("prob_column") or "blender_prob")
+
     df_proc = ensure_labels(df).copy()
     if "timestamp" not in df_proc.columns:
         raise KeyError("Dataset must include a timestamp column for leak-proof folds.")
@@ -364,13 +372,16 @@ def evaluate_blender_oos(
     if X.empty:
         raise ValueError("Blender feature frame is empty after preprocessing.")
     prob = blender_model.predict_proba(X.values)[:, 1]
-    prob_series = pd.Series(prob, index=df_proc.index, name="blender_prob")
-    df_proc["blender_prob"] = prob_series
-
-    gate_cfg = _resolve_gate_config(
-        gate_config,
-        align_training_with_inference=align_gates,
-    )
+    prob_series = pd.Series(prob, index=df_proc.index, name=prob_col)
+    prob_calibrator = load_calibrator(model_dir, prob_col)
+    if prob_calibrator is not None:
+        calibrated = apply_posthoc_calibration(
+            prob_series.to_numpy(),
+            method=prob_calibrator.method,
+            estimator=prob_calibrator.estimator,
+        )
+        prob_series = pd.Series(calibrated, index=prob_series.index, name=prob_col)
+    df_proc[prob_col] = prob_series
 
     ret_series = df_proc["ret_next"].astype(float)
     y_series = df_proc["y_dir"].astype(int)

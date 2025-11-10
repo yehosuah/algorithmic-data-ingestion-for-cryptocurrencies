@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 import pandas as pd
+import joblib
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from prometheus_client import start_http_server, Counter, Histogram, Gauge
@@ -30,31 +31,67 @@ if "USE_INGEST_METRICS_REGISTRY" not in os.environ:
 from app.features.factory.market_factory import build_market_features
 from app.ingestion_service.manifests import get_manifest_registry, prepare_decision_payload
 from training.feature_eng import augment_market_features
+from training.blender import build_blender_features
 from training.infer import (
     load_base_predictor,
     load_tcn_predictor,
     predict_base,
     predict_tcn,
+    _register_metric_thresholds,
 )
-from app.monitoring.model_metrics import observe_gate_coverage
+from training.calibration_store import load_calibrator, LoadedCalibrator
+from training.calibration_utils import apply_posthoc_calibration
+from app.monitoring.model_metrics import observe_gate_coverage, record_gate_coverage_sample
 from collections import defaultdict
 
 _MODEL_SYMBOL_COVERAGE: Dict[str, Dict[str, float]] = defaultdict(dict)
 
 
-def _record_gate_coverage(model_label: str, symbol: str, coverage: float, mode: str = "inference") -> None:
+def _inference_gate_threshold(artifacts: Any) -> Optional[float]:
+    try:
+        gate_cfg = artifacts.gate_config.get("inference") or {}
+    except AttributeError:
+        return None
+    value = gate_cfg.get("prob_gate_min")
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _record_gate_coverage(
+    model_label: str,
+    symbol: str,
+    *,
+    passed: int,
+    total: int,
+    mode: str = "inference",
+    gate_threshold: Optional[float] = None,
+) -> None:
+    total = max(0, int(total))
+    passed = max(0, min(total, int(passed)))
+    coverage = float(passed) / float(total) if total else 0.0
     """
     Publish gate coverage for a model/symbol pair and aggregate per-model coverage.
     """
     per_symbol = _MODEL_SYMBOL_COVERAGE[model_label]
     per_symbol[symbol] = float(coverage)
     log.info(
-        "Gate coverage updated model=%s symbol=%s coverage=%.6f",
+        "Gate coverage updated model=%s symbol=%s coverage=%.6f passed=%d total=%d threshold=%s mode=%s",
         model_label,
         symbol,
         coverage,
+        passed,
+        total,
+        f"{gate_threshold:.4f}" if gate_threshold is not None else "<none>",
+        mode,
     )
     observe_gate_coverage(f"{model_label}:{symbol}", mode, coverage)
+    if total > 0:
+        record_gate_coverage_sample(f"{model_label}:{symbol}", mode, passed, total)
+        record_gate_coverage_sample(model_label, mode, passed, total)
     aggregate = sum(per_symbol.values()) / max(len(per_symbol), 1)
     observe_gate_coverage(model_label, mode, aggregate)
 
@@ -197,6 +234,8 @@ class InferenceJob:
     base_path: Optional[str]
     tcn_model: Optional[str]
     tcn_path: Optional[str]
+    blender_model: Optional[str]
+    blender_path: Optional[str]
     stride: int
     include_features: bool
     queue_url: str
@@ -242,8 +281,13 @@ def _parse_inference_jobs(raw: str) -> List[InferenceJob]:
         base_path = str(entry.get("base_path") or "").strip() or (base_model or None)
         tcn_model = str(entry.get("tcn_model") or "").strip() or None
         tcn_path = str(entry.get("tcn_path") or "").strip() or (tcn_model or None)
-        if not base_model and not tcn_model:
-            log.warning("INFER_JOBS[%d] requires at least one of base_model or tcn_model; skipping.", idx)
+        blender_model = str(entry.get("blender_model") or "").strip() or None
+        blender_path = str(entry.get("blender_path") or "").strip() or (blender_model or None)
+        if not base_model and not tcn_model and not blender_model:
+            log.warning(
+                "INFER_JOBS[%d] requires at least one of base_model, tcn_model, or blender_model; skipping.",
+                idx,
+            )
             continue
 
         queue_url = str(entry.get("queue_url") or DECISION_QUEUE_URL).strip()
@@ -270,6 +314,8 @@ def _parse_inference_jobs(raw: str) -> List[InferenceJob]:
                 base_path=base_path,
                 tcn_model=tcn_model,
                 tcn_path=tcn_path,
+                blender_model=blender_model,
+                blender_path=blender_path,
                 stride=stride,
                 include_features=include_features,
                 queue_url=queue_url,
@@ -286,6 +332,7 @@ INFERENCE_JOBS: List[InferenceJob] = _parse_inference_jobs(INFER_JOBS_RAW)
 _QUEUE_CLIENTS: Dict[str, aioredis.Redis] = {}
 _BASE_MODEL_CACHE: Dict[str, Tuple[Any, object, List[str]]] = {}
 _TCN_MODEL_CACHE: Dict[str, Tuple[Any, object, object, List[str], object, int]] = {}
+_BLENDER_MODEL_CACHE: Dict[str, Tuple[Any, object, List[str], Optional[LoadedCalibrator]]] = {}
 _LAST_EMITTED: Dict[Tuple[str, str], pd.Timestamp] = {}
 _LOCAL_MODEL_ROOT = Path("/tmp/scheduler-models")
 _LOCAL_MODEL_ROOT.mkdir(parents=True, exist_ok=True)
@@ -416,6 +463,8 @@ def _preload_inference_manifests(jobs: List[InferenceJob]) -> None:
             specs.append((job.base_model, job.base_path or job.base_model))
         if job.tcn_model:
             specs.append((job.tcn_model, job.tcn_path or job.tcn_model))
+        if job.blender_model:
+            specs.append((job.blender_model, job.blender_path or job.blender_model))
     unique: List[Tuple[str, str]] = []
     seen: set[Tuple[str, str]] = set()
     for label, rel_path in specs:
@@ -480,6 +529,14 @@ async def _enqueue_payload(job: InferenceJob, payload: Dict[str, Any], now: date
         return 0
     items = payload.get("items") or []
     min_ts = None
+    total_items = len(items)
+    missing_ts = 0
+    if total_items:
+        for item in items:
+            ts_raw = item.get("timestamp")
+            ts = pd.to_datetime(ts_raw, utc=True, errors="coerce")
+            if ts is pd.NaT:
+                missing_ts += 1
     if job.lookback_minutes:
         min_ts_dt = now - timedelta(minutes=job.lookback_minutes)
         min_ts = pd.Timestamp(min_ts_dt)
@@ -488,6 +545,17 @@ async def _enqueue_payload(job: InferenceJob, payload: Dict[str, Any], now: date
         else:
             min_ts = min_ts.tz_convert("UTC")
     new_items = _filter_new_payload_items(job.job_id, model_label, items, min_ts=min_ts)
+    new_count = len(new_items)
+    min_ts_str = min_ts.isoformat() if isinstance(min_ts, pd.Timestamp) else "<none>"
+    log.info(
+        "enqueue_stats job=%s model=%s items=%d new_items=%d missing_ts=%d min_ts=%s",
+        job.job_id,
+        model_label,
+        total_items,
+        new_count,
+        missing_ts,
+        min_ts_str,
+    )
     if not new_items:
         return 0
 
@@ -522,6 +590,13 @@ async def _enqueue_payload(job: InferenceJob, payload: Dict[str, Any], now: date
         messages.append(json.dumps(message, default=str))
 
     if not messages:
+        log.info(
+            "enqueue_stats_no_messages job=%s model=%s new_items=%d dropped_ts=%d",
+            job.job_id,
+            model_label,
+            new_count,
+            missing_ts,
+        )
         return 0
 
     await client.rpush(job.queue_key, *messages)
@@ -590,8 +665,10 @@ def _get_base_context(label: str) -> Tuple[Any, object, List[str]]:
         return cached
     registry = get_manifest_registry()
     artifacts = registry.ensure_loaded(label)
+    _register_metric_thresholds(artifacts)
     model_dir = _ensure_local_model_dir(label, registry.get_path(label))
-    calibrator, feature_columns = load_base_predictor(model_dir)
+    prob_col = artifacts.prob_column or "base_prob"
+    calibrator, feature_columns = load_base_predictor(model_dir, prob_column=prob_col)
     ctx = (artifacts, calibrator, list(feature_columns))
     _BASE_MODEL_CACHE[label] = ctx
     return ctx
@@ -603,10 +680,39 @@ def _get_tcn_context(label: str) -> Tuple[Any, object, object, List[str], object
         return cached
     registry = get_manifest_registry()
     artifacts = registry.ensure_loaded(label)
+    _register_metric_thresholds(artifacts)
     model_dir = _ensure_local_model_dir(label, registry.get_path(label))
-    model, calibrator, series_cols, scaler, window = load_tcn_predictor(model_dir)
+    prob_col = artifacts.prob_column or "tcn_prob"
+    model, calibrator, series_cols, scaler, window = load_tcn_predictor(model_dir, prob_column=prob_col)
     ctx = (artifacts, model, calibrator, list(series_cols), scaler, int(window))
     _TCN_MODEL_CACHE[label] = ctx
+    return ctx
+
+
+def _get_blender_context(label: str) -> Tuple[Any, object, List[str], Optional[LoadedCalibrator]]:
+    cached = _BLENDER_MODEL_CACHE.get(label)
+    if cached is not None:
+        return cached
+    registry = get_manifest_registry()
+    artifacts = registry.ensure_loaded(label)
+    _register_metric_thresholds(artifacts)
+    model_dir = _ensure_local_model_dir(label, registry.get_path(label))
+    feature_path = model_dir / "blender_features.txt"
+    if not feature_path.exists():
+        raise FileNotFoundError(f"Missing blender feature list for {label}: {feature_path}")
+    candidate_columns = [
+        line.strip() for line in feature_path.read_text().splitlines() if line.strip()
+    ]
+    if not candidate_columns:
+        raise ValueError(f"No blender feature columns declared in {feature_path}")
+    model_path = model_dir / "blender.joblib"
+    if not model_path.exists():
+        raise FileNotFoundError(f"Missing blender model artifact for {label}: {model_path}")
+    model = joblib.load(model_path)
+    prob_col = artifacts.prob_column or "blender_prob"
+    calibrator = load_calibrator(model_dir, prob_col)
+    ctx = (artifacts, model, list(candidate_columns), calibrator)
+    _BLENDER_MODEL_CACHE[label] = ctx
     return ctx
 
 
@@ -641,6 +747,7 @@ def _required_history_minutes(
 def _run_inference_sync(job: InferenceJob, now: datetime) -> List[Dict[str, Any]]:
     base_ctx = _get_base_context(job.base_model) if job.base_model else None
     tcn_ctx = _get_tcn_context(job.tcn_model) if job.tcn_model else None
+    blender_ctx = _get_blender_context(job.blender_model) if job.blender_model else None
 
     history_minutes = _required_history_minutes(job, tcn_ctx=tcn_ctx)
 
@@ -671,12 +778,17 @@ def _run_inference_sync(job: InferenceJob, now: datetime) -> List[Dict[str, Any]
             update_metrics=False,
         )
         items = base_payload.get("items") or []
-        coverage = (
-            sum(1 for item in items if item.get("gate_pass")) / len(items)
-            if items
-            else 0.0
+        total = len(items)
+        passed = sum(1 for item in items if item.get("gate_pass"))
+        gate_threshold = _inference_gate_threshold(artifacts)
+        _record_gate_coverage(
+            job.base_model,
+            job.symbol,
+            passed=passed,
+            total=total,
+            mode="inference",
+            gate_threshold=gate_threshold,
         )
-        _record_gate_coverage(job.base_model, job.symbol, coverage)
         payloads.append(base_payload)
 
     if tcn_ctx is not None:
@@ -691,7 +803,15 @@ def _run_inference_sync(job: InferenceJob, now: datetime) -> List[Dict[str, Any]
                 window,
                 len(working),
             )
-            _record_gate_coverage(job.tcn_model, job.symbol, 0.0)
+            gate_threshold = _inference_gate_threshold(artifacts_tcn)
+            _record_gate_coverage(
+                job.tcn_model,
+                job.symbol,
+                passed=0,
+                total=0,
+                mode="inference",
+                gate_threshold=gate_threshold,
+            )
         else:
             prob_frame = predict_tcn(
                 working,
@@ -704,6 +824,15 @@ def _run_inference_sync(job: InferenceJob, now: datetime) -> List[Dict[str, Any]
             )
             if prob_frame.empty:
                 log.info("TCN probabilities empty for inference job %s", job.job_id)
+                gate_threshold = _inference_gate_threshold(artifacts_tcn)
+                _record_gate_coverage(
+                    job.tcn_model,
+                    job.symbol,
+                    passed=0,
+                    total=0,
+                    mode="inference",
+                    gate_threshold=gate_threshold,
+                )
             else:
                 merged = pd.merge(working, prob_frame, on="timestamp", how="inner")
                 if merged.empty:
@@ -720,13 +849,103 @@ def _run_inference_sync(job: InferenceJob, now: datetime) -> List[Dict[str, Any]
                     update_metrics=False,
                 )
                 items = tcn_payload.get("items") or []
-                coverage = (
-                    sum(1 for item in items if item.get("gate_pass")) / len(items)
-                    if items
-                    else 0.0
+                total = len(items)
+                passed = sum(1 for item in items if item.get("gate_pass"))
+                gate_threshold = _inference_gate_threshold(artifacts_tcn)
+                _record_gate_coverage(
+                    job.tcn_model,
+                    job.symbol,
+                    passed=passed,
+                    total=total,
+                    mode="inference",
+                    gate_threshold=gate_threshold,
                 )
-                _record_gate_coverage(job.tcn_model, job.symbol, coverage)
                 payloads.append(tcn_payload)
+                try:
+                    working = working.merge(prob_frame, on="timestamp", how="left")
+                except Exception as exc:
+                    log.warning("Unable to merge TCN probabilities into working frame for job %s: %s", job.job_id, exc)
+
+    if blender_ctx is not None:
+        artifacts_bl, blender_model, candidate_cols, calibrator_bl = blender_ctx
+        try:
+            feature_frame = working.copy()
+            X, cols = build_blender_features(
+                feature_frame,
+                candidate_cols=candidate_cols,
+                use_rss_features=True,
+            )
+        except Exception as exc:
+            log.warning("Skipping blender inference for job %s (%s): %s", job.job_id, job.blender_model, exc)
+            gate_threshold = _inference_gate_threshold(artifacts_bl)
+            _record_gate_coverage(
+                job.blender_model,
+                job.symbol,
+                passed=0,
+                total=0,
+                mode="inference",
+                gate_threshold=gate_threshold,
+            )
+        else:
+            if X.empty:
+                log.info("Blender features empty for job %s", job.job_id)
+                gate_threshold = _inference_gate_threshold(artifacts_bl)
+                _record_gate_coverage(
+                    job.blender_model,
+                    job.symbol,
+                    passed=0,
+                    total=0,
+                    mode="inference",
+                    gate_threshold=gate_threshold,
+                )
+            else:
+                try:
+                    probs = blender_model.predict_proba(X.values)
+                except Exception as exc:
+                    log.warning("Blender model inference failed for job %s: %s", job.job_id, exc)
+                    gate_threshold = _inference_gate_threshold(artifacts_bl)
+                    _record_gate_coverage(
+                        job.blender_model,
+                        job.symbol,
+                        passed=0,
+                        total=0,
+                        mode="inference",
+                        gate_threshold=gate_threshold,
+                    )
+                else:
+                    if probs.shape[1] < 2:
+                        raise ValueError(f"Blender model {job.blender_model} must output binary probabilities")
+                    prob_col = artifacts_bl.prob_column or "blender_prob"
+                    prob_series_bl = pd.Series(probs[:, 1], index=X.index, name=prob_col).astype(float)
+                    if calibrator_bl is not None:
+                        calibrated = apply_posthoc_calibration(
+                            prob_series_bl.to_numpy(),
+                            method=calibrator_bl.method,
+                            estimator=calibrator_bl.estimator,
+                        )
+                        prob_series_bl = pd.Series(calibrated, index=prob_series_bl.index, name=prob_col)
+                    scored = feature_frame.loc[X.index].copy()
+                    scored[prob_col] = prob_series_bl
+                    blender_payload = prepare_decision_payload(
+                        job.blender_model,
+                        scored,
+                        prob_series=prob_series_bl,
+                        include_features=job.include_features,
+                        update_metrics=False,
+                    )
+                    items = blender_payload.get("items") or []
+                    total = len(items)
+                    passed = sum(1 for item in items if item.get("gate_pass"))
+                    gate_threshold = _inference_gate_threshold(artifacts_bl)
+                    _record_gate_coverage(
+                        job.blender_model,
+                        job.symbol,
+                        passed=passed,
+                        total=total,
+                        mode="inference",
+                        gate_threshold=gate_threshold,
+                    )
+                    payloads.append(blender_payload)
 
     return payloads
 

@@ -14,6 +14,8 @@ from app.ingestion_service.manifests import (
     prepare_decision_payload,
 )
 from training.blender import build_blender_features
+from training.calibration_store import load_calibrator, LoadedCalibrator
+from training.calibration_utils import apply_posthoc_calibration
 from training.infer import (
     ManifestArtifacts,
     load_base_predictor,
@@ -159,6 +161,7 @@ class BlenderRunner(BaseRunner):
     artifacts: ManifestArtifacts
     model: object
     candidate_columns: Sequence[str]
+    prob_calibrator: Optional[LoadedCalibrator]
 
     def score(
         self,
@@ -185,6 +188,13 @@ class BlenderRunner(BaseRunner):
         if proba.shape[1] < 2:
             raise ValueError("Blender model must output binary class probabilities")
         prob_series = pd.Series(proba[:, 1], index=X.index, name=prob_col).astype(float)
+        if self.prob_calibrator is not None:
+            calibrated = apply_posthoc_calibration(
+                prob_series.to_numpy(),
+                method=self.prob_calibrator.method,
+                estimator=self.prob_calibrator.estimator,
+            )
+            prob_series = pd.Series(calibrated, index=prob_series.index, name=prob_col)
 
         scored = df_proc.loc[X.index].copy()
         scored[prob_col] = prob_series
@@ -247,6 +257,8 @@ class ModelScoringService:
                 if not candidate_columns:
                     raise ValueError(f"No feature columns declared in {feature_path}")
                 model = joblib.load(model_dir / "blender.joblib")
+                prob_col = artifacts.prob_column or "blender_prob"
+                prob_calibrator = load_calibrator(model_dir, prob_col)
                 logger.info(
                     "Initialised blender scorer for '%s' (feature_cols=%d)",
                     label,
@@ -257,9 +269,11 @@ class ModelScoringService:
                     artifacts=artifacts,
                     model=model,
                     candidate_columns=candidate_columns,
+                    prob_calibrator=prob_calibrator,
                 )
 
-        calibrator, feature_columns = load_base_predictor(model_dir)
+        prob_col = artifacts.prob_column or "base_prob"
+        calibrator, feature_columns = load_base_predictor(model_dir, prob_column=prob_col)
         logger.info("Initialised base XGB scorer for '%s' (features=%d)", label, len(feature_columns))
 
         return BaseXGBRunner(
