@@ -1,6 +1,8 @@
 # Final Stretch – Production Checklist (Calmon Stack)
 
-Last updated: 2025-11-05 14:56 UTC (archival snapshot)
+Last updated: 2025-11-10 04:13 UTC (archival snapshot refreshed)
+
+> Update 2025-11-10: Revalidated this archival snapshot against the release/20251030 export that now includes scheduler->Redis inference jobs and the trading dry-run Prometheus hooks from app/trading.
 
 Scope: Align the relaxed-gate Horizon-120 XGB, Calmon TCN suite, and elastic-net blender for a deployable release, with manifest-driven governance and monitoring.
 

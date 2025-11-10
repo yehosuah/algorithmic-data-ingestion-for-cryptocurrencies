@@ -1,6 +1,8 @@
 # Subtask 2 – Horizon-120 XGB Baseline
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Base XGB notes now link to release/20251030 outputs and the scheduler->trading instrumentation guarding coverage.
 
 ## Goal
 Retrain the base XGBoost classifier on the 2024–2025 minute feed using the relaxed Calmon gate so post-cost equity exceeds 1.0 at 5 bps while preserving a deployable inference mask.
@@ -40,3 +42,5 @@ Retrain the base XGBoost classifier on the 2024–2025 minute feed using the rel
 2. Integrate manifest gates and threshold into `training/infer.py` regression tests so CI catches drift (use `score_base_with_manifest`).
 3. Export coverage alert thresholds and RSS audit metadata alongside the artifact bundle.
 4. During dry-run rehearsals, confirm Redis queue depth and audit logs mirror the 12 deployable base trades before promoting threshold adjustments.
+5. Before tagging a release, run the manifest/report parity sweep (`python - <<'PY' ...` helper or `pytest tests/regression/test_manifest_gating.py`) so `prob_gate_min`, `hl_spread_z_max`, and `rvol20_max` stay locked to the validated report values.
+6. When training updates shift gate targets, overwrite manifests by re-exporting from the refreshed `report.json` artifacts (never hand-edit inference gates) and repeat the parity + regression checks to document the new thresholds.

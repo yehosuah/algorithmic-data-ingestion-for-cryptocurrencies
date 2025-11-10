@@ -1,6 +1,8 @@
 # Final Stretch – Snapshot Redirect
 
-Last updated: 2025-11-05 14:56 UTC
+Last updated: 2025-11-10 04:13 UTC
+
+> Update 2025-11-10: Redirect clarifies this snapshot maps to release/20251030 and points readers to the scheduler/trading wiring now in docs.
 
 This document has been superseded by `docs/final_stretch_v1.md`, which tracks the current production checklist for the Calmon stack (base XGB, TCN suite, elastic-net blender).
 

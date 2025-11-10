@@ -1,6 +1,8 @@
 # Subtask 2 – Horizon-120 XGB Baseline Refresh
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Captured how the release/20251030 base manifests and the new trading dry-run instrumentation factor into this workstream.
 
 ## Run
 ```

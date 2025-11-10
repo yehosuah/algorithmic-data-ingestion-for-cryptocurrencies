@@ -1,6 +1,8 @@
 # Subtask 1 – 120-Bar TCN Turnover Control
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Progress log now tags the release/20251030 TCN artifacts and the scheduler->trading rehearsal metrics so subtask 1 mirrors mainline git.
 
 ## Run
 ```

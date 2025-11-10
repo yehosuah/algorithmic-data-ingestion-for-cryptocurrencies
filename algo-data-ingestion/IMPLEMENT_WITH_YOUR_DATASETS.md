@@ -1,6 +1,8 @@
 # Walkthrough: Implement with Your Datasets
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Added pointers to release/20251030 artifacts, `INFER_JOBS` wiring, and the trading dry-run + Grafana instrumentation so custom datasets can plug into the shipped stack.
 
 This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your own instruments once you have equivalent market + RSS coverage.
 

@@ -1,6 +1,8 @@
 # Subtask 3b – Meta-Label Attempt
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Meta task notes cite the release/20251030 datasets/manifests and the scheduler/trading telemetry required to keep gates honest.
 
 ## Goal
 Train a logistic meta-label filter on horizon-120 signals using the relaxed-gate base/TCN probabilities and the RSS-enriched matrix.

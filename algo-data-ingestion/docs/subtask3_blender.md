@@ -1,6 +1,8 @@
 # Subtask 3 – Elastic-Net Blender Refresh
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Blender plan now ties to the release/20251030 artifacts plus the trading/Grafana instrumentation tracking gate coverage.
 
 ## Goal
 Train an elastic-net logistic blender that combines Calmon relaxed base and TCN probabilities with RSS spike features, clearing 5 bps transaction costs while maintaining actionable turnover.
@@ -46,3 +48,4 @@ python scripts/train_blender.py \
 2. Integrate RSS audit thresholds into monitoring; automatically switch to a no-RSS fallback when coverage dips below requirements.
 3. Document feature preprocessing in inference code to mirror StandardScaler + selected columns from the manifest.
 4. Capture Grafana `trading-overview` snapshots during the dry run after each blender refresh to validate faux P&L and gate toggles line up with the replay stats.
+5. Each time blender training adjusts gates or thresholds, regenerate the manifest from `report.json` and rerun the manifest/report parity sweep plus `pytest tests/regression/test_manifest_gating.py` before exporting release artifacts.

@@ -1,6 +1,8 @@
 # Subtask 1 – TCN Turnover Tightening
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Subtask description now references the release/20251030 TCN artifacts plus the app/trading metrics used in rehearsal.
 
 ## Goal
 Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity > 1.0 (5 bps costs).
@@ -46,3 +48,4 @@ Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity
 - Maintain the deployable gate above the 5e-4 floor with the guardrail; document fallback behaviour if coverage regresses.
 - Evaluate horizon 60 and 180 siblings for ensemble coverage; document selection criteria alongside manifests.
 - Capture trading dry-run metrics (Redis state, audit logs, faux P&L) whenever this manifest changes so ops can confirm stability.
+- When thresholds or guardrails move, regenerate the manifest directly from the refreshed `report.json`, then rerun the manifest/report parity sweep plus `pytest tests/regression/test_manifest_gating.py` before promoting new TCN artifacts.

@@ -1,6 +1,8 @@
 # Algo Data Ingestion – Comprehensive Project Dossier
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Highlighted how the release/20251030 artifacts pair with the new docker-compose trading worker, Redis queue governance, and Grafana monitoring wired up in app/trading and monitoring/.
 
 ---
 

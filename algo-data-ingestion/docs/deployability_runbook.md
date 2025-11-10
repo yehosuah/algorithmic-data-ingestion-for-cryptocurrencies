@@ -1,6 +1,8 @@
 # Deployability Runbook (TCN Suite Refresh – Oct 2025)
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Runbook ties deployability tasks to the release/20251030 manifests plus the docker-compose trading worker (Redis/Postgres state, `scripts/verify_trading_redis.py`).
 
 ## Immediate Follow-Ups
 - **Refresh shortlist** – `python3 scripts/report_shortlist.py --models-root models --out models/report_shortlist.json` to surface the updated TCN manifests alongside base/blender.
@@ -19,6 +21,9 @@ _Last updated: 2025-11-05 14:56 UTC_
 - **Execution layer integration**  
   - Deploy `app/trading/service.py` (Docker service `trading`) to consume `trading:decisions`, enforce manifest gates/min-hold, and route dry-run orders via the CCXT adapter with spread guardrails.  
   - Persist per-symbol state using `app/trading/state.py` (file/Redis/Postgres backends) and log audit events with `app/trading/audit.py` for retrospectives.
+  - Mount `TRADING_STATE_PATH` on a persistent volume (Docker Compose maps `trading-state:/app/trading_state/state.json`) so `last_timestamp` survives container restarts and stale payloads are ignored by the `register_bar` guard.  
+  - Mirror the scheduler’s Redis endpoint for the trading worker, track per-model decision timestamps in `TRADING_LAST_TS_HASH` (default `trading:last_processed_ts`), and let `_handle_payload` drop anything older; before restarting the worker, run `redis-cli -u $DECISION_QUEUE_URL DEL trading:decisions` (or `LTRIM` up to the persisted timestamp) to avoid replay storms.  
+  - Redis outages that close `BLPOP` sockets now trigger reconnection with exponential backoff—keep Prometheus alerts/ Grafana panels pointed at the shared Redis instance so scheduler + trading failures surface together.
 - **Monitoring & alerting**  
   - Export `model_gate_coverage_ratio`, `model_probability_sigma`, `model_rss_minute_spike_share`, plus trading counters/gauges (`trading_trade_attempts_total`, `trading_gate_toggles_total`, `trading_trade_notional_total`, `trading_position_active`, `trading_realized_pnl_total`).  
   - Update `monitoring/alert.rules.yml` to watch the new coverage floor (~5 e‑4), probability σ guardrails, stale decision queues, and missing trading audit events.  

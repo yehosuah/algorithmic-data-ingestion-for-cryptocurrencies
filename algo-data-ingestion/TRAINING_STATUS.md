@@ -1,6 +1,8 @@
 # Model Training Status (XGB · TCN · Blender)
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Synced this status snapshot with release/20251030 and called out the scheduler-fed Redis decision queue + trading_* Prometheus counters that now guard deployability.
 
 ## Quick Status
 - **Base XGB (Calmon relaxed gate)** – `models/base_xgb_h120_calmon_spread0` retains `final_equity 4.48`, Sharpe 108, 3.6 k toggles under the relaxed mask, and the deployable manifest now keeps only `prob ≥ 0.2`, `min_hold 10`, `long_only`, delegating spread/rvol guardrails to the trading layer. The refreshed Oct 1 – Oct 28 2025 replay (`models/oos_replay_summary_latest.json`) records 12 gate hits, 8 toggles, `final_equity 1.2336`, and `gate_coverage 2.99e-4`, restoring a measurable live floor.

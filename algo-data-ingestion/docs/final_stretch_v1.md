@@ -1,6 +1,8 @@
 # Final Stretch – Production Checklist (Calmon Stack)
 
-Last updated: 2025-11-05 14:56 UTC
+Last updated: 2025-11-10 04:13 UTC
+
+> Update 2025-11-10: Checklist now points directly to the release/20251030 package and the scheduler->trading dry-run instrumentation we ship as the go/no-go contract.
 
 Scope: Align the relaxed-gate Horizon-120 XGB, Calmon TCN suite, and elastic-net blender for a deployable release, with manifest-driven governance and monitoring.
 
@@ -10,6 +12,7 @@ Scope: Align the relaxed-gate Horizon-120 XGB, Calmon TCN suite, and elastic-net
 - Persist monthly gate coverage snapshots for base and TCN (`live_gate_coverage.csv`), forward replay diagnostics (`models/oos_replay_summary_latest.json` with the archived `...oct_nov_2025.json` for regression), and attach to the release package.
 - Ensure manifests include deployable gates, thresholds, feature lists, and RSS audits; treat them as the contract between training and inference.
 - Keep `.github/workflows/ci.yml` green so manifest gating and shortlist regressions (`tests/regression`) stay enforced ahead of release tagging.
+- Before cutting artifacts, run the manifest/report parity sweep (or `pytest tests/regression/test_manifest_gating.py`) and regenerate manifests directly from `report.json` outputs whenever gate targets move so the inference mask stays identical to the validated training values.
 - Dry-run the scheduler `INFER_JOBS` → Redis queue → trading service pipeline, capturing Prometheus metrics (`scheduler_decision_messages_enqueued_total`, `trading_trade_attempts_total`, `trading_position_active`) and Redis audit logs for the release window.
 
 ## 2. Base XGBoost (H120 Calmon)

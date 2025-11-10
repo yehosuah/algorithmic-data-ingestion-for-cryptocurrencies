@@ -1,6 +1,8 @@
 # Oct 2025 Forward Replay – Manifest Refresh (2025-10-27)
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Forward replay notes now cross-reference release/20251030 artifacts and the scheduler/trading telemetry (model_gate_coverage_ratio, trading counters) used for validation.
 
 ## Model Refresh Snapshot
 - `models/base_xgb_h120_calmon_spread0` (deployable manifest now enforces `prob ≥ 0.2`, `min_hold 10`, `long_only`) registers 12 gate hits on Oct 2025 (`toggle_count 8`, deployable `final_equity 1.2336`, `gate_coverage 0.0002985`) while spread/rvol checks are handled by the trading service.  

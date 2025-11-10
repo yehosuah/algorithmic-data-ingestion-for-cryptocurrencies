@@ -1,6 +1,8 @@
 # Sanity Checks and Optional Improvements
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Captured the release/20251030 parquet + manifest bundle and the scheduler/trading health probes (Redis queue depth, trading metrics endpoint) that now live in git.
 
 This document summarizes quick validation steps for a 2‑week backfill (market + RSS) and tracks optional improvements to reference during iteration.
 

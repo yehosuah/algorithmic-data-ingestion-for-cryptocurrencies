@@ -1,6 +1,8 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Walkthrough steps now reference the release/20251030 bundle, scheduler-driven inference lane, and trading dry-run rehearsal loop committed this week.
 
 This guide walks through the refreshed modeling stack: relaxed-gate retrains for the horizon-120 XGBoost baseline, the Calmon TCN suite, and the elastic-net blender that now clears 5 bps costs with RSS enrichment.
 

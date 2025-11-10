@@ -1,6 +1,8 @@
 # Subtask 4 – Deployability Check
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Deployability summary now anchors on release/20251030 and the trading dry-run instrumentation (Redis decisions, `scripts/verify_trading_redis.py`).
 
 ## Models In Scope
 - **Base XGB (H120, Calmon relaxed)** – `models/base_xgb_h120_calmon_spread0`

@@ -1,6 +1,8 @@
 # Subtask 3 – Blender Refresh
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Logged that the release/20251030 blender bundle plus the trading dry-run telemetry now back these experiments.
 
 ## Run
 ```

@@ -1,6 +1,8 @@
 # Subtask 4 – Meta-Label Training Refresh
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Meta-label notes now reference the release/20251030 drop and the Redis/Grafana trading loop we just added.
 
 ## Run
 ```

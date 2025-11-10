@@ -1,6 +1,8 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Folded the release/20251030 bundle plus the scheduler->trading dry-run instrumentation (Redis queue, app/trading metrics, Grafana dashboards) into this quickstart so it mirrors the docker-compose stack.
 
 End-to-end ingestion for **market**, **on-chain**, **social**, and **news** data with a Redis feature store, admin backfills/TTL sweeps, a scheduler, and monitoring (Prometheus + Grafana).
 
@@ -76,6 +78,8 @@ Each payload carries manifest metadata, side, and probability, so the trading wo
 Useful helpers:
 - `python scripts/verify_trading_redis.py` inspects the Redis position hash and audit stream.
 - Grafana dashboard `monitoring/grafana/dashboards/trading-overview.json` surfaces queue depth, gate coverage, and trade attempt metrics; alert rules now include stale decision queue detection.
+
+> **Recovery plan:** Whenever live coverage or PnL drifts from the training reports, follow the authoritative checklist in `docs/live_trading_recovery_plan.md`. Treat that document as the source of truth for remediation steps before adjusting manifests or redeploying.
 
 ---
 
@@ -525,14 +529,15 @@ Notes
 - Scripts read from the data lake paths configured in env (local or S3/GCS). For S3/GCS, ensure credentials/env are set as described above.
 - The training matrix script expects that some RSS or Reddit Parquet exists; you can generate it via the `rss_to_parquet.py` script or schedule ingest jobs.
 
-## Modeling Snapshot (Oct 2025)
+## Modeling Snapshot (Nov 2025)
 
-- `scripts/build_blender_matrix.py` now emits a 606 121-row matrix (`datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet`) covering 2024‑09‑01 ➜ 2025‑10‑26 with intraday RSS aggregations, probability momentum (`prob_diff*`), and spread-aware regime labels; the JSON stats include window start/end for sanity checks.
-- Refreshed TCN suite (`models/tcn_h{60,120,180}_calmon_relaxed`) still clears 5 bps costs under the relaxed gate; `tcn_h120_calmon_relaxed` reports `final_equity 1.33`, `total_turnover 180`, and persists fold logits for downstream recalibration.
-- Horizon-120 XGB baseline (`models/base_xgb_h120_calmon_spread0`) keeps `final_equity 4.48` under the relaxed gate and now publishes a deployable manifest that only enforces `prob ≥ 0.2`, `min_hold 10`, `long_only`; spread and rvol guardrails are delegated to the trading service (Oct 2025 replay: 12 gate hits, 8 toggles, `final_equity 1.23`).
-- `training/blender.py` + `blender_h120_v6` add optional class weighting and calibration control; the elastic-net stack (711 toggles, `final_equity 1.84`) leans on the richer RSS signals and its manifest now gates inference at `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`, delivering `gate_coverage ≈ 16 %` on the Oct 2025 replay.
-- `training/reporting.ensure_kpi_schema` and `scripts/report_shortlist.py` standardise KPI fields and emit `models/report_shortlist.json`, making it easy to bubble up deployable candidates without manual report diffing.
-- Forward validation for Oct 1 – Oct 27 2025 is tracked in `models/oos_replay_summary_latest.json` (paired with `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`); base regained minimal coverage under the deployable mask while TCNs remain idle, signalling the need for further gate tuning before launch.
+- `scripts/build_blender_matrix.py` now ships `datasets/blender_matrix_2025-09_to_2025-11_oos.parquet` (84 839 rows, 2025‑09‑01 ➜ 2025‑10‑29) built straight from the live feature pipeline: market features, RSS aggregations, refreshed base/TCN predictions, and the production label definition.
+- `scripts/refresh_calibration.py` consumes that matrix, fits post-hoc calibrators, and emits charts + JSON into `release/calibration/<stamp>/`. The latest refresh (split 65/35 train/validation) keeps `base_xgb_h120_calmon_spread005` on Platt scaling (Brier 6.998e‑4 → 6.996e‑4, ECE 1.04e‑4 → 1.02e‑4), lifts `tcn_h120_calmon_relaxed` onto an isotonic/identity blend after the stride‑2 replay (Brier 5.75e‑2 → 5.74e‑2, ECE 1.65e‑2 → 1.25e‑2), and leaves the blender at identity because the calibrated replay already matches the OOS reference.
+- Each manifest now carries its calibrated inference path automatically: loading a predictor attaches `models/<manifest>/calibration/<prob_col>.json + .joblib`, and inference/training scripts apply those mappings before computing gates or downstream KPIs.
+- The blender manifest was re-aligned with the calibrated probabilities — `prob_gate_min` (training+inference) and `threshold.txt` both move to **0.55**, keeping gate coverage around 19 % while tightening the dual-threshold filter for the trading service.
+- Forward validation metrics, calibration plots, and gate/threshold recommendations live in `release/calibration/2025-11-oos_stride2/` alongside the machine-readable `calibration_summary.json` for dashboards/reporting.
+
+See `docs/calibration.md` for the step-by-step refresh workflow and `docs/oos_gate_runbook.md` for the end-to-end OOS + gate-coverage playbook.
 
 ---
 

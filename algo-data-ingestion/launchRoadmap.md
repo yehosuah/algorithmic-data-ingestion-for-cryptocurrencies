@@ -1,6 +1,8 @@
 # Launch Roadmap – Calmon Stack
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Roadmap milestones now assume the release/20251030 drop and the app/trading metrics/alerting that ship with the docker-compose stack.
 
 ## Executive Summary
 - Training gates remain profitable (base `final_equity 4.48`, TCN `1.28/3.62/1.85`, blender `4.48`), and the retuned Oct 1–Oct 28 2025 replay (`models/oos_replay_summary_latest.json`) now shows **deployable coverage across all manifests**: base logs 12 gate hits (8 trades, `final_equity 1.2336`), TCN horizons 60/120/180 clear the guardrail (`gate_coverage 4.73e-4/7.71e-4/4.23e-4` with 4/62/2 toggles), and the eased blender manifest fires ≈15.8 % of bars (6 346 toggles) while the stride‑1 sandbox variant bounds turnover at 134 toggles.

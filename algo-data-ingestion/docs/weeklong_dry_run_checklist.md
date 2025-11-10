@@ -1,6 +1,8 @@
 # Week-Long Dry Run Checklist
 
-_Last updated: 2025-11-05 14:56 UTC_
+_Last updated: 2025-11-10 04:13 UTC_
+
+> Update 2025-11-10: Checklist now expects the release/20251030 manifests plus the docker-compose trading service metrics (`trading_trade_attempts_total`, Grafana trading-overview) during the rehearsal.
 
 Use this checklist to track the current paper-trading exercise from start to finish. Update status daily (☐ → ☑) and capture notes in the right-hand column.
 
