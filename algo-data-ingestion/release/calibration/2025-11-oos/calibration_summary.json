@@ -1,0 +1,1671 @@
+{
+  "dataset": {
+    "source": "datasets/blender_matrix_2025-09_to_2025-11_oos.parquet",
+    "start": "2025-09-01T00:00:00+00:00",
+    "end": "2025-10-29T21:58:00+00:00",
+    "split_ratio": 0.65
+  },
+  "splits": {
+    "train": {
+      "name": "train",
+      "rows": 55145,
+      "start": "2025-09-01T00:00:00+00:00",
+      "end": "2025-10-09T07:04:00+00:00"
+    },
+    "validation": {
+      "name": "validation",
+      "rows": 29694,
+      "start": "2025-10-09T07:05:00+00:00",
+      "end": "2025-10-29T21:58:00+00:00"
+    }
+  },
+  "models": [
+    {
+      "model": "base_xgb",
+      "prob_column": "base_prob",
+      "method": "isotonic",
+      "train_rows": 55145,
+      "val_rows": 29694,
+      "metrics_before": {
+        "brier": 0.0007310977133925182,
+        "ece": 0.0002832019094356535,
+        "roc_auc": 0.9999949556386788,
+        "pr_auc": 0.9999912738559343,
+        "reliability": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.05,
+            "mean_pred": 1.0000000000000002e-06,
+            "empirical_rate": 0.0,
+            "count": 14386.0
+          },
+          {
+            "bin_lower": 0.05,
+            "bin_upper": 0.1,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.15000000000000002,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.15000000000000002,
+            "bin_upper": 0.2,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.25,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.25,
+            "bin_upper": 0.30000000000000004,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.30000000000000004,
+            "bin_upper": 0.35000000000000003,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.35000000000000003,
+            "bin_upper": 0.4,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.45,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.45,
+            "bin_upper": 0.5,
+            "mean_pred": 0.47058823704719543,
+            "empirical_rate": 0.75,
+            "count": 8.0
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.55,
+            "mean_pred": 0.5289562344551086,
+            "empirical_rate": 1.0,
+            "count": 1.0
+          },
+          {
+            "bin_lower": 0.55,
+            "bin_upper": 0.6000000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.65,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.65,
+            "bin_upper": 0.7000000000000001,
+            "mean_pred": 0.6734693646430969,
+            "empirical_rate": 0.7319587628865979,
+            "count": 97.0
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.75,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.75,
+            "bin_upper": 0.8,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.8500000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8500000000000001,
+            "bin_upper": 0.9,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 0.9500000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.9500000000000001,
+            "bin_upper": 1.0,
+            "mean_pred": 0.9999990000000003,
+            "empirical_rate": 1.0,
+            "count": 15202.0
+          }
+        ],
+        "histogram": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.05,
+            "fraction": 0.4844749781100559,
+            "count": 14386.0
+          },
+          {
+            "bin_lower": 0.05,
+            "bin_upper": 0.1,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.15000000000000002,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.15000000000000002,
+            "bin_upper": 0.2,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.25,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.25,
+            "bin_upper": 0.30000000000000004,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.30000000000000004,
+            "bin_upper": 0.35000000000000003,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.35000000000000003,
+            "bin_upper": 0.4,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.45,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.45,
+            "bin_upper": 0.5,
+            "fraction": 0.000269414696571698,
+            "count": 8.0
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.55,
+            "fraction": 3.367683707146225e-05,
+            "count": 1.0
+          },
+          {
+            "bin_lower": 0.55,
+            "bin_upper": 0.6000000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.65,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.65,
+            "bin_upper": 0.7000000000000001,
+            "fraction": 0.003266653195931838,
+            "count": 97.0
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.75,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.75,
+            "bin_upper": 0.8,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.8500000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8500000000000001,
+            "bin_upper": 0.9,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 0.9500000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.9500000000000001,
+            "bin_upper": 1.0,
+            "fraction": 0.5119552771603691,
+            "count": 15202.0
+          }
+        ],
+        "n_bins": 20
+      },
+      "metrics_after": {
+        "brier": 0.0006997861507602968,
+        "ece": 0.00010369737739961702,
+        "roc_auc": 0.9999949510982995,
+        "pr_auc": 0.9999912653636204,
+        "reliability": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.05,
+            "mean_pred": 1.0000000000000002e-06,
+            "empirical_rate": 0.0,
+            "count": 14386.0
+          },
+          {
+            "bin_lower": 0.05,
+            "bin_upper": 0.1,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.15000000000000002,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.15000000000000002,
+            "bin_upper": 0.2,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.25,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.25,
+            "bin_upper": 0.30000000000000004,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.30000000000000004,
+            "bin_upper": 0.35000000000000003,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.35000000000000003,
+            "bin_upper": 0.4,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.45,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.45,
+            "bin_upper": 0.5,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.55,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.55,
+            "bin_upper": 0.6000000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.65,
+            "mean_pred": 0.6455696202531646,
+            "empirical_rate": 0.7777777777777778,
+            "count": 9.0
+          },
+          {
+            "bin_lower": 0.65,
+            "bin_upper": 0.7000000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.75,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.75,
+            "bin_upper": 0.8,
+            "mean_pred": 0.751131221719457,
+            "empirical_rate": 0.7319587628865979,
+            "count": 97.0
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.8500000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8500000000000001,
+            "bin_upper": 0.9,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 0.9500000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.9500000000000001,
+            "bin_upper": 1.0,
+            "mean_pred": 0.9999990000000003,
+            "empirical_rate": 1.0,
+            "count": 15202.0
+          }
+        ],
+        "histogram": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.05,
+            "fraction": 0.4844749781100559,
+            "count": 14386.0
+          },
+          {
+            "bin_lower": 0.05,
+            "bin_upper": 0.1,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.15000000000000002,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.15000000000000002,
+            "bin_upper": 0.2,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.25,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.25,
+            "bin_upper": 0.30000000000000004,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.30000000000000004,
+            "bin_upper": 0.35000000000000003,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.35000000000000003,
+            "bin_upper": 0.4,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.45,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.45,
+            "bin_upper": 0.5,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.55,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.55,
+            "bin_upper": 0.6000000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.65,
+            "fraction": 0.0003030915336431602,
+            "count": 9.0
+          },
+          {
+            "bin_lower": 0.65,
+            "bin_upper": 0.7000000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.75,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.75,
+            "bin_upper": 0.8,
+            "fraction": 0.003266653195931838,
+            "count": 97.0
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.8500000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8500000000000001,
+            "bin_upper": 0.9,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 0.9500000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.9500000000000001,
+            "bin_upper": 1.0,
+            "fraction": 0.5119552771603691,
+            "count": 15202.0
+          }
+        ],
+        "n_bins": 20
+      }
+    },
+    {
+      "model": "tcn",
+      "prob_column": "tcn_prob",
+      "method": "identity",
+      "train_rows": 1832,
+      "val_rows": 990,
+      "metrics_before": {
+        "brier": 0.05038167219708571,
+        "ece": 0.01298454913092334,
+        "roc_auc": 0.9776599617916211,
+        "pr_auc": 0.973665842957458,
+        "reliability": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.05,
+            "mean_pred": 0.013154786927379508,
+            "empirical_rate": 0.009375,
+            "count": 320.0
+          },
+          {
+            "bin_lower": 0.05,
+            "bin_upper": 0.1,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.15000000000000002,
+            "mean_pred": 0.1111111111111111,
+            "empirical_rate": 0.10810810810810811,
+            "count": 37.0
+          },
+          {
+            "bin_lower": 0.15000000000000002,
+            "bin_upper": 0.2,
+            "mean_pred": 0.18577648766328012,
+            "empirical_rate": 0.20833333333333334,
+            "count": 96.0
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.25,
+            "mean_pred": 0.25,
+            "empirical_rate": 0.0,
+            "count": 3.0
+          },
+          {
+            "bin_lower": 0.25,
+            "bin_upper": 0.30000000000000004,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.30000000000000004,
+            "bin_upper": 0.35000000000000003,
+            "mean_pred": 0.35,
+            "empirical_rate": 0.2857142857142857,
+            "count": 14.0
+          },
+          {
+            "bin_lower": 0.35000000000000003,
+            "bin_upper": 0.4,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.45,
+            "mean_pred": 0.416390467925515,
+            "empirical_rate": 1.0,
+            "count": 1.0
+          },
+          {
+            "bin_lower": 0.45,
+            "bin_upper": 0.5,
+            "mean_pred": 0.4915865384615385,
+            "empirical_rate": 0.5625,
+            "count": 32.0
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.55,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.55,
+            "bin_upper": 0.6000000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.65,
+            "mean_pred": 0.631578947368421,
+            "empirical_rate": 0.7,
+            "count": 10.0
+          },
+          {
+            "bin_lower": 0.65,
+            "bin_upper": 0.7000000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.75,
+            "mean_pred": 0.7222222222222221,
+            "empirical_rate": 0.7692307692307693,
+            "count": 13.0
+          },
+          {
+            "bin_lower": 0.75,
+            "bin_upper": 0.8,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.8500000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8500000000000001,
+            "bin_upper": 0.9,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 0.9500000000000001,
+            "mean_pred": 0.9415359341530133,
+            "empirical_rate": 0.955,
+            "count": 200.0
+          },
+          {
+            "bin_lower": 0.9500000000000001,
+            "bin_upper": 1.0,
+            "mean_pred": 0.985312013563307,
+            "empirical_rate": 0.9886363636363636,
+            "count": 264.0
+          }
+        ],
+        "histogram": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.05,
+            "fraction": 0.32323232323232326,
+            "count": 320.0
+          },
+          {
+            "bin_lower": 0.05,
+            "bin_upper": 0.1,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.15000000000000002,
+            "fraction": 0.03737373737373737,
+            "count": 37.0
+          },
+          {
+            "bin_lower": 0.15000000000000002,
+            "bin_upper": 0.2,
+            "fraction": 0.09696969696969697,
+            "count": 96.0
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.25,
+            "fraction": 0.0030303030303030303,
+            "count": 3.0
+          },
+          {
+            "bin_lower": 0.25,
+            "bin_upper": 0.30000000000000004,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.30000000000000004,
+            "bin_upper": 0.35000000000000003,
+            "fraction": 0.014141414141414142,
+            "count": 14.0
+          },
+          {
+            "bin_lower": 0.35000000000000003,
+            "bin_upper": 0.4,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.45,
+            "fraction": 0.00101010101010101,
+            "count": 1.0
+          },
+          {
+            "bin_lower": 0.45,
+            "bin_upper": 0.5,
+            "fraction": 0.03232323232323232,
+            "count": 32.0
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.55,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.55,
+            "bin_upper": 0.6000000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.65,
+            "fraction": 0.010101010101010102,
+            "count": 10.0
+          },
+          {
+            "bin_lower": 0.65,
+            "bin_upper": 0.7000000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.75,
+            "fraction": 0.013131313131313131,
+            "count": 13.0
+          },
+          {
+            "bin_lower": 0.75,
+            "bin_upper": 0.8,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.8500000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8500000000000001,
+            "bin_upper": 0.9,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 0.9500000000000001,
+            "fraction": 0.20202020202020202,
+            "count": 200.0
+          },
+          {
+            "bin_lower": 0.9500000000000001,
+            "bin_upper": 1.0,
+            "fraction": 0.26666666666666666,
+            "count": 264.0
+          }
+        ],
+        "n_bins": 20
+      },
+      "metrics_after": {
+        "brier": 0.05038167219708571,
+        "ece": 0.01298454913092334,
+        "roc_auc": 0.9776599617916211,
+        "pr_auc": 0.973665842957458,
+        "reliability": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.05,
+            "mean_pred": 0.013154786927379508,
+            "empirical_rate": 0.009375,
+            "count": 320.0
+          },
+          {
+            "bin_lower": 0.05,
+            "bin_upper": 0.1,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.15000000000000002,
+            "mean_pred": 0.1111111111111111,
+            "empirical_rate": 0.10810810810810811,
+            "count": 37.0
+          },
+          {
+            "bin_lower": 0.15000000000000002,
+            "bin_upper": 0.2,
+            "mean_pred": 0.18577648766328012,
+            "empirical_rate": 0.20833333333333334,
+            "count": 96.0
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.25,
+            "mean_pred": 0.25,
+            "empirical_rate": 0.0,
+            "count": 3.0
+          },
+          {
+            "bin_lower": 0.25,
+            "bin_upper": 0.30000000000000004,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.30000000000000004,
+            "bin_upper": 0.35000000000000003,
+            "mean_pred": 0.35,
+            "empirical_rate": 0.2857142857142857,
+            "count": 14.0
+          },
+          {
+            "bin_lower": 0.35000000000000003,
+            "bin_upper": 0.4,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.45,
+            "mean_pred": 0.416390467925515,
+            "empirical_rate": 1.0,
+            "count": 1.0
+          },
+          {
+            "bin_lower": 0.45,
+            "bin_upper": 0.5,
+            "mean_pred": 0.4915865384615385,
+            "empirical_rate": 0.5625,
+            "count": 32.0
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.55,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.55,
+            "bin_upper": 0.6000000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.65,
+            "mean_pred": 0.631578947368421,
+            "empirical_rate": 0.7,
+            "count": 10.0
+          },
+          {
+            "bin_lower": 0.65,
+            "bin_upper": 0.7000000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.75,
+            "mean_pred": 0.7222222222222221,
+            "empirical_rate": 0.7692307692307693,
+            "count": 13.0
+          },
+          {
+            "bin_lower": 0.75,
+            "bin_upper": 0.8,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.8500000000000001,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8500000000000001,
+            "bin_upper": 0.9,
+            "mean_pred": NaN,
+            "empirical_rate": NaN,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 0.9500000000000001,
+            "mean_pred": 0.9415359341530133,
+            "empirical_rate": 0.955,
+            "count": 200.0
+          },
+          {
+            "bin_lower": 0.9500000000000001,
+            "bin_upper": 1.0,
+            "mean_pred": 0.985312013563307,
+            "empirical_rate": 0.9886363636363636,
+            "count": 264.0
+          }
+        ],
+        "histogram": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.05,
+            "fraction": 0.32323232323232326,
+            "count": 320.0
+          },
+          {
+            "bin_lower": 0.05,
+            "bin_upper": 0.1,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.15000000000000002,
+            "fraction": 0.03737373737373737,
+            "count": 37.0
+          },
+          {
+            "bin_lower": 0.15000000000000002,
+            "bin_upper": 0.2,
+            "fraction": 0.09696969696969697,
+            "count": 96.0
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.25,
+            "fraction": 0.0030303030303030303,
+            "count": 3.0
+          },
+          {
+            "bin_lower": 0.25,
+            "bin_upper": 0.30000000000000004,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.30000000000000004,
+            "bin_upper": 0.35000000000000003,
+            "fraction": 0.014141414141414142,
+            "count": 14.0
+          },
+          {
+            "bin_lower": 0.35000000000000003,
+            "bin_upper": 0.4,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.45,
+            "fraction": 0.00101010101010101,
+            "count": 1.0
+          },
+          {
+            "bin_lower": 0.45,
+            "bin_upper": 0.5,
+            "fraction": 0.03232323232323232,
+            "count": 32.0
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.55,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.55,
+            "bin_upper": 0.6000000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.65,
+            "fraction": 0.010101010101010102,
+            "count": 10.0
+          },
+          {
+            "bin_lower": 0.65,
+            "bin_upper": 0.7000000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.75,
+            "fraction": 0.013131313131313131,
+            "count": 13.0
+          },
+          {
+            "bin_lower": 0.75,
+            "bin_upper": 0.8,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.8500000000000001,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.8500000000000001,
+            "bin_upper": 0.9,
+            "fraction": 0.0,
+            "count": 0.0
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 0.9500000000000001,
+            "fraction": 0.20202020202020202,
+            "count": 200.0
+          },
+          {
+            "bin_lower": 0.9500000000000001,
+            "bin_upper": 1.0,
+            "fraction": 0.26666666666666666,
+            "count": 264.0
+          }
+        ],
+        "n_bins": 20
+      }
+    },
+    {
+      "model": "blender",
+      "prob_column": "blender_prob",
+      "method": "platt",
+      "train_rows": 55145,
+      "val_rows": 29694,
+      "metrics_before": {
+        "brier": 0.019505705781206077,
+        "ece": 0.030366953859521855,
+        "roc_auc": 0.9963131485023651,
+        "pr_auc": 0.9950604120214016,
+        "reliability": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.05,
+            "mean_pred": 0.0024403350189796847,
+            "empirical_rate": 0.004825698645923365,
+            "count": 13884.0
+          },
+          {
+            "bin_lower": 0.05,
+            "bin_upper": 0.1,
+            "mean_pred": 0.07343712798533814,
+            "empirical_rate": 0.15636363636363637,
+            "count": 275.0
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.15000000000000002,
+            "mean_pred": 0.11606017045045654,
+            "empirical_rate": 0.7884615384615384,
+            "count": 52.0
+          },
+          {
+            "bin_lower": 0.15000000000000002,
+            "bin_upper": 0.2,
+            "mean_pred": 0.18044587549723806,
+            "empirical_rate": 0.9393939393939394,
+            "count": 66.0
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.25,
+            "mean_pred": 0.2260433247300114,
+            "empirical_rate": 0.9142857142857143,
+            "count": 70.0
+          },
+          {
+            "bin_lower": 0.25,
+            "bin_upper": 0.30000000000000004,
+            "mean_pred": 0.2752718923193593,
+            "empirical_rate": 0.9672131147540983,
+            "count": 61.0
+          },
+          {
+            "bin_lower": 0.30000000000000004,
+            "bin_upper": 0.35000000000000003,
+            "mean_pred": 0.328873060349884,
+            "empirical_rate": 0.9318181818181818,
+            "count": 44.0
+          },
+          {
+            "bin_lower": 0.35000000000000003,
+            "bin_upper": 0.4,
+            "mean_pred": 0.37450128806478844,
+            "empirical_rate": 0.9591836734693877,
+            "count": 49.0
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.45,
+            "mean_pred": 0.4214325612694302,
+            "empirical_rate": 0.9411764705882353,
+            "count": 34.0
+          },
+          {
+            "bin_lower": 0.45,
+            "bin_upper": 0.5,
+            "mean_pred": 0.4753825365516626,
+            "empirical_rate": 0.5263157894736842,
+            "count": 57.0
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.55,
+            "mean_pred": 0.5239652897711347,
+            "empirical_rate": 0.07317073170731707,
+            "count": 41.0
+          },
+          {
+            "bin_lower": 0.55,
+            "bin_upper": 0.6000000000000001,
+            "mean_pred": 0.5740598324510081,
+            "empirical_rate": 0.2653061224489796,
+            "count": 49.0
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.65,
+            "mean_pred": 0.6291866775209701,
+            "empirical_rate": 0.8837209302325582,
+            "count": 43.0
+          },
+          {
+            "bin_lower": 0.65,
+            "bin_upper": 0.7000000000000001,
+            "mean_pred": 0.6722770846091672,
+            "empirical_rate": 0.7714285714285715,
+            "count": 70.0
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.75,
+            "mean_pred": 0.7246176014350197,
+            "empirical_rate": 0.5652173913043478,
+            "count": 69.0
+          },
+          {
+            "bin_lower": 0.75,
+            "bin_upper": 0.8,
+            "mean_pred": 0.7801579332561523,
+            "empirical_rate": 0.7126436781609196,
+            "count": 87.0
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.8500000000000001,
+            "mean_pred": 0.836776107406305,
+            "empirical_rate": 0.8693379790940766,
+            "count": 574.0
+          },
+          {
+            "bin_lower": 0.8500000000000001,
+            "bin_upper": 0.9,
+            "mean_pred": 0.8783919581315861,
+            "empirical_rate": 0.994258872651357,
+            "count": 1916.0
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 0.9500000000000001,
+            "mean_pred": 0.9264790284396803,
+            "empirical_rate": 0.999293036408625,
+            "count": 2829.0
+          },
+          {
+            "bin_lower": 0.9500000000000001,
+            "bin_upper": 1.0,
+            "mean_pred": 0.984131258241687,
+            "empirical_rate": 0.9925721561969439,
+            "count": 9424.0
+          }
+        ],
+        "histogram": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.05,
+            "fraction": 0.46756920590018186,
+            "count": 13884.0
+          },
+          {
+            "bin_lower": 0.05,
+            "bin_upper": 0.1,
+            "fraction": 0.009261130194652118,
+            "count": 275.0
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.15000000000000002,
+            "fraction": 0.001751195527716037,
+            "count": 52.0
+          },
+          {
+            "bin_lower": 0.15000000000000002,
+            "bin_upper": 0.2,
+            "fraction": 0.002222671246716508,
+            "count": 66.0
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.25,
+            "fraction": 0.0023573785950023575,
+            "count": 70.0
+          },
+          {
+            "bin_lower": 0.25,
+            "bin_upper": 0.30000000000000004,
+            "fraction": 0.002054287061359197,
+            "count": 61.0
+          },
+          {
+            "bin_lower": 0.30000000000000004,
+            "bin_upper": 0.35000000000000003,
+            "fraction": 0.001481780831144339,
+            "count": 44.0
+          },
+          {
+            "bin_lower": 0.35000000000000003,
+            "bin_upper": 0.4,
+            "fraction": 0.0016501650165016502,
+            "count": 49.0
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.45,
+            "fraction": 0.0011450124604297164,
+            "count": 34.0
+          },
+          {
+            "bin_lower": 0.45,
+            "bin_upper": 0.5,
+            "fraction": 0.0019195797130733482,
+            "count": 57.0
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.55,
+            "fraction": 0.0013807503199299521,
+            "count": 41.0
+          },
+          {
+            "bin_lower": 0.55,
+            "bin_upper": 0.6000000000000001,
+            "fraction": 0.0016501650165016502,
+            "count": 49.0
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.65,
+            "fraction": 0.0014481039940728766,
+            "count": 43.0
+          },
+          {
+            "bin_lower": 0.65,
+            "bin_upper": 0.7000000000000001,
+            "fraction": 0.0023573785950023575,
+            "count": 70.0
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.75,
+            "fraction": 0.002323701757930895,
+            "count": 69.0
+          },
+          {
+            "bin_lower": 0.75,
+            "bin_upper": 0.8,
+            "fraction": 0.0029298848252172155,
+            "count": 87.0
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.8500000000000001,
+            "fraction": 0.01933050447901933,
+            "count": 574.0
+          },
+          {
+            "bin_lower": 0.8500000000000001,
+            "bin_upper": 0.9,
+            "fraction": 0.06452481982892166,
+            "count": 1916.0
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 0.9500000000000001,
+            "fraction": 0.0952717720751667,
+            "count": 2829.0
+          },
+          {
+            "bin_lower": 0.9500000000000001,
+            "bin_upper": 1.0,
+            "fraction": 0.3173705125614602,
+            "count": 9424.0
+          }
+        ],
+        "n_bins": 20
+      },
+      "metrics_after": {
+        "brier": 0.019336099491594382,
+        "ece": 0.017583124106438152,
+        "roc_auc": 0.9963121836717793,
+        "pr_auc": 0.9950120002068362,
+        "reliability": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.05,
+            "mean_pred": 0.001141225469124663,
+            "empirical_rate": 0.007698827518011019,
+            "count": 14158.0
+          },
+          {
+            "bin_lower": 0.05,
+            "bin_upper": 0.1,
+            "mean_pred": 0.06390693338207314,
+            "empirical_rate": 0.7777777777777778,
+            "count": 54.0
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.15000000000000002,
+            "mean_pred": 0.12625508883322936,
+            "empirical_rate": 0.9558823529411765,
+            "count": 68.0
+          },
+          {
+            "bin_lower": 0.15000000000000002,
+            "bin_upper": 0.2,
+            "mean_pred": 0.17570158718949333,
+            "empirical_rate": 0.9206349206349206,
+            "count": 63.0
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.25,
+            "mean_pred": 0.22505246818010902,
+            "empirical_rate": 0.9347826086956522,
+            "count": 46.0
+          },
+          {
+            "bin_lower": 0.25,
+            "bin_upper": 0.30000000000000004,
+            "mean_pred": 0.2717589459557679,
+            "empirical_rate": 0.9393939393939394,
+            "count": 33.0
+          },
+          {
+            "bin_lower": 0.30000000000000004,
+            "bin_upper": 0.35000000000000003,
+            "mean_pred": 0.3258248088677719,
+            "empirical_rate": 0.9487179487179487,
+            "count": 39.0
+          },
+          {
+            "bin_lower": 0.35000000000000003,
+            "bin_upper": 0.4,
+            "mean_pred": 0.37572528978096453,
+            "empirical_rate": 0.9696969696969697,
+            "count": 33.0
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.45,
+            "mean_pred": 0.42643829617322027,
+            "empirical_rate": 0.9354838709677419,
+            "count": 31.0
+          },
+          {
+            "bin_lower": 0.45,
+            "bin_upper": 0.5,
+            "mean_pred": 0.48254969585553437,
+            "empirical_rate": 0.7586206896551724,
+            "count": 29.0
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.55,
+            "mean_pred": 0.532172941979849,
+            "empirical_rate": 0.5,
+            "count": 34.0
+          },
+          {
+            "bin_lower": 0.55,
+            "bin_upper": 0.6000000000000001,
+            "mean_pred": 0.5720000324733235,
+            "empirical_rate": 0.13333333333333333,
+            "count": 30.0
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.65,
+            "mean_pred": 0.627570246138482,
+            "empirical_rate": 0.05714285714285714,
+            "count": 35.0
+          },
+          {
+            "bin_lower": 0.65,
+            "bin_upper": 0.7000000000000001,
+            "mean_pred": 0.6711758138902931,
+            "empirical_rate": 0.41935483870967744,
+            "count": 31.0
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.75,
+            "mean_pred": 0.7276386190261105,
+            "empirical_rate": 0.8717948717948718,
+            "count": 39.0
+          },
+          {
+            "bin_lower": 0.75,
+            "bin_upper": 0.8,
+            "mean_pred": 0.7729666913718459,
+            "empirical_rate": 0.746031746031746,
+            "count": 63.0
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.8500000000000001,
+            "mean_pred": 0.82871555836264,
+            "empirical_rate": 0.6216216216216216,
+            "count": 74.0
+          },
+          {
+            "bin_lower": 0.8500000000000001,
+            "bin_upper": 0.9,
+            "mean_pred": 0.8825376476440043,
+            "empirical_rate": 0.7126436781609196,
+            "count": 87.0
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 0.9500000000000001,
+            "mean_pred": 0.9365266702412488,
+            "empirical_rate": 0.9224598930481284,
+            "count": 1122.0
+          },
+          {
+            "bin_lower": 0.9500000000000001,
+            "bin_upper": 1.0,
+            "mean_pred": 0.989520482118798,
+            "empirical_rate": 0.9946422018348624,
+            "count": 13625.0
+          }
+        ],
+        "histogram": [
+          {
+            "bin_lower": 0.0,
+            "bin_upper": 0.05,
+            "fraction": 0.4767966592577625,
+            "count": 14158.0
+          },
+          {
+            "bin_lower": 0.05,
+            "bin_upper": 0.1,
+            "fraction": 0.0018185492018589614,
+            "count": 54.0
+          },
+          {
+            "bin_lower": 0.1,
+            "bin_upper": 0.15000000000000002,
+            "fraction": 0.002290024920859433,
+            "count": 68.0
+          },
+          {
+            "bin_lower": 0.15000000000000002,
+            "bin_upper": 0.2,
+            "fraction": 0.0021216407355021216,
+            "count": 63.0
+          },
+          {
+            "bin_lower": 0.2,
+            "bin_upper": 0.25,
+            "fraction": 0.0015491345052872634,
+            "count": 46.0
+          },
+          {
+            "bin_lower": 0.25,
+            "bin_upper": 0.30000000000000004,
+            "fraction": 0.001111335623358254,
+            "count": 33.0
+          },
+          {
+            "bin_lower": 0.30000000000000004,
+            "bin_upper": 0.35000000000000003,
+            "fraction": 0.0013133966457870277,
+            "count": 39.0
+          },
+          {
+            "bin_lower": 0.35000000000000003,
+            "bin_upper": 0.4,
+            "fraction": 0.001111335623358254,
+            "count": 33.0
+          },
+          {
+            "bin_lower": 0.4,
+            "bin_upper": 0.45,
+            "fraction": 0.0010439819492153296,
+            "count": 31.0
+          },
+          {
+            "bin_lower": 0.45,
+            "bin_upper": 0.5,
+            "fraction": 0.0009766282750724052,
+            "count": 29.0
+          },
+          {
+            "bin_lower": 0.5,
+            "bin_upper": 0.55,
+            "fraction": 0.0011450124604297164,
+            "count": 34.0
+          },
+          {
+            "bin_lower": 0.55,
+            "bin_upper": 0.6000000000000001,
+            "fraction": 0.0010103051121438675,
+            "count": 30.0
+          },
+          {
+            "bin_lower": 0.6000000000000001,
+            "bin_upper": 0.65,
+            "fraction": 0.0011786892975011788,
+            "count": 35.0
+          },
+          {
+            "bin_lower": 0.65,
+            "bin_upper": 0.7000000000000001,
+            "fraction": 0.0010439819492153296,
+            "count": 31.0
+          },
+          {
+            "bin_lower": 0.7000000000000001,
+            "bin_upper": 0.75,
+            "fraction": 0.0013133966457870277,
+            "count": 39.0
+          },
+          {
+            "bin_lower": 0.75,
+            "bin_upper": 0.8,
+            "fraction": 0.0021216407355021216,
+            "count": 63.0
+          },
+          {
+            "bin_lower": 0.8,
+            "bin_upper": 0.8500000000000001,
+            "fraction": 0.0024920859432882064,
+            "count": 74.0
+          },
+          {
+            "bin_lower": 0.8500000000000001,
+            "bin_upper": 0.9,
+            "fraction": 0.0029298848252172155,
+            "count": 87.0
+          },
+          {
+            "bin_lower": 0.9,
+            "bin_upper": 0.9500000000000001,
+            "fraction": 0.03778541119418064,
+            "count": 1122.0
+          },
+          {
+            "bin_lower": 0.9500000000000001,
+            "bin_upper": 1.0,
+            "fraction": 0.45884690509867315,
+            "count": 13625.0
+          }
+        ],
+        "n_bins": 20
+      }
+    }
+  ]
+}
