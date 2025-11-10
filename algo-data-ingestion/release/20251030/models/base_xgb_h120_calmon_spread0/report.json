@@ -127,7 +127,7 @@
     },
     "inference": {
       "hl_spread_max": 0.0007,
-      "hl_spread_z_max": -0.25,
+      "hl_spread_z_max": 0.25,
       "rvol20_max": 8e-05,
       "prob_gate_min": 0.72,
       "min_hold_bars": 10,
@@ -144,14 +144,14 @@
     "minute_indicator_column": "rss_spike_presence",
     "minute_spike_share_candidates": {
       "rss_spike_proximity_flag": 0.4689123108474002,
-      "rss_spike_halo": 0.9881025710086821,
+      "rss_spike_halo": 0.9881025710086822,
       "rss_spike_trailing_15": 0.9880530611562214,
       "rss_spike_leading_15": 0.5192847039690882,
       "rss_spike_decay_fast": 0.9889112231904443,
       "rss_spike_presence": 0.9916823447866125,
       "rss_spike_decay_long": 0.9916823447866125,
       "rss_spike_decay": 0.990014892240919,
-      "rss_spike_active": 0.5192351941166275,
+      "rss_spike_active": 0.5192351941166276,
       "rss_count_minute": 0.0001984028832134452
     },
     "fallback_to_no_rss": false
