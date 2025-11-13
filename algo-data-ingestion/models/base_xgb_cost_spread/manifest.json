@@ -1,0 +1,79 @@
+{
+  "model_path": "model.json",
+  "calibrator_path": "calibrator.joblib",
+  "feature_list_path": "feature_list.json",
+  "threshold": {
+    "value": 0.8416666666666667,
+    "path": "threshold.json"
+  },
+  "report_path": "report.json",
+  "gates": {
+    "spread_column": "hl_spread",
+    "prob_column": "base_prob",
+    "training": {
+      "hl_spread_max": null,
+      "hl_spread_z_max": 0.4,
+      "rvol20_max": {
+        "default": 0.00035,
+        "ETH/USDT": 0.0005,
+        "SOL/USDT": 0.0006
+      },
+      "prob_gate_min": {
+        "default": 0.58,
+        "ETH/USDT": 0.55,
+        "SOL/USDT": 0.52
+      },
+      "min_hold_bars": 6,
+      "long_only": true,
+      "sym_spread_ratio_max": {
+        "default": 1.1,
+        "ETH/USDT": 1.4,
+        "SOL/USDT": 1.8
+      },
+      "sym_rvol_ratio_max": {
+        "default": 1.2,
+        "ETH/USDT": 1.4,
+        "SOL/USDT": 1.6
+      },
+      "liquidity_rank_max": {
+        "default": 2.0,
+        "SOL/USDT": 3.0
+      }
+    },
+    "inference": {
+      "hl_spread_max": 0.001,
+      "hl_spread_z_max": 0.3,
+      "rvol20_max": {
+        "default": 0.00035,
+        "ETH/USDT": 0.0005,
+        "SOL/USDT": 0.0006
+      },
+      "prob_gate_min": {
+        "default": 0.6,
+        "ETH/USDT": 0.55,
+        "SOL/USDT": 0.52
+      },
+      "min_hold_bars": 8,
+      "long_only": true,
+      "sym_spread_ratio_max": {
+        "default": 1.05,
+        "BTC/USDT": 1.05,
+        "ETH/USDT": 1.3,
+        "SOL/USDT": 1.6
+      },
+      "sym_rvol_ratio_max": {
+        "default": 1.1,
+        "ETH/USDT": 1.3,
+        "SOL/USDT": 1.5
+      },
+      "liquidity_rank_max": {
+        "default": 2.0,
+        "SOL/USDT": 3.0
+      }
+    }
+  },
+  "metadata": {
+    "model_type": "xgboost_classifier",
+    "calibrated": true
+  }
+}

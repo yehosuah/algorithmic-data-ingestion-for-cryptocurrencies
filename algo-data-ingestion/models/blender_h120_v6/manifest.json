@@ -31,6 +31,8 @@
       0.55,
       0.75,
       0.9
-    ]
+    ],
+    "gate_reference_coverage": 0.19,
+    "gate_reference_tolerance": 0.03
   }
 }
