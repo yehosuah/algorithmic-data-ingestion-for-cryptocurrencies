@@ -1,0 +1,90 @@
+{
+  "source": "datasets/market_multi_3symbol_1m.parquet",
+  "rows": 1193504,
+  "symbols": [
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT"
+  ],
+  "training": {
+    "hl_spread_max": {
+      "BTC/USDT": 0.00259704,
+      "ETH/USDT": 0.00324014,
+      "SOL/USDT": 0.00392244,
+      "default": 0.00392244
+    },
+    "rvol20_max": {
+      "BTC/USDT": 0.001625013001,
+      "ETH/USDT": 0.001933660373,
+      "SOL/USDT": 0.003454228942,
+      "default": 0.003454228942
+    },
+    "sym_spread_ratio_max": {
+      "BTC/USDT": 1.82029241,
+      "ETH/USDT": 1.74718181,
+      "SOL/USDT": 1.77276998,
+      "default": 1.82029241
+    },
+    "sym_rvol_ratio_max": {
+      "BTC/USDT": 1.62856236,
+      "ETH/USDT": 1.54274288,
+      "SOL/USDT": 1.77250252,
+      "default": 1.77250252
+    },
+    "liquidity_rank_max": {
+      "BTC/USDT": 1.0,
+      "ETH/USDT": 2.0,
+      "SOL/USDT": 3.0,
+      "default": 3.0
+    }
+  },
+  "inference": {
+    "hl_spread_max": {
+      "BTC/USDT": 0.00200883,
+      "ETH/USDT": 0.00254495,
+      "SOL/USDT": 0.00297092,
+      "default": 0.00297092
+    },
+    "rvol20_max": {
+      "BTC/USDT": 0.001323407387,
+      "ETH/USDT": 0.001623693567,
+      "SOL/USDT": 0.002458046245,
+      "default": 0.002458046245
+    },
+    "sym_spread_ratio_max": {
+      "BTC/USDT": 1.40800761,
+      "ETH/USDT": 1.37231633,
+      "SOL/USDT": 1.34272553,
+      "default": 1.40800761
+    },
+    "sym_rvol_ratio_max": {
+      "BTC/USDT": 1.32629798,
+      "ETH/USDT": 1.29544036,
+      "SOL/USDT": 1.26132148,
+      "default": 1.32629798
+    },
+    "liquidity_rank_max": {
+      "BTC/USDT": 1.0,
+      "ETH/USDT": 2.0,
+      "SOL/USDT": 3.0,
+      "default": 3.0
+    }
+  },
+  "stats": {
+    "BTC/USDT": {
+      "rows": 966117.0,
+      "start": "2024-01-01T00:00:00+00:00",
+      "end": "2025-11-04T15:23:00+00:00"
+    },
+    "ETH/USDT": {
+      "rows": 224471.0,
+      "start": "2025-06-01T00:00:00+00:00",
+      "end": "2025-11-04T15:23:00+00:00"
+    },
+    "SOL/USDT": {
+      "rows": 2916.0,
+      "start": "2025-11-02T10:40:00+00:00",
+      "end": "2025-11-04T15:23:00+00:00"
+    }
+  }
+}
