@@ -2,6 +2,7 @@ from __future__ import annotations
 import errno
 import logging
 import os
+import operator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -70,20 +71,80 @@ DEFAULT_GATE_CONFIG: Dict[str, Any] = {
     "spread_column": "hl_spread",
     "prob_column": "base_prob",
     "training": {
-        "hl_spread_max": None,
+        "hl_spread_max": {
+            "BTC/USDT": 0.00259762,
+            "ETH/USDT": 0.00324014,
+            "SOL/USDT": 0.00392244,
+            "default": 0.00392244,
+        },
         "hl_spread_z_max": 0.25,
-        "rvol20_max": 2e-4,
+        "rvol20_max": {
+            "BTC/USDT": 0.001625910819,
+            "ETH/USDT": 0.001933756009,
+            "SOL/USDT": 0.00345556233,
+            "default": 0.00345556233,
+        },
         "prob_gate_min": None,
         "min_hold_bars": 10,
         "long_only": True,
+        "sym_spread_ratio_max": {
+            "BTC/USDT": 1.8206031,
+            "ETH/USDT": 1.74718181,
+            "SOL/USDT": 1.77276998,
+            "default": 1.8206031,
+        },
+        "sym_rvol_ratio_max": {
+            "BTC/USDT": 1.62934166,
+            "ETH/USDT": 1.54273458,
+            "SOL/USDT": 1.77045051,
+            "default": 1.77045051,
+        },
+        "liquidity_rank_max": {
+            "BTC/USDT": 1.0,
+            "ETH/USDT": 2.0,
+            "SOL/USDT": 3.0,
+            "default": 3.0,
+        },
     },
     "inference": {
-        "hl_spread_max": 7e-4,
-        "hl_spread_z_max": -0.25,
-        "rvol20_max": 8e-5,
-        "prob_gate_min": 0.72,
+        "hl_spread_max": {
+            "BTC/USDT": 0.00200922,
+            "ETH/USDT": 0.00254495,
+            "SOL/USDT": 0.00297092,
+            "default": 0.00297092,
+        },
+        "hl_spread_z_max": 0.3,
+        "rvol20_max": {
+            "BTC/USDT": 0.001323804714,
+            "ETH/USDT": 0.001623748022,
+            "SOL/USDT": 0.002458999182,
+            "default": 0.002458999182,
+        },
+        "prob_gate_min": {
+            "default": 0.6,
+            "ETH/USDT": 0.55,
+            "SOL/USDT": 0.52,
+        },
         "min_hold_bars": 10,
         "long_only": True,
+        "sym_spread_ratio_max": {
+            "BTC/USDT": 1.40820917,
+            "ETH/USDT": 1.37231633,
+            "SOL/USDT": 1.34272553,
+            "default": 1.40820917,
+        },
+        "sym_rvol_ratio_max": {
+            "BTC/USDT": 1.3266056,
+            "ETH/USDT": 1.29543339,
+            "SOL/USDT": 1.25986126,
+            "default": 1.3266056,
+        },
+        "liquidity_rank_max": {
+            "BTC/USDT": 1.0,
+            "ETH/USDT": 2.0,
+            "SOL/USDT": 3.0,
+            "default": 3.0,
+        },
     },
 }
 
@@ -302,8 +363,19 @@ def load_base_predictor(base_dir: Path, prob_column: str = "base_prob"):
         calib = xgb.XGBClassifier()
         calib._Booster = booster
         calib._le = None
-        calib.n_features_in_ = len(feat_cols)
-        calib.classes_ = np.array([0, 1])
+        try:
+            calib.n_features_in_ = len(feat_cols)
+        except AttributeError:
+            # Recent xgboost versions expose n_features_in_ as read-only property.
+            pass
+        try:
+            calib.classes_ = np.array([0, 1])
+        except AttributeError:
+            pass
+        try:
+            calib.n_classes_ = 2
+        except AttributeError:
+            pass
     _attach_posthoc_calibrator(calib, base_dir, prob_column or "base_prob")
     return calib, feat_cols
 
@@ -323,6 +395,56 @@ def predict_base(df: pd.DataFrame, calib, feat_cols: List[str]) -> pd.Series:
     p = calib.predict_proba(X.values)[:, 1]
     p = _apply_posthoc_if_available(calib, p)
     return pd.Series(p, index=df.index, name="base_prob")
+
+def _resolve_gate_value(value: Any, df: pd.DataFrame) -> Optional[Union[float, pd.Series]]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float, np.floating)):
+        return float(value)
+    if isinstance(value, dict):
+        symbols = df["symbol"].astype(str) if "symbol" in df.columns else None
+        default = value.get("default")
+        if symbols is None:
+            return float(default) if default is not None else None
+        series = pd.Series(
+            float(default) if default is not None else np.nan,
+            index=df.index,
+            dtype=float,
+        )
+        for key, val in value.items():
+            if key == "default":
+                continue
+            series.loc[symbols == key] = float(val)
+        return series
+    return None
+
+
+def _apply_numeric_gate(
+    mask: pd.Series,
+    df: pd.DataFrame,
+    column: str,
+    gate_value: Any,
+    comparator,
+) -> pd.Series:
+    if gate_value is None:
+        return mask
+    if column not in df.columns:
+        return mask & False
+    threshold = _resolve_gate_value(gate_value, df)
+    if threshold is None:
+        return mask
+    try:
+        values = df[column].astype(float)
+    except Exception:
+        return mask & False
+    if isinstance(threshold, pd.Series):
+        thr = threshold.reindex(df.index)
+        valid = thr.notna()
+        comp = comparator(values, thr.fillna(0.0))
+        comp = comp & valid
+    else:
+        comp = comparator(values, float(threshold))
+    return mask & comp
 
 
 def compute_gate_mask(
@@ -351,23 +473,13 @@ def compute_gate_mask(
     mask = pd.Series(True, index=df.index, dtype=bool)
 
     spread_col = cfg.get("spread_column")
-    if spread_col and gate.get("hl_spread_max") is not None and spread_col in df.columns:
-        try:
-            mask &= df[spread_col].astype(float) <= float(gate["hl_spread_max"])
-        except Exception:
-            mask &= False
-
-    if gate.get("hl_spread_z_max") is not None and "hl_spread_z" in df.columns:
-        try:
-            mask &= df["hl_spread_z"].astype(float) <= float(gate["hl_spread_z_max"])
-        except Exception:
-            mask &= False
-
-    if gate.get("rvol20_max") is not None and "rvol_20" in df.columns:
-        try:
-            mask &= df["rvol_20"].astype(float) <= float(gate["rvol20_max"])
-        except Exception:
-            mask &= False
+    if spread_col:
+        mask = _apply_numeric_gate(mask, df, spread_col, gate.get("hl_spread_max"), operator.le)
+    mask = _apply_numeric_gate(mask, df, "hl_spread_z", gate.get("hl_spread_z_max"), operator.le)
+    mask = _apply_numeric_gate(mask, df, "rvol_20", gate.get("rvol20_max"), operator.le)
+    mask = _apply_numeric_gate(mask, df, "sym_spread_ratio", gate.get("sym_spread_ratio_max"), operator.le)
+    mask = _apply_numeric_gate(mask, df, "sym_rvol_ratio", gate.get("sym_rvol_ratio_max"), operator.le)
+    mask = _apply_numeric_gate(mask, df, "sym_liquidity_rank", gate.get("liquidity_rank_max"), operator.le)
 
     prob_col = cfg.get("prob_column", "base_prob")
     prob_threshold = gate.get("prob_gate_min")
@@ -382,7 +494,18 @@ def compute_gate_mask(
             prob_series = pd.Series(prob_series, index=df.index)
         else:
             prob_series = prob_series.reindex(df.index)
-        mask &= prob_series.astype(float) >= float(prob_threshold)
+        prob_series = prob_series.astype(float)
+        threshold = _resolve_gate_value(prob_threshold, df)
+        if isinstance(threshold, pd.Series):
+            threshold = threshold.reindex(prob_series.index)
+            valid = threshold.notna()
+            comp = prob_series >= threshold.fillna(0.0)
+            comp = comp & valid
+        elif threshold is not None:
+            comp = prob_series >= float(threshold)
+        else:
+            comp = prob_series >= float(prob_threshold)
+        mask &= comp
 
     return mask.fillna(False)
 

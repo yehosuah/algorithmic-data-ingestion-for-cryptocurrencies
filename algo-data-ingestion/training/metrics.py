@@ -90,7 +90,7 @@ def equity_curve(
     pnl = pos_lag * ret - cost
     pnl = np.clip(pnl, -0.95, 10.0)
     log_equity = np.cumsum(np.log1p(pnl))
-    log_equity = np.clip(log_equity, -50.0, 1.5)
+    log_equity = np.clip(log_equity, -50.0, 10.0)
     eq = np.exp(log_equity)
     eq = np.clip(eq, 1e-6, 1e6)
 

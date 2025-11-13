@@ -5,7 +5,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 import numpy as np
 import pandas as pd
@@ -13,7 +13,7 @@ import pandas as pd
 # Ensure project root on sys.path
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from training.data import load_parquet_dataset, ensure_labels
+from training.data import load_parquet_dataset, ensure_labels, sanitize_market_dataset
 from training.feature_eng import augment_market_features
 from training.walkforward import time_folds
 from training.model import extract_features_labels, train_xgb, calibrate, predict_proba, save_artifacts
@@ -21,6 +21,62 @@ from training.thresholds import select_prob_threshold
 from training.metrics import summary_stats, equity_curve
 from training.reporting import ensure_kpi_schema, social_signal_audit
 from sklearn.metrics import roc_auc_score
+
+
+def _serialise_gate_value(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, (int, float, np.floating)):
+        return float(value)
+    if isinstance(value, dict):
+        out: Dict[str, Any] = {}
+        for key, val in value.items():
+            if val is None:
+                continue
+            out[key] = float(val) if isinstance(val, (int, float, np.floating)) else val
+        return out
+    return value
+
+
+def _resolve_symbol_threshold(symbols: Optional[pd.Series], threshold: Any, index: pd.Index) -> Optional[pd.Series | float]:
+    if threshold is None:
+        return None
+    if isinstance(threshold, dict):
+        if symbols is None:
+            raise ValueError("Symbol-aware thresholds require a 'symbol' column in the dataset.")
+        series = pd.Series(np.nan, index=index, dtype=float)
+        default = threshold.get("default")
+        if default is not None:
+            series.loc[:] = float(default)
+        for key, val in threshold.items():
+            if key == "default":
+                continue
+            series.loc[symbols == key] = float(val)
+        return series
+    if isinstance(threshold, (int, float, np.floating)):
+        return float(threshold)
+    return None
+
+
+def _mask_for_threshold(
+    values: pd.Series,
+    threshold: Any,
+    symbols: Optional[pd.Series] = None,
+) -> Optional[pd.Series]:
+    resolved = _resolve_symbol_threshold(symbols, threshold, values.index)
+    if resolved is None:
+        return None
+    if isinstance(resolved, pd.Series):
+        thr = resolved.reindex(values.index)
+        mask = (values <= thr) & thr.notna()
+        return mask.astype(bool)
+    return (values <= float(resolved)).astype(bool)
+
+
+def _merge_masks(lhs: Optional[pd.Series], rhs: Optional[pd.Series]) -> Optional[pd.Series]:
+    if rhs is None:
+        return lhs
+    return rhs if lhs is None else (lhs & rhs)
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -36,6 +92,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--max-spread", type=float, default=None, help="Optional absolute spread ceiling (same units as spread_col) for opening/holding trades")
     ap.add_argument("--max-spread-z", type=float, default=0.25, help="Optional z-score ceiling using hl_spread_z to gate trades (default relaxed training gate)")
     ap.add_argument("--max-rvol20", type=float, default=2e-4, help="Optional ceiling on rvol_20 to gate trades (default relaxed training gate)")
+    ap.add_argument("--max-symbol-spread-ratio", type=float, default=None, help="Ceiling on sym_spread_ratio (instantaneous spread vs symbol q90) to enforce per-symbol liquidity caps")
+    ap.add_argument("--max-symbol-rvol-ratio", type=float, default=None, help="Ceiling on sym_rvol_ratio (instantaneous rvol vs symbol q90)")
+    ap.add_argument("--max-liquidity-rank", type=float, default=None, help="Upper bound on sym_liquidity_rank (1=most liquid).")
     ap.add_argument("--prob-gate", type=float, default=None, help="Optional minimum probability gate applied before thresholding")
     ap.add_argument("--diagnostic-thresholds", default=None, help="Comma-separated thresholds to log additional equity diagnostics")
     ap.add_argument("--threshold-grid-min", type=float, default=0.55, help="Lower bound for automatic threshold grid")
@@ -66,11 +125,23 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--inference-max-spread", type=float, default=7e-4, help="Inference gate: absolute spread ceiling in live trading")
     ap.add_argument("--inference-max-spread-z", type=float, default=-0.25, help="Inference gate: z-score ceiling using hl_spread_z")
     ap.add_argument("--inference-max-rvol20", type=float, default=8e-5, help="Inference gate: rvol_20 ceiling")
+    ap.add_argument("--inference-max-symbol-spread-ratio", type=float, default=None, help="Inference gate: ceiling on sym_spread_ratio")
+    ap.add_argument("--inference-max-symbol-rvol-ratio", type=float, default=None, help="Inference gate: ceiling on sym_rvol_ratio")
+    ap.add_argument("--inference-max-liquidity-rank", type=float, default=None, help="Inference gate: upper bound on sym_liquidity_rank")
     ap.add_argument("--inference-prob-gate", type=float, default=0.72, help="Inference gate: minimum calibrated probability before thresholding")
     ap.add_argument("--inference-min-hold-bars", type=int, default=10, help="Inference gate: minimum hold bars constraint to enforce downstream")
+    ap.add_argument("--symbol-gate-config", help="Optional JSON file describing per-symbol training/inference gate overrides.")
     args = ap.parse_args(argv)
 
+    if args.symbol_gate_config is None:
+        dataset_stem = Path(args.data).stem
+        auto_gate = Path(__file__).resolve().parents[1] / "release" / "symbol_gates" / f"{dataset_stem}.json"
+        if auto_gate.exists():
+            args.symbol_gate_config = str(auto_gate)
+            print(f"[Gate] Auto-loaded symbol gate config: {auto_gate}")
+
     df = load_parquet_dataset(args.data)
+    df = sanitize_market_dataset(df, verbose=True)
     df = ensure_labels(df)
     df = augment_market_features(df)
     df = df.sort_values("timestamp").reset_index(drop=True)
@@ -87,6 +158,39 @@ def main(argv: Optional[List[str]] = None) -> int:
             raise ValueError("Dataset missing ret_next for label thresholding")
         df["y_dir"] = (df["ret_next"] > thr_val).astype(int)
     df = df.dropna(subset=["ret_next"]).reset_index(drop=True)
+
+    if args.symbol_gate_config:
+        cfg_path = Path(args.symbol_gate_config)
+        if not cfg_path.exists():
+            raise FileNotFoundError(f"Symbol gate config not found: {cfg_path}")
+        payload = json.loads(cfg_path.read_text())
+        training_gate_overrides = payload.get("training") or {}
+        inference_gate_overrides = payload.get("inference") or {}
+
+        training_map = {
+            "hl_spread_max": "max_spread",
+            "hl_spread_z_max": "max_spread_z",
+            "rvol20_max": "max_rvol20",
+            "sym_spread_ratio_max": "max_symbol_spread_ratio",
+            "sym_rvol_ratio_max": "max_symbol_rvol_ratio",
+            "liquidity_rank_max": "max_liquidity_rank",
+            "prob_gate_min": "prob_gate",
+        }
+        inference_map = {
+            "hl_spread_max": "inference_max_spread",
+            "hl_spread_z_max": "inference_max_spread_z",
+            "rvol20_max": "inference_max_rvol20",
+            "sym_spread_ratio_max": "inference_max_symbol_spread_ratio",
+            "sym_rvol_ratio_max": "inference_max_symbol_rvol_ratio",
+            "liquidity_rank_max": "inference_max_liquidity_rank",
+            "prob_gate_min": "inference_prob_gate",
+        }
+        for key, attr in training_map.items():
+            if key in training_gate_overrides:
+                setattr(args, attr, training_gate_overrides[key])
+        for key, attr in inference_map.items():
+            if key in inference_gate_overrides:
+                setattr(args, attr, inference_gate_overrides[key])
     pos_rate = df["y_dir"].mean()
     if args.auto_scale_pos_weight and args.xgb_scale_pos_weight is None and pos_rate not in (0.0, 1.0):
         args.xgb_scale_pos_weight = float((1.0 - pos_rate) / max(pos_rate, 1e-6))
@@ -172,20 +276,40 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.spread_scale != 0.0 and args.spread_col and args.spread_col in df.columns:
         spread_series = df.loc[valid_idx, args.spread_col]
     gate_mask = None
+    symbol_series = df.loc[valid_idx, "symbol"].astype(str) if "symbol" in df.columns else None
     if args.max_spread is not None and args.spread_col and args.spread_col in df.columns:
-        gate_mask = (df.loc[valid_idx, args.spread_col] <= float(args.max_spread)).astype(bool)
+        mask = _mask_for_threshold(df.loc[valid_idx, args.spread_col].astype(float), args.max_spread, symbol_series)
+        gate_mask = _merge_masks(gate_mask, mask)
     if args.max_spread_z is not None and "hl_spread_z" in df.columns:
-        mask_z = (df.loc[valid_idx, "hl_spread_z"] <= float(args.max_spread_z)).astype(bool)
-        if gate_mask is None:
-            gate_mask = mask_z
-        else:
-            gate_mask = gate_mask & mask_z
+        mask_z = _mask_for_threshold(df.loc[valid_idx, "hl_spread_z"].astype(float), args.max_spread_z, symbol_series)
+        gate_mask = _merge_masks(gate_mask, mask_z)
     if args.prob_gate is not None:
-        mask_prob = (p >= float(args.prob_gate)).astype(bool)
-        gate_mask = mask_prob if gate_mask is None else (gate_mask & mask_prob)
+        mask_prob = _mask_for_threshold(p.astype(float), args.prob_gate, symbol_series)
+        gate_mask = _merge_masks(gate_mask, mask_prob)
     if args.max_rvol20 is not None and "rvol_20" in df.columns:
-        mask_rvol = (df.loc[valid_idx, "rvol_20"] <= float(args.max_rvol20)).astype(bool)
-        gate_mask = mask_rvol if gate_mask is None else (gate_mask & mask_rvol)
+        mask_rvol = _mask_for_threshold(df.loc[valid_idx, "rvol_20"].astype(float), args.max_rvol20, symbol_series)
+        gate_mask = _merge_masks(gate_mask, mask_rvol)
+    if args.max_symbol_spread_ratio is not None and "sym_spread_ratio" in df.columns:
+        mask_sym_spread = _mask_for_threshold(
+            df.loc[valid_idx, "sym_spread_ratio"].astype(float),
+            args.max_symbol_spread_ratio,
+            symbol_series,
+        )
+        gate_mask = _merge_masks(gate_mask, mask_sym_spread)
+    if args.max_symbol_rvol_ratio is not None and "sym_rvol_ratio" in df.columns:
+        mask_sym_rvol = _mask_for_threshold(
+            df.loc[valid_idx, "sym_rvol_ratio"].astype(float),
+            args.max_symbol_rvol_ratio,
+            symbol_series,
+        )
+        gate_mask = _merge_masks(gate_mask, mask_sym_rvol)
+    if args.max_liquidity_rank is not None and "sym_liquidity_rank" in df.columns:
+        mask_liq = _mask_for_threshold(
+            df.loc[valid_idx, "sym_liquidity_rank"].astype(float),
+            args.max_liquidity_rank,
+            symbol_series,
+        )
+        gate_mask = _merge_masks(gate_mask, mask_liq)
     if gate_mask is not None:
         gate_mask = gate_mask.reindex(ret_next.index).fillna(False)
         print(f"[XGB] Trade gating active: coverage={gate_mask.mean():.3f}")
@@ -211,11 +335,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     if gate_mask is not None:
         rep["gate_fraction"] = float(gate_mask.mean())
         if args.max_spread is not None:
-            rep["max_spread"] = float(args.max_spread)
+            rep["max_spread"] = _serialise_gate_value(args.max_spread)
         if args.max_spread_z is not None:
-            rep["max_spread_z"] = float(args.max_spread_z)
+            rep["max_spread_z"] = _serialise_gate_value(args.max_spread_z)
         if args.max_rvol20 is not None:
-            rep["max_rvol20"] = float(args.max_rvol20)
+            rep["max_rvol20"] = _serialise_gate_value(args.max_rvol20)
+        if args.max_symbol_spread_ratio is not None:
+            rep["max_symbol_spread_ratio"] = _serialise_gate_value(args.max_symbol_spread_ratio)
+        if args.max_symbol_rvol_ratio is not None:
+            rep["max_symbol_rvol_ratio"] = _serialise_gate_value(args.max_symbol_rvol_ratio)
+        if args.max_liquidity_rank is not None:
+            rep["max_liquidity_rank"] = _serialise_gate_value(args.max_liquidity_rank)
     if args.sample_weight_scheme != "none":
         rep["sample_weight_scheme"] = args.sample_weight_scheme
     if args.label_threshold_bps is not None:
@@ -296,20 +426,26 @@ def main(argv: Optional[List[str]] = None) -> int:
         rep["monthly_diagnostics"] = monthly_diag
 
     training_gate = {
-        "hl_spread_max": float(args.max_spread) if args.max_spread is not None else None,
-        "hl_spread_z_max": float(args.max_spread_z) if args.max_spread_z is not None else None,
-        "rvol20_max": float(args.max_rvol20) if args.max_rvol20 is not None else None,
-        "prob_gate_min": float(args.prob_gate) if args.prob_gate is not None else None,
+        "hl_spread_max": _serialise_gate_value(args.max_spread),
+        "hl_spread_z_max": _serialise_gate_value(args.max_spread_z),
+        "rvol20_max": _serialise_gate_value(args.max_rvol20),
+        "prob_gate_min": _serialise_gate_value(args.prob_gate),
         "min_hold_bars": int(max(1, args.min_hold_bars)),
         "long_only": bool(args.long_only),
+        "sym_spread_ratio_max": _serialise_gate_value(args.max_symbol_spread_ratio),
+        "sym_rvol_ratio_max": _serialise_gate_value(args.max_symbol_rvol_ratio),
+        "liquidity_rank_max": _serialise_gate_value(args.max_liquidity_rank),
     }
     inference_gate = {
-        "hl_spread_max": float(args.inference_max_spread) if args.inference_max_spread is not None else None,
-        "hl_spread_z_max": float(args.inference_max_spread_z) if args.inference_max_spread_z is not None else None,
-        "rvol20_max": float(args.inference_max_rvol20) if args.inference_max_rvol20 is not None else None,
-        "prob_gate_min": float(args.inference_prob_gate) if args.inference_prob_gate is not None else None,
+        "hl_spread_max": _serialise_gate_value(args.inference_max_spread),
+        "hl_spread_z_max": _serialise_gate_value(args.inference_max_spread_z),
+        "rvol20_max": _serialise_gate_value(args.inference_max_rvol20),
+        "prob_gate_min": _serialise_gate_value(args.inference_prob_gate),
         "min_hold_bars": int(max(1, args.inference_min_hold_bars)),
         "long_only": bool(args.long_only),
+        "sym_spread_ratio_max": _serialise_gate_value(args.inference_max_symbol_spread_ratio),
+        "sym_rvol_ratio_max": _serialise_gate_value(args.inference_max_symbol_rvol_ratio),
+        "liquidity_rank_max": _serialise_gate_value(args.inference_max_liquidity_rank),
     }
     gate_config = {
         "spread_column": args.spread_col,

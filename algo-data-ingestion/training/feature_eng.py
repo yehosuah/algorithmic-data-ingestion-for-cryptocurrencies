@@ -100,6 +100,33 @@ def augment_market_features(df: pd.DataFrame, *, inplace: bool = False) -> pd.Da
         out["dow_sin"] = np.sin(2 * np.pi * dow / 7.0)
         out["dow_cos"] = np.cos(2 * np.pi * dow / 7.0)
 
+    if "symbol" in out.columns:
+        sym_series = out["symbol"].astype(str)
+        if "hl_spread" in out.columns:
+            spread = out["hl_spread"].astype(float)
+            out["sym_spread_median"] = spread.groupby(sym_series).transform("median")
+            out["sym_spread_q90"] = spread.groupby(sym_series).transform(lambda s: s.quantile(0.9))
+            median_by_symbol = spread.groupby(sym_series).median()
+            rank_map = median_by_symbol.rank(method="dense")
+            out["sym_liquidity_rank"] = sym_series.map(rank_map)
+            denom = out["sym_spread_q90"].abs() + _EPS
+            out["sym_spread_ratio"] = spread / denom
+        if "rvol_20" in out.columns:
+            rvol = out["rvol_20"].astype(float)
+            out["sym_rvol_median"] = rvol.groupby(sym_series).transform("median")
+            out["sym_rvol_q90"] = rvol.groupby(sym_series).transform(lambda s: s.quantile(0.9))
+            rvol_median = rvol.groupby(sym_series).median()
+            rvol_rank_map = rvol_median.rank(method="dense")
+            out["sym_vol_rank"] = sym_series.map(rvol_rank_map)
+            denom = out["sym_rvol_q90"].abs() + _EPS
+            out["sym_rvol_ratio"] = rvol / denom
+        unique_symbols = sym_series.dropna().unique()
+        for sym in unique_symbols:
+            prefix = sym.split("/", 1)[0].replace("-", "_").replace(" ", "_").lower()
+            col_name = f"sym_{prefix}"
+            if col_name not in out.columns:
+                out[col_name] = (sym_series == sym).astype(float)
+
     # Replace remaining NaNs coming from rolling windows with 0 so downstream models stay robust
     new_cols = [c for c in out.columns if c not in df.columns]
     if new_cols:

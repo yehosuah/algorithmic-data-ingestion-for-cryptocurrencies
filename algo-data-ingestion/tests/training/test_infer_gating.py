@@ -75,6 +75,43 @@ def test_compute_gate_mask_training_mode():
     assert mask.tolist() == [True, False]
 
 
+def test_compute_gate_mask_symbol_thresholds():
+    df = pd.DataFrame(
+        {
+            "symbol": ["BTC/USDT", "SOL/USDT", "ETH/USDT"],
+            "sym_spread_ratio": [1.05, 1.32, 1.28],
+            "hl_spread": [5e-4, 6e-4, 5.5e-4],
+            "hl_spread_z": [0.0, 0.0, 0.0],
+            "rvol_20": [1e-4, 1e-4, 1e-4],
+            "base_prob": [0.7, 0.7, 0.7],
+        }
+    )
+    gate_cfg = {
+        "spread_column": "hl_spread",
+        "prob_column": "base_prob",
+        "training": DEFAULT_GATE_CONFIG["training"],
+        "inference": {
+            "hl_spread_max": 0.001,
+            "hl_spread_z_max": 0.5,
+            "rvol20_max": 0.0003,
+            "prob_gate_min": 0.6,
+            "min_hold_bars": 10,
+            "long_only": True,
+            "sym_spread_ratio_max": {
+                "default": 1.1,
+                "ETH/USDT": 1.3,
+                "SOL/USDT": 1.35,
+            },
+            "sym_rvol_ratio_max": None,
+            "liquidity_rank_max": None,
+        },
+    }
+
+    mask = compute_gate_mask(df, gate_cfg)
+
+    assert mask.tolist() == [True, True, True]
+
+
 def test_apply_manifest_gates_updates_metrics(tmp_path):
     model_dir = Path(tmp_path) / "model"
     model_dir.mkdir()

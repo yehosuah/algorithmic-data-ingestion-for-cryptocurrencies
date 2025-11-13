@@ -56,6 +56,13 @@ def test_manifest_gate_configs_match_reports():
             ), f"{manifest_path} threshold mismatch"
 
         # Inference gates should never be looser than the training gate.
+        def _as_mapping(value: Any) -> Dict[str, float]:
+            if isinstance(value, dict):
+                return {k: float(v) for k, v in value.items() if v is not None}
+            if value is None:
+                return {}
+            return {"default": float(value)}
+
         for key, tr_value in training_gate.items():
             inf_value = inference_gate.get(key)
             if tr_value is None:
@@ -67,18 +74,38 @@ def test_manifest_gate_configs_match_reports():
 
             if key.endswith("_max"):
                 assert inf_value is not None, f"{manifest_path} inference gate missing {key}"
-                assert float(inf_value) <= float(tr_value), (
-                    f"{manifest_path} inference {key} ({inf_value}) "
-                    f"should not exceed training bound ({tr_value})"
-                )
+                tr_map = _as_mapping(tr_value)
+                inf_map = _as_mapping(inf_value)
+                for symbol, tr_limit in tr_map.items():
+                    inf_limit = inf_map.get(symbol, inf_map.get("default"))
+                    if inf_limit is None:
+                        continue
+                    assert float(inf_limit) <= float(tr_limit), (
+                        f"{manifest_path} inference {key} ({inf_limit}) "
+                        f"should not exceed training bound ({tr_limit}) for symbol {symbol}"
+                    )
+                for symbol, inf_limit in inf_map.items():
+                    tr_limit = tr_map.get(symbol, tr_map.get("default"))
+                    if tr_limit is None:
+                        continue
+                    assert float(inf_limit) <= float(tr_limit), (
+                        f"{manifest_path} inference {key} ({inf_limit}) "
+                        f"should not exceed training bound ({tr_limit}) for symbol {symbol}"
+                    )
             elif key == "prob_gate_min":
                 # Higher inference probability thresholds are safer.
                 if inf_value is None:
                     continue
-                assert float(inf_value) >= float(tr_value), (
-                    f"{manifest_path} inference {key} ({inf_value}) "
-                    f"is looser than training ({tr_value})"
-                )
+                tr_map = _as_mapping(tr_value)
+                inf_map = _as_mapping(inf_value)
+                for symbol, inf_limit in inf_map.items():
+                    tr_limit = tr_map.get(symbol, tr_map.get("default"))
+                    if tr_limit is None:
+                        continue
+                    assert float(inf_limit) >= float(tr_limit), (
+                        f"{manifest_path} inference {key} ({inf_limit}) "
+                        f"is looser than training ({tr_limit}) for symbol {symbol}"
+                    )
             elif key == "min_hold_bars":
                 assert inf_value is not None, f"{manifest_path} inference gate missing {key}"
                 assert int(inf_value) >= int(tr_value), (

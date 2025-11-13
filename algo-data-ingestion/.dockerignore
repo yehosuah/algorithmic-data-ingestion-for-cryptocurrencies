@@ -31,7 +31,9 @@ models/
 models/**
 **/models/**
 !models/base_xgb_h120_calmon_spread0/**
+!models/base_xgb_cost_spread/**
 !models/tcn_h120_calmon_relaxed/**
+!models/blender_h120_v6/**
 datasets
 datasets/
 **/datasets

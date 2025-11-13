@@ -15,8 +15,69 @@ def load_parquet_dataset(path: str | Path, *, drop_duplicates: bool = True) -> p
     if "timestamp" in df.columns:
         df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
         if drop_duplicates:
-            df = df.sort_values("timestamp").drop_duplicates(subset=["timestamp"], keep="last")
+            subset = ["timestamp", "symbol"] if "symbol" in df.columns else ["timestamp"]
+            df = (
+                df.sort_values(subset)
+                .drop_duplicates(subset=subset, keep="last")
+            )
     return df.reset_index(drop=True)
+
+
+def sanitize_market_dataset(
+    df: pd.DataFrame,
+    *,
+    price_outlier_factor: float = 10.0,
+    logret_cap: float = 0.25,
+    verbose: bool = False,
+) -> pd.DataFrame:
+    required = {"timestamp", "symbol", "close"}
+    if not required.issubset(df.columns):
+        return df
+    out = df.copy()
+    out = out.dropna(subset=["timestamp", "symbol", "close"])
+    out["timestamp"] = pd.to_datetime(out["timestamp"], utc=True)
+    out["close"] = out["close"].astype(float)
+    out = out[out["close"] > 0].copy()
+
+    if price_outlier_factor and price_outlier_factor > 0:
+        medians = out.groupby("symbol")["close"].transform("median").abs()
+        lower = medians / price_outlier_factor
+        upper = medians * price_outlier_factor
+        mask = out["close"].between(lower, upper)
+        dropped = len(out) - int(mask.sum())
+        if dropped and verbose:
+            print(
+                f"[Sanitize] Dropped {dropped} rows outside ±{price_outlier_factor}x median close"
+            )
+        out = out[mask].copy()
+
+    out = out.sort_values(["symbol", "timestamp"]).reset_index(drop=True)
+    grouped = out.groupby("symbol", group_keys=False)
+
+    out["ret_1"] = grouped["close"].pct_change()
+
+    def _logret(series: pd.Series) -> pd.Series:
+        return np.log(series.replace(0.0, np.nan)).diff()
+
+    logret = grouped["close"].transform(_logret)
+    if logret_cap and logret_cap > 0:
+        logret = logret.clip(lower=-logret_cap, upper=logret_cap)
+    out["logret_1"] = logret
+
+    for window, col in ((5, "rvol_5"), (20, "rvol_20")):
+        out[col] = grouped["logret_1"].transform(
+            lambda s, w=window: s.rolling(w, min_periods=w).std()
+        )
+
+    out[["ret_1", "logret_1", "rvol_5", "rvol_20"]] = out[
+        ["ret_1", "logret_1", "rvol_5", "rvol_20"]
+    ].fillna(0.0)
+
+    cols_to_drop = [col for col in ("ret_next", "y_dir") if col in out.columns]
+    if cols_to_drop:
+        out = out.drop(columns=cols_to_drop)
+
+    return out.sort_values("timestamp").reset_index(drop=True)
 
 
 def sliding_windows(

@@ -14,11 +14,18 @@ import xgboost as xgb
 from .reporting import ensure_kpi_schema
 
 NON_FEAT = {"timestamp","dt","symbol","exchange","timeframe","feature_version","close","ret_next","y_dir"}
+_NON_FEAT_PREFIXES = ("ret_next",)
+
+
+def _is_feature_column(name: str) -> bool:
+    if name in NON_FEAT:
+        return False
+    return not any(name.startswith(prefix) for prefix in _NON_FEAT_PREFIXES)
 
 
 def extract_features_labels(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series, List[str]]:
     y = df["y_dir"].astype(int)
-    feat_cols = [c for c in df.columns if c not in NON_FEAT]
+    feat_cols = [c for c in df.columns if _is_feature_column(c)]
     X = df[feat_cols].astype(float)
     return X, y, feat_cols
 

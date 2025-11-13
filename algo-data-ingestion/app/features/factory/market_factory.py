@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 import numpy as np
 import pandas as pd
 from typing import Dict, Optional, Sequence
@@ -6,6 +7,8 @@ from typing import Dict, Optional, Sequence
 from app.common.time_norm import standardize_time_column, add_dt_partition, coerce_schema
 
 FEATURE_VERSION = "market.v1"
+_LOG = logging.getLogger(__name__)
+_MAX_SPREAD_RATIO = 0.01  # drop bars where (high - low) / close exceeds 1%
 
 # Expected input (already enforced upstream, but we re-assert defensively)
 REQUIRED_COLS: Sequence[str] = (
@@ -121,6 +124,26 @@ def build_market_features(
     high = df["high"].astype(float)
     low = df["low"].astype(float)
     volume = df["volume"].astype(float)
+
+    # Drop anomalous bars that would explode hl_spread/z-score downstream
+    denom = close.replace(0.0, np.nan).abs()
+    spread_ratio = (high - low).abs() / denom
+    mask = spread_ratio.isna() | (spread_ratio <= _MAX_SPREAD_RATIO)
+    dropped = int((~mask).sum())
+    if dropped:
+        _LOG.warning(
+            "Dropped %d OHLCV rows with spread ratio > %.4f while building features",
+            dropped,
+            _MAX_SPREAD_RATIO,
+        )
+        df = df.loc[mask].copy()
+        df = df.reset_index(drop=True)
+        close = df["close"].astype(float)
+        high = df["high"].astype(float)
+        low = df["low"].astype(float)
+        volume = df["volume"].astype(float)
+        if df.empty:
+            return pd.DataFrame(columns=list(FEATURE_SCHEMA.keys()))
 
     # --- features ---
     ret_1 = close.pct_change()
