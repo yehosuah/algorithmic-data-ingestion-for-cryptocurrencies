@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from redis import asyncio as aioredis
 
@@ -82,6 +82,23 @@ def _extract_spread_from_item(item: Dict[str, object]) -> Optional[float]:
     return None
 
 
+def _resolve_symbol_value(value: Any, symbol: Optional[str]) -> Any:
+    """
+    Resolve per-symbol gate config entries that may provide defaults.
+    """
+    if not isinstance(value, dict):
+        return value
+    symbol_key = (symbol or "").strip()
+    if symbol_key and symbol_key in value:
+        return value[symbol_key]
+    if "default" in value:
+        return value["default"]
+    for candidate in value.values():
+        if candidate is not None:
+            return candidate
+    return None
+
+
 @dataclass(frozen=True)
 class ManifestSnapshot:
     entry_threshold: float
@@ -118,7 +135,7 @@ class TradingService:
             file_path=audit_file_path,
         )
         self.executor = OrderExecutor(dry_run=config.dry_run)
-        self._manifest_cache: Dict[Path, ManifestSnapshot] = {}
+        self._manifest_cache: Dict[Tuple[Path, Optional[str]], ManifestSnapshot] = {}
         self._model_map: Dict[Tuple[str, Optional[str]], TradingModelConfig] = {}
         for model_cfg in config.trading_models:
             symbol_key = (model_cfg.model, model_cfg.symbol)
@@ -360,7 +377,7 @@ class TradingService:
             )
             return
 
-        manifest = self._resolve_manifest(message, model_label)
+        manifest = self._resolve_manifest(message, model_label, symbol_hint=model_cfg.symbol)
         if manifest is None:
             logger.warning("Unable to resolve manifest for model '%s'; skipping", model_label)
             return
@@ -779,13 +796,25 @@ class TradingService:
             decision.reason or "",
         )
 
-    def _resolve_manifest(self, payload: Dict[str, object], model_label: str) -> Optional[ManifestSnapshot]:
+    def _resolve_manifest(
+        self,
+        payload: Dict[str, object],
+        model_label: str,
+        *,
+        symbol_hint: Optional[str] = None,
+    ) -> Optional[ManifestSnapshot]:
         artifact = payload.get("artifact_dir")
         path = Path(str(artifact)) if artifact else self.config.models_root / model_label
         if not path.is_absolute():
             path = (self.config.models_root / path).resolve()
         path = path.expanduser().resolve()
-        cached = self._manifest_cache.get(path)
+        symbol = symbol_hint or payload.get("symbol")
+        if isinstance(symbol, str):
+            symbol = symbol.strip() or None
+        else:
+            symbol = None
+        cache_key = (path, symbol)
+        cached = self._manifest_cache.get(cache_key)
         if cached is not None:
             return cached
         try:
@@ -794,7 +823,7 @@ class TradingService:
             logger.exception("Failed to load manifest for %s: %s", model_label, exc)
             return None
         infer_cfg = artifacts.gate_config.get("inference") or {}
-        entry_threshold = infer_cfg.get("prob_gate_min")
+        entry_threshold = _resolve_symbol_value(infer_cfg.get("prob_gate_min"), symbol)
         threshold_meta = artifacts.manifest.get("threshold")
         exit_threshold = None
         if isinstance(threshold_meta, dict):
@@ -807,8 +836,13 @@ class TradingService:
             exit_threshold = entry_threshold
         metadata = artifacts.manifest.get("metadata") or {}
         exit_prob_drop = float(metadata.get("exit_prob_drop", 0.15))
-        min_hold_bars = int(infer_cfg.get("min_hold_bars") or 1)
-        long_only = bool(infer_cfg.get("long_only", True))
+        min_hold_raw = _resolve_symbol_value(infer_cfg.get("min_hold_bars"), symbol)
+        try:
+            min_hold_bars = int(min_hold_raw or 1)
+        except (TypeError, ValueError):
+            min_hold_bars = 1
+        long_only_raw = _resolve_symbol_value(infer_cfg.get("long_only"), symbol)
+        long_only = bool(True if long_only_raw is None else long_only_raw)
         snapshot = ManifestSnapshot(
             entry_threshold=float(entry_threshold),
             exit_threshold=float(exit_threshold),
@@ -816,5 +850,5 @@ class TradingService:
             min_hold_bars=min_hold_bars,
             long_only=long_only,
         )
-        self._manifest_cache[path] = snapshot
+        self._manifest_cache[cache_key] = snapshot
         return snapshot
