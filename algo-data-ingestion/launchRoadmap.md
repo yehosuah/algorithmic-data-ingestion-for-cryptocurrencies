@@ -1,8 +1,8 @@
 # Launch Roadmap – Calmon Stack
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Roadmap milestones now assume the release/20251030 drop and the app/trading metrics/alerting that ship with the docker-compose stack.
+> Update 2025-11-13: Roadmap items now call out the sanitizer + symbol-gate workflow, parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`), and the Redis-backed trading defaults baked into `.env` so launch criteria reference the exact gates and metrics in git.
 
 ## Executive Summary
 - Training gates remain profitable (base `final_equity 4.48`, TCN `1.28/3.62/1.85`, blender `4.48`), and the retuned Oct 1–Oct 28 2025 replay (`models/oos_replay_summary_latest.json`) now shows **deployable coverage across all manifests**: base logs 12 gate hits (8 trades, `final_equity 1.2336`), TCN horizons 60/120/180 clear the guardrail (`gate_coverage 4.73e-4/7.71e-4/4.23e-4` with 4/62/2 toggles), and the eased blender manifest fires ≈15.8 % of bars (6 346 toggles) while the stride‑1 sandbox variant bounds turnover at 134 toggles.
@@ -18,14 +18,17 @@ _Last updated: 2025-11-10 04:13 UTC_
 
 ## High-Priority Tasks (1–2 Weeks)
 - Recompute forward replay as TCN manifests evolve; update manifests, `live_gate_coverage.csv`, and `models/oos_replay_summary_latest.json` (keeping the archived `...oct_nov_2025.json` for regression) with each threshold change.
+- Keep `release/symbol_gates/*.json` in lockstep with every sanitized dataset refresh (run `scripts/compute_symbol_gate_config.py`) so retrains, scheduler jobs, and `TRADING_MODELS` consume identical per-symbol caps.
 - Document the blender gate smoothing window (`gate_smoothing_stride`) alongside each artifact and quantify turnover vs coverage using the new stride‑1 sandbox runs before finalising deployable thresholds.
 - Extend the regression suite with an inference replay test (fixture-driven) so CI fails if deployable thresholds drift again.
 - Package release bundle: models, manifests, forward matrix (`datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`), coverage CSVs, shortlist, and updated documentation.
 - Harden the FastAPI service to consume manifest-defined gates (probability threshold, spread/rvol caps, min-hold) at inference time and emit Prometheus metrics for gate hits/misses via `app/monitoring/model_metrics.py`.
 - Stand up the scheduler `INFER_JOBS` + trading dry-run loop in staging, document Redis/Postgres state backends, and capture Grafana screenshots (`trading-overview`, `scheduler-overview`) showing steady gate coverage and bounded queue depth.
+- Automate the feature parity workflow: export Redis slices via `scripts/export_feature_slice.py`, diff against the sanitized training parquet with `scripts/compare_feature_stats.py`, and archive the JSON (e.g., `release/calibration/latest/feature_parity.json`) per rehearsal so threshold changes cite concrete drift stats.
 
 ## Monitoring & Ops Checklist
 - Add alerts for gate coverage < historical floor (±2× `live_gate_coverage.csv`), RSS minute spike share <5e-4, probability σ <0.03, and inference parity mismatches, leveraging the new Prometheus gauges (`model_gate_coverage_ratio`, `model_rss_minute_spike_share`, `model_probability_sigma` + thresholds).
+- Mirror the parity JSON payloads (training vs live `hl_spread`, `hl_spread_z`, `rvol_20`, `base_prob`) on Grafana so operators can correlate alert noise with concrete drift observed by `scripts/compare_feature_stats.py`.
 - Surface the recorded `gate_smoothing_stride` and stride-aware inference metrics in Grafana so operators see when smoothing changes or stride experiments deviate from the release baseline.
 - Publish Grafana panels overlaying deployable vs relaxed coverage, RSS audits, and model equity curves for the Oct 2025 forward window onward.
 - Ensure `.github/workflows/ci.yml` remains green and add a nightly job (cron or scheduled workflow) that reruns `pytest tests/regression` plus the new inference replay test over the latest manifests.

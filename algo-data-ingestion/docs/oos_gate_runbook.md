@@ -1,8 +1,8 @@
 # OOS Matrix + Gate Coverage Runbook
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Runbook links the release/20251030 calibration outputs with the scheduler/trading monitoring hooks (Redis queue alerts, Prometheus gauges) introduced in this branch.
+> Update 2025-11-13: Layered in the multi-symbol sanitizer + symbol-gate workflow plus the parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so coverage decisions cite the same caps the scheduler/trading loop enforces.
 
 ## 1. Rebuild the stride-2 OOS blender matrix
 
@@ -41,6 +41,7 @@ python3 scripts/refresh_calibration.py \
 1. Read the recommended gate threshold from `release/calibration/2025-11-oos_stride2/calibration_summary.json` (blender section).
 2. Update `models/blender_h120_v6/threshold.txt` and `manifest.json` (`gates.training.prob_gate_min`, `gates.inference.prob_gate_min`) to the selected value (currently 0.55).
 3. Copy the refreshed manifest bundle to `MODELS_ROOT` so the scheduler/trading services reload it.
+4. If the replay used a refreshed multi-symbol parquet, re-run `scripts/compute_symbol_gate_config.py --data datasets/market_multi_3symbol_1m.parquet` so the base/TCN manifolds inherit the same `hl_spread`, `rvol`, and liquidity caps captured during the calibration pass.
 
 ## 4. Monitoring blender gate coverage
 
@@ -59,5 +60,6 @@ python3 scripts/refresh_calibration.py \
 3. **Review:** Inspect the blender section in `release/calibration/<new_stamp>/calibration_summary.json` for the recommended gate threshold and coverage deltas.
 4. **Deploy:** Update `threshold.txt`/manifest gates, sync to `MODELS_ROOT`, and restart scheduler + trading.
 5. **Verify:** Watch `model_gate_coverage_ratio{model="blender_h120_v6",mode="inference_rolling24h"}` converge back to the new `oos_reference`, confirm alerts clear, and sanity-check trade logs for quality improvements.
+6. **Document parity:** Export a fresh scheduler slice (`scripts/export_feature_slice.py`) and diff it against the sanitized training parquet (`scripts/compare_feature_stats.py --train datasets/market_multi_3symbol_1m.parquet --live /tmp/features_debug.parquet`). Check the JSON into `release/calibration/latest` so future drift investigations reference concrete `hl_spread`, `hl_spread_z`, `rvol_20`, and `base_prob` deltas.
 
 Keep this loop documented in Git (calibration artifact folder + manifest diff) so future refreshes can be audited.

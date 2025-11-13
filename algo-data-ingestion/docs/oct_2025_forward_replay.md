@@ -1,14 +1,15 @@
 # Oct 2025 Forward Replay – Manifest Refresh (2025-10-27)
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Forward replay notes now cross-reference release/20251030 artifacts and the scheduler/trading telemetry (model_gate_coverage_ratio, trading counters) used for validation.
+> Update 2025-11-13: Folded in the multi-symbol sanitizer + gate payload (`release/symbol_gates/market_multi_3symbol_1m.json`) and the parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so forward replay decisions cite the same gates/metrics enforced by scheduler/trading.
 
 ## Model Refresh Snapshot
 - `models/base_xgb_h120_calmon_spread0` (deployable manifest now enforces `prob ≥ 0.2`, `min_hold 10`, `long_only`) registers 12 gate hits on Oct 2025 (`toggle_count 8`, deployable `final_equity 1.2336`, `gate_coverage 0.0002985`) while spread/rvol checks are handled by the trading service.  
 - `models/tcn_h120_calmon_relaxed` clears the deployable mask with the simplified inference gate (`prob ≥ 0.25`, `min_hold 10`, `long_only`); the Oct 2025 run logs 31 gate hits (`toggle_count 62`, `gate_coverage 0.0007711`) and `final_equity 1.9356`. Horizons 60/180 now show shallow but non-zero coverage floors (`gate_coverage 4.73e-4`/`4.23e-4`) at the same probability rule.  
 - `models/blender_h120_v6` (deployable manifest `prob ≥ 0.5`, `rvol_20 ≤ 5e-4`, `min_hold 10`) delivers 6 346 deployable toggles (`gate_coverage 0.1579`, deployable `final_equity 4.48`) while retaining `final_equity 1.84` under the relaxed gate and now records `gate_smoothing_stride = 30` in `report.json`.  
 - RSS audit for the replay window remains healthy (daily coverage 100 %, minute spike share ≈1.0e0), confirming the rebuilt RSS lake.
+- All three manifests now consume the sanitized multi-symbol parquet (`datasets/market_multi_3symbol_1m.parquet` generated via `training.data.sanitize_market_dataset`) and the gate file at `release/symbol_gates/market_multi_3symbol_1m.json`; rerun `scripts/compute_symbol_gate_config.py` whenever the replay window expands so scheduler/trading inherit the updated `hl_spread`, `rvol`, and liquidity caps.
 
 ## Shortlist Status
 - `models/report_shortlist.json` still prioritises earlier Calmon variants (`spread{0/0.05/0.1/0.2}`) because the refreshed baseline sits below the `final_equity ≥ 1.05` guardrail after costs. Update the shortlist thresholds or seed it with the new manifest bundle before hand-off.
@@ -26,3 +27,4 @@ Source: `models/oos_replay_summary_latest.json` (40 201 rows, Oct 1 00:00 
 3. Align shortlist criteria with the refreshed manifest bundle so reviewers see the deployable artifacts that actually ship and include the recorded `gate_smoothing_stride` in release notes.  
 4. Ensure CI exercises `training/infer.py::score_base_with_manifest` over the replay window and fails when deployable coverage or probability σ violates guardrails.  
 5. Feed this replay window through the scheduler dry run (Redis queue + trading service) and confirm metrics (`scheduler_decision_messages_enqueued_total`, `trading_trade_attempts_total`, `trading_position_active`) reflect the gate counts above.
+6. After each replay, export a scheduler slice and run `scripts/compare_feature_stats.py --train datasets/market_multi_3symbol_1m.parquet --live /tmp/features_debug.parquet --out release/calibration/latest/oct2025_parity.json` so widening thresholds reference concrete drift in `hl_spread`, `hl_spread_z`, `rvol_20`, and `base_prob`.

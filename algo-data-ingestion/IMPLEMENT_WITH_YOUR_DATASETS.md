@@ -1,8 +1,8 @@
 # Walkthrough: Implement with Your Datasets
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Added pointers to release/20251030 artifacts, `INFER_JOBS` wiring, and the trading dry-run + Grafana instrumentation so custom datasets can plug into the shipped stack.
+> Update 2025-11-13: Layered in the sanitizer/parity workflow (multi-symbol parquet, `compute_symbol_gate_config.py`, `export_feature_slice.py`, `compare_feature_stats.py`) so custom datasets inherit the same symbol-aware gates the manifests + trading service now expect.
 
 This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your own instruments once you have equivalent market + RSS coverage.
 
@@ -11,6 +11,16 @@ This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your
 - RSS-enriched blender matrix: `datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet` (606 121 rows, mirrored as `..._2025-10_rss_latest.parquet`).
 - Baseline models: `models/base_xgb_h120_calmon_spread0`, `models/tcn_h120_calmon_relaxed`
 - Forward replay snapshot: `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` + `models/oos_replay_summary_latest.json` (Oct 1–Oct 28 deployable vs relaxed gate comparison; `...oct_nov_2025.json` kept for regression).
+
+## Step 0 – Sanitize Multi-Symbol Feed & Gate Config
+- Load your raw parquet (single or multi-symbol) via `training.data.load_parquet_dataset(..., drop_duplicates=False)` and run it through `training.data.sanitize_market_dataset` to drop duplicate (timestamp, symbol) rows, clamp log-return outliers, and seed per-symbol rolling volatility columns. Persist the cleaned file as `datasets/<name>.parquet`.
+- Generate symbol-aware caps that scheduler/trading will share with training/inference:
+  ```bash
+  python scripts/compute_symbol_gate_config.py \
+    --data datasets/<name>.parquet \
+    --out release/symbol_gates/<name>.json
+  ```
+  The CLI writes `training` vs `inference` keys with `hl_spread`, `rvol`, spread/vol ratios, and liquidity ranks; keep the JSON in git so any retrain with the same dataset stem auto-loads it.
 
 ## Step 1 – Feature Engineering
 1. **Market dataset**: reuse `scripts/build_market_dataset.py` to generate your symbol’s feature parquet (ensures consistent `ret_next` and `y_dir` labels).
@@ -25,9 +35,11 @@ This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your
     --data <your_market_dataset.parquet> \
     --out models/base_xgb_h120_calmon_spread0_yoursymbol \
     --fold-scheme calendar_month --n-folds 6 \
-    --cost-bps 5 --max-spread-z 0.25 --max-rvol20 2e-4
+    --cost-bps 5 --max-spread-z 0.25 --max-rvol20 2e-4 \
+    --symbol-gate-config <release/symbol_gates/your_dataset.json>
   ```
 - Validate the RSS audit and monthly diagnostics in `report.json`, then review deployable gates within the generated manifest.
+- When a matching gate file lives under `release/symbol_gates/` (same filename stem as your dataset), the CLI auto-loads it; passing the flag keeps deployable training/inference caps aligned when you deviate from the default dataset name.
 
 ## Step 3 – Temporal Model
 - Clone the TCN run with horizon tuned to your strategy (120 bars by default). Adjust `--window`, `--channels`, and `--stride` to match volatility profile while keeping turnover ≤200.
@@ -53,6 +65,15 @@ This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your
 - Run regression guardrails before deployment: `pytest tests/regression -q` keeps manifests aligned with reports and verifies the shortlist; `pytest tests/ingestion_service -q` exercises the async API.
 - Inspect your forward replay equivalent of `models/oos_replay_summary_latest.json`; aim for at least the current baseline (base: 12 gate hits, `final_equity 1.2336`, gate coverage 2.99e-4; TCN h60/h120/h180: gate coverage 4.73e-4/7.71e-4/4.23e-4 with toggles 4/62/2; blender: ≈15.8 % coverage with 6 346 toggles). If deployable masks fall back to zero, widen thresholds or stage a fallback gate prior to launch (keep an archived zero-coverage snapshot like `...oct_nov_2025.json` for regression).
 - Ensure your inference path uses the updated stride-aware batching in `training/infer.predict_tcn` so experiments with smaller strides do not overload memory.
+- Before modifying gate thresholds, export a scheduler-style slice and compare it with the sanitized training parquet:
+  ```bash
+  python scripts/export_feature_slice.py --output /tmp/features_debug.parquet
+  python scripts/compare_feature_stats.py \
+    --train datasets/<name>.parquet \
+    --live /tmp/features_debug.parquet \
+    --out release/calibration/latest/<name>_parity.json
+  ```
+  Attach the JSON to your rollout ticket so reviewers can see live vs training drift across `hl_spread`, `hl_spread_z`, `rvol_20`, and `base_prob`.
 
 ## Step 7 – Scheduler & Trading Dry Run
 - Populate `INFER_JOBS` with your symbols/timeframes and manifest names (base/TCN optional). Pair each job with a `lookback_minutes` window large enough to reconstruct features plus a `history_minutes` margin for warm-up.

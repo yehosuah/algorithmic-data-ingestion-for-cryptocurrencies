@@ -1,8 +1,8 @@
 # Subtask 1 – 120-Bar TCN Turnover Control
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Progress log now tags the release/20251030 TCN artifacts and the scheduler->trading rehearsal metrics so subtask 1 mirrors mainline git.
+> Update 2025-11-13: Folded in the sanitized multi-symbol feed + symbol-gate generator and the parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so subtask 1 tracks the same gates/metrics enforced downstream.
 
 ## Run
 ```
@@ -34,6 +34,15 @@ _Last updated: 2025-11-10 04:13 UTC_
 - Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) now shows deployable coverage for the h120 model (`gate_hits 31`, `toggle_count 62`, `gate_fraction 7.71e-4`, `final_equity 1.94`); keep the guardrail (`gate_fraction ≥ 5e-4`, `final_equity ≥ 1.2`) in mind when tuning thresholds further.
 - `training/infer.predict_tcn` now batches inference by stride, letting us explore stride‑1 gates without exhausting memory.
 - `app/scheduler/main.py` consumes this manifest via `INFER_JOBS` to publish Redis decisions for the trading dry run; monitor `scheduler_decision_messages_enqueued_total` when experimenting with stride or threshold changes.
+- Capture feature parity drift after each tweak via:
+  ```bash
+  python scripts/export_feature_slice.py --output /tmp/features_debug.parquet
+  python scripts/compare_feature_stats.py \
+    --train datasets/market_multi_3symbol_1m.parquet \
+    --live /tmp/features_debug.parquet \
+    --out release/calibration/latest/subtask1_tcn_parity.json
+  ```
+  so deployability reviewers can see how `hl_spread`, `hl_spread_z`, `rvol_20`, and `base_prob` moved before signing off.
 
 ## Follow-ups
 1. Maintain the deployable gate above the 5e-4 floor while iterating on turnover; document fallback behaviour if coverage regresses.

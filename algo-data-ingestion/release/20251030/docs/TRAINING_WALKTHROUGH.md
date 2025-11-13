@@ -1,8 +1,8 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-11-10 04:13 UTC (archival snapshot refreshed)_
+_Last updated: 2025-11-13 04:43 UTC (archival snapshot refreshed)_
 
-> Update 2025-11-10: Refreshed the walkthrough notes to mention the scheduler-driven inference jobs and trading dry-run dashboards that accompany the release/20251030 drop.
+> Update 2025-11-13: Clarified that sanitizer + symbol-gate workflows and the parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) live in the mainline walkthrough; this archive mirrors the release/20251030 drop for posterity.
 
 This guide walks through the refreshed modeling stack: relaxed-gate retrains for the horizon-120 XGBoost baseline, the Calmon TCN suite, and the elastic-net blender that now clears 5 bps costs with RSS enrichment.
 

@@ -1,8 +1,8 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Walkthrough steps now reference the release/20251030 bundle, scheduler-driven inference lane, and trading dry-run rehearsal loop committed this week.
+> Update 2025-11-13: Added the multi-symbol sanitizer workflow, symbol-aware gate generator, and the new parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so every retrain shares the exact caps the scheduler/trading loop now enforces.
 
 This guide walks through the refreshed modeling stack: relaxed-gate retrains for the horizon-120 XGBoost baseline, the Calmon TCN suite, and the elastic-net blender that now clears 5 bps costs with RSS enrichment.
 
@@ -13,6 +13,30 @@ This guide walks through the refreshed modeling stack: relaxed-gate retrains for
   - `datasets/market_btcusdt_1m_2024_2025.parquet` (2024-01-01 ➜ 2025-10-27, 959 039 bars).
   - `datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet` (alias `..._2025-10_rss_latest.parquet`, 606 121 rows covering 2024-09-01 ➜ 2025-10-26).
   - Optional forward replay matrix for gate audits: `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` (40 201 rows, 2025-10-01 ➜ 2025-10-28 22:00).
+- Multi-symbol relaxed gate bundle (BTC/ETH/SOL) if you plan to retrain on the combined feed:
+  - `datasets/market_multi_3symbol_1m.parquet` (≈1.19 M rows spanning 2024-01-01 ➜ 2025-11-04).
+  - `release/symbol_gates/market_multi_3symbol_1m.json` stores per-symbol spread/vol caps; `scripts/train_base_gbdt.py` now auto-loads a gate config whose filename matches the dataset stem (e.g., `market_multi_3symbol_1m.parquet` → `release/symbol_gates/market_multi_3symbol_1m.json`).
+
+## 0. Prepare Multi-Symbol Feed & Gates
+- Sanitize fresh parquet pulls before training so duplicate (timestamp, symbol) rows and price outliers do not blow up `hl_spread`/`rvol`:
+  ```bash
+  python3 - <<'PY'
+  from pathlib import Path
+  from training.data import load_parquet_dataset, sanitize_market_dataset
+
+  raw = load_parquet_dataset("raw/market_multi_3symbol_1m.parquet", drop_duplicates=False)
+  clean = sanitize_market_dataset(raw, verbose=True)
+  Path("datasets").mkdir(exist_ok=True)
+  clean.to_parquet("datasets/market_multi_3symbol_1m.parquet", index=False)
+  PY
+  ```
+- Generate symbol-aware caps straight from the sanitized parquet; manifests, scheduler jobs, and `TRADING_MODELS` all consume the JSON payload:
+  ```bash
+  python scripts/compute_symbol_gate_config.py \
+    --data datasets/market_multi_3symbol_1m.parquet \
+    --out release/symbol_gates/market_multi_3symbol_1m.json
+  ```
+- Keep the JSON alongside the dataset—`scripts/train_base_gbdt.py` auto-loads a config whose filename matches the dataset stem (override with `--symbol-gate-config` when needed) so BTC/ETH/SOL inherit consistent `hl_spread`, `rvol`, and liquidity ranks through training, inference, and trading.
 
 ## 1. Generate/Refresh Feature Matrices
 The relaxed gate relies on augmented features and RSS spikes engineered by the new builder.
@@ -39,6 +63,7 @@ python scripts/train_base_gbdt.py \
   --threshold-criterion final_equity --diagnostic-thresholds 0.5,0.55,0.6,0.65 \
   --calmon-gate
 ```
+- Swap `--data` for `datasets/market_multi_3symbol_1m.parquet` when retraining across BTC/ETH/SOL; the CLI automatically applies `release/symbol_gates/market_multi_3symbol_1m.json`, but you can pass it explicitly via `--symbol-gate-config` to keep the manifest caps identical to scheduler inference.
 - Artifacts: booster (`model.json`), calibrator, feature list, threshold, manifest (`gates.training` vs `gates.inference`), `report.json`; the deployable mask now keeps `prob ≥ 0.2`, `min_hold 10`, and `long_only` while leaving spread/rvol enforcement to the trading layer.
 - `report.json` captures monthly diagnostics, RSS audits, and spread stress-test metadata.
 
@@ -120,8 +145,8 @@ python scripts/report_shortlist.py \
 - Copy refreshed manifests and reports to the models directory mounted by Docker (`MODELS_ROOT`). The scheduler reads them when parsing `INFER_JOBS`.
 - Configure `INFER_JOBS` (env JSON list) with exchange/symbol/timeframe, lookback/history windows, and manifest names. Example:
   ```json
-  [{"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":120,
-    "history_minutes":240,"base_model":"base_xgb_h120_calmon_spread0",
+  [{"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":1440,
+    "history_minutes":2880,"base_model":"base_xgb_h120_calmon_spread0",
     "tcn_model":"tcn_h120_calmon_relaxed","stride":30,"queue_key":"trading:decisions",
     "cron":"*/1 * * * *"}]
   ```
@@ -133,3 +158,21 @@ python scripts/report_shortlist.py \
   ```
   Grafana dashboards `ingestion-overview`, `scheduler-overview`, and `trading-overview` ship pre-wired panels for queue depth, gate coverage, and audit throughput.
 - Use `python scripts/verify_trading_redis.py` to inspect the Redis-backed trading state (`trading:positions`) and audit stream (`trading:audit`) during the dry run. Flip `TRADING_DRY_RUN=0` only after compliance/ops sign-off and update the runbook with observed gate coverage + P&L metrics.
+
+## 10. Feature Parity & Live Gate Drift
+- Export the same scheduler slice you just dry-ran so you can diff it against the sanitized training parquet:
+  ```bash
+  python scripts/export_feature_slice.py \
+    --data-lake-root data_lake/market \
+    --base-manifest base_xgb_cost_spread \
+    --symbols BTC/USDT,ETH/USDT,SOL/USDT \
+    --output /tmp/features_debug.parquet
+  ```
+- Compare live vs training stats and persist the JSON summary alongside the manifest bundle:
+  ```bash
+  python scripts/compare_feature_stats.py \
+    --train datasets/market_multi_3symbol_1m.parquet \
+    --live /tmp/features_debug.parquet \
+    --out release/calibration/latest/feature_parity.json
+  ```
+- Treat the parity file + Prometheus `model_*` gauges as the final gate drift check before promoting a manifest or trading config change. Any widening of `hl_spread`/`rvol` thresholds must cite both the sanitizer output and this comparison payload.

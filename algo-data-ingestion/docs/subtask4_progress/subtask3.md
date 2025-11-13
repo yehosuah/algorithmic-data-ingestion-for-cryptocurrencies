@@ -1,8 +1,8 @@
 # Subtask 3 – Blender Refresh
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Logged that the release/20251030 blender bundle plus the trading dry-run telemetry now back these experiments.
+> Update 2025-11-13: Folded in the sanitizer + symbol-gate workflow and the feature parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so the blender progress log stays aligned with the gates/metrics enforced downstream.
 
 ## Run
 ```
@@ -36,6 +36,7 @@ python scripts/train_blender.py \
 - Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) now fires 6 346 deployable trades (`gate_fraction ≈ 0.158`), confirming the eased manifest stays aligned with the retuned base thresholds.
 - Smoothing follows the stride specified in training; sandbox runs (`models/blender_h120_stride1_v2`) collapse it to 1 bar, dropping gate share to ≈0.2 % (134 toggles) while preserving equity, mapping the turnover ceiling for production manifests.
 - Scheduler inference emits blender decisions alongside base/TCN; check `scheduler_decision_messages_enqueued_total` and the trading dashboard when experimenting with stride or smoothing tweaks so the queue volume mirrors the 6 346 deployable trades.
+- Feature parity proof now lives in `release/calibration/latest/blender_parity.json` (generated via `scripts/export_feature_slice.py` + `scripts/compare_feature_stats.py --train datasets/market_multi_3symbol_1m.parquet --live /tmp/features_debug.parquet`); refresh it whenever stride/thresholds move so ops know live `hl_spread`, `hl_spread_z`, `rvol_20`, and `base_prob` drift stays within tolerance.
 
 ## Follow-ups
 1. Keep the deployable gate aligned with the base manifest so Oct–Nov 2025 maintains ≈15.8 % coverage and turnover within ±25 % of the 4 809-toggle baseline; use the stride‑1 sandbox runs as the upper bound when adjusting smoothing.

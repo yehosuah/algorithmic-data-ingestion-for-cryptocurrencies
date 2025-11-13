@@ -1,8 +1,8 @@
 # Subtask 3 – Elastic-Net Blender Refresh
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Blender plan now ties to the release/20251030 artifacts plus the trading/Grafana instrumentation tracking gate coverage.
+> Update 2025-11-13: Folded in the sanitizer + symbol-gate workflow and the feature parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so blender retrains reference the same gates/metrics enforced in scheduler + trading.
 
 ## Goal
 Train an elastic-net logistic blender that combines Calmon relaxed base and TCN probabilities with RSS spike features, clearing 5 bps transaction costs while maintaining actionable turnover.
@@ -11,6 +11,7 @@ Train an elastic-net logistic blender that combines Calmon relaxed base and TCN 
 1. Build the RSS-enriched blender matrix using `scripts/build_blender_matrix.py` (intraday RSS spikes, probability momentum, relaxed gate masks) and capture forward windows (e.g., Oct 2025) into `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet`. The stride you supply (or allow the script to infer) now becomes the smoothing window for the blender gate.
 2. Run `scripts/train_blender.py` with elastic-net sweep and turnover guards.
 3. Review RSS audit (`passed=true`) and feature inventory before promoting the artifact.
+4. After fitting, export a scheduler slice (`scripts/export_feature_slice.py`) and compare it to the sanitized multi-symbol parquet via `scripts/compare_feature_stats.py --train datasets/market_multi_3symbol_1m.parquet --live /tmp/features_debug.parquet --out release/calibration/latest/blender_parity.json` so gate adjustments cite concrete drift.
 
 ## Command
 ```bash
@@ -42,6 +43,7 @@ python scripts/train_blender.py \
 - Oct 2025 replay (`models/oos_replay_summary_latest.json`) confirms the eased manifest now delivers 6 346 deployable trades while maintaining `final_equity 4.48`; keep blender aligned with base thresholds as they evolve.
 - Sandbox runs (`models/blender_h120_stride1_v2`) collapse the smoothing window to 1 bar to stress turnover—relaxed equity stays at 4.48 while gate share drops to ≈0.2 % with 134 toggles, giving a ceiling for production manifests when smoothing is reduced.
 - Scheduler + trading dry run metrics should mirror this coverage: watch `scheduler_decision_messages_enqueued_total` and `trading_trade_attempts_total` after retraining to ensure redispatched blender decisions match the expected trade volume.
+- Keep `release/symbol_gates/market_multi_3symbol_1m.json` refreshed via `scripts/compute_symbol_gate_config.py` so base/TCN gate caps (which feed the blender matrix) stay consistent with the sanitized dataset powering scheduler/trading inference.
 
 ## Next Steps
 1. Keep blender gating in lockstep with the base manifest so Oct–Nov 2025 maintains equity ≥1.2 with turnover within ±25 % of the 4 809-toggle baseline; use the stride‑1 sandbox results as the turnover ceiling when coverage dips below ≈15.8 %.

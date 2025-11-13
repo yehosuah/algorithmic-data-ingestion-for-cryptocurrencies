@@ -1,18 +1,20 @@
 # Final Stretch – Production Checklist (Calmon Stack)
 
-Last updated: 2025-11-10 04:13 UTC
+Last updated: 2025-11-13 04:43 UTC
 
-> Update 2025-11-10: Checklist now points directly to the release/20251030 package and the scheduler->trading dry-run instrumentation we ship as the go/no-go contract.
+> Update 2025-11-13: Checklist now threads in the sanitizer + symbol-gate generator and the parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so launch sign-off cites the exact gates/metrics the scheduler + trading stack enforces.
 
 Scope: Align the relaxed-gate Horizon-120 XGB, Calmon TCN suite, and elastic-net blender for a deployable release, with manifest-driven governance and monitoring.
 
 ## 1. Pre-Flight
 - Freeze `datasets/market_btcusdt_1m_2024_2025.parquet`, `datasets/blender_matrix_2024-09_to_2025-09_rss_latest.parquet`, and the forward replay matrix `datasets/blender_matrix_2025-10_to_2025-11_with_preds.parquet` (record commit hash + SHA in release notes).
+- Sanitize and freeze the multi-symbol parquet via `training.data.sanitize_market_dataset` (→ `datasets/market_multi_3symbol_1m.parquet`) and refresh the matching gate config with `python scripts/compute_symbol_gate_config.py --data datasets/market_multi_3symbol_1m.parquet --out release/symbol_gates/market_multi_3symbol_1m.json`; include both artifacts in the release manifest so retrains/scheduler/trading share identical per-symbol caps.
 - Record `gate_smoothing_stride` from the blender `report.json` (and the stride-1 sandbox metrics) so smoothing changes are captured in release notes.
 - Persist monthly gate coverage snapshots for base and TCN (`live_gate_coverage.csv`), forward replay diagnostics (`models/oos_replay_summary_latest.json` with the archived `...oct_nov_2025.json` for regression), and attach to the release package.
 - Ensure manifests include deployable gates, thresholds, feature lists, and RSS audits; treat them as the contract between training and inference.
 - Keep `.github/workflows/ci.yml` green so manifest gating and shortlist regressions (`tests/regression`) stay enforced ahead of release tagging.
 - Before cutting artifacts, run the manifest/report parity sweep (or `pytest tests/regression/test_manifest_gating.py`) and regenerate manifests directly from `report.json` outputs whenever gate targets move so the inference mask stays identical to the validated training values.
+- Export a scheduler-style slice (`scripts/export_feature_slice.py`) and run `scripts/compare_feature_stats.py --train datasets/market_multi_3symbol_1m.parquet --live /tmp/features_debug.parquet --out release/calibration/latest/feature_parity.json` so the go/no-go packet captures live vs training `hl_spread`, `hl_spread_z`, `rvol_20`, and `base_prob` drift.
 - Dry-run the scheduler `INFER_JOBS` → Redis queue → trading service pipeline, capturing Prometheus metrics (`scheduler_decision_messages_enqueued_total`, `trading_trade_attempts_total`, `trading_position_active`) and Redis audit logs for the release window.
 
 ## 2. Base XGBoost (H120 Calmon)

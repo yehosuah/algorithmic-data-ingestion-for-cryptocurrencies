@@ -1,8 +1,8 @@
 # Subtask 4 – Meta-Label Training Refresh
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Meta-label notes now reference the release/20251030 drop and the Redis/Grafana trading loop we just added.
+> Update 2025-11-13: Folded in the sanitized multi-symbol feed + symbol-gate generator and the parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so meta updates align with the gates/metrics enforced by scheduler + trading.
 
 ## Run
 ```
@@ -25,6 +25,7 @@ python scripts/train_meta_label.py \
 - Blender stride experiments (`models/blender_h120_stride1_v2`) indicate that shrinking the smoothing window can reduce turnover to 134 toggles while maintaining equity, yet the meta layer still sees imbalanced labels.
 - The relaxed gate already suppresses most trades; additional meta gating adds no value until deployable thresholds are retuned to yield meaningful overlap.
 - The scheduler/trading dry run continues to rely solely on manifest gates; keep meta gating disabled in `TRADING_MODELS` until label balance improves and faux P&L/coverage justify another layer.
+- Any future attempt must reuse the sanitized multi-symbol dataset (`training.data.sanitize_market_dataset` → `datasets/market_multi_3symbol_1m.parquet`) plus the matching gate payload (`release/symbol_gates/market_multi_3symbol_1m.json`) and capture feature parity diffs via `scripts/export_feature_slice.py` + `scripts/compare_feature_stats.py` so we know meta labels observe the same `hl_spread`, `hl_spread_z`, `rvol_20`, and `base_prob` drift as trading.
 
 ## Next Steps
 1. Wait for deployable gate expansion beyond the current 5e-4 floor (especially on the TCN suite) to restore meaningful overlap on forward windows before attempting further meta training; the current stride‑1 sandbox runs are for analysis only.

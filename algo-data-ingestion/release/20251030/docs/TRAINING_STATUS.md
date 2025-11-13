@@ -1,8 +1,8 @@
 # Model Training Status (XGB · TCN · Blender)
 
-_Last updated: 2025-11-10 04:13 UTC (archival snapshot refreshed)_
+_Last updated: 2025-11-13 04:43 UTC (archival snapshot refreshed)_
 
-> Update 2025-11-10: Marked this archive as synced with the release/20251030 bundle that packages the scheduler inference queue plus trading dry-run worker for distribution.
+> Update 2025-11-13: Recorded that the sanitized multi-symbol feed + symbol-gate payload and the parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) are documented in the active branch; this archive stays frozen at release/20251030 for historical comparison.
 
 ## Quick Status
 - _Update 2025-11-05_: The active branch now includes scheduler-driven inference and a trading dry run (`app/trading/service.py`). Refer to the root `TRAINING_STATUS.md` for the latest metrics covering Redis decision queues and Prometheus trading counters.

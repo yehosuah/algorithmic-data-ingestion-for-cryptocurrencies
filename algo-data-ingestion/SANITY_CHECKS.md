@@ -1,8 +1,8 @@
 # Sanity Checks and Optional Improvements
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Captured the release/20251030 parquet + manifest bundle and the scheduler/trading health probes (Redis queue depth, trading metrics endpoint) that now live in git.
+> Update 2025-11-13: Added the sanitizer/parity workflow (multi-symbol parquet, `export_feature_slice.py`, `compare_feature_stats.py`) plus the symbol-gate generator so these checks now align with the gates that scheduler/trading enforce.
 
 This document summarizes quick validation steps for a 2‑week backfill (market + RSS) and tracks optional improvements to reference during iteration.
 
@@ -60,6 +60,21 @@ python scripts/build_training_matrix.py \
   --out datasets/training_matrix_two_weeks.parquet
 ```
 
+### Multi-symbol sanitizer + gate config
+Use the combined BTC/ETH/SOL parquet when validating relaxed gates:
+```bash
+python3 - <<'PY'
+from training.data import load_parquet_dataset, sanitize_market_dataset
+df = load_parquet_dataset("raw/market_multi_3symbol_1m.parquet", drop_duplicates=False)
+clean = sanitize_market_dataset(df, verbose=True)
+clean.to_parquet("datasets/market_multi_3symbol_1m.parquet", index=False)
+PY
+python scripts/compute_symbol_gate_config.py \
+  --data datasets/market_multi_3symbol_1m.parquet \
+  --out release/symbol_gates/market_multi_3symbol_1m.json
+```
+Check the generated JSON into `release/symbol_gates/` so CI + manifests inherit the same `hl_spread`, `rvol`, and liquidity caps.
+
 ## Trading Dry Run Validation
 
 With manifests refreshed and the Docker stack running, validate the scheduler → Redis → trading loop:
@@ -85,12 +100,26 @@ With manifests refreshed and the Docker stack running, validate the scheduler �
    ```
    Review the `trading:positions` hash and `trading:audit` stream for gate/trade entries.
 6. Grafana dashboards `scheduler-overview` and `trading-overview` visualise queue depth, coverage, trade attempts, and dry-run P&L; keep Prometheus alert rules green throughout the exercise.
+7. Export a parity slice and compare it with the sanitized training parquet before loosening gates:
+   ```bash
+   python scripts/export_feature_slice.py \
+     --data-lake-root data_lake/market \
+     --base-manifest base_xgb_cost_spread \
+     --symbols BTC/USDT,ETH/USDT,SOL/USDT \
+     --output /tmp/features_debug.parquet
+   python scripts/compare_feature_stats.py \
+     --train datasets/market_multi_3symbol_1m.parquet \
+     --live /tmp/features_debug.parquet \
+     --out release/calibration/latest/feature_parity.json
+   ```
+   Attach the resulting JSON to your run log so reviewers can see live vs training `hl_spread`, `hl_spread_z`, `rvol_20`, and `base_prob` drift.
 
 ## Optional Improvements (Backlog)
 
 Data & Features
 - Multi‑symbol, multi‑timeframe coverage (BTC/USDT, ETH/USDT; 1m + 5m).
 - Extend feature set (higher‑order returns, regime features, realized volatility variants, microstructure if L2 is added).
+- Keep `release/symbol_gates` current by re-running `scripts/compute_symbol_gate_config.py` whenever the sanitized multi-symbol parquet refreshes so manifests, scheduler, and `TRADING_MODELS` stay in sync.
 - Social/news: expand RSS sources and add Twitter keys; ensure minute spikes stay ≥5e-4 so the blender’s RSS audit passes (`scripts/build_blender_matrix.py` emits coverage stats). The `/ingest/news` endpoint now uses `fetch_news_rss_once` to persist RSS/API payloads into `NEWS_PATH`, so live feeds can be mirrored in the sanity run.
 - On‑chain: add Glassnode metrics (with keys), align to bar closes.
 
@@ -106,6 +135,7 @@ ML & Evaluation
 Serving & Ops
 - Real-time scoring path that mirrors training transformations (avoid skew).
 - Feature monitoring: drift detection, data availability SLAs; hook `app/monitoring/model_metrics.py` gauges (`model_gate_coverage_ratio`, `model_rss_minute_spike_share`, `model_probability_sigma`) into dashboards and alert when thresholds (from manifests) are breached.
+- Persist feature parity diffs from `scripts/export_feature_slice.py` + `scripts/compare_feature_stats.py` in `release/calibration/latest` for every rehearsal so gate changes cite concrete drift metrics.
 - Hardening: retries/circuit breakers, backpressure on ingest, structured logging.
 - CI hygiene: `.github/workflows/ci.yml` now runs ingestion service E2E tests, KPI regressions, and a forward replay guardrail that calls `scripts/run_oos_eval.py --family tcn --stride 30` for h60/h120/h180 (fails if `gate_fraction < 5e-4` or `final_equity < 1.2`); extend it with environment-specific smoke checks as needed.
 - Exercise the stride-aware batching in `training/infer.predict_tcn` during staging runs so smaller strides do not exhaust memory when evaluating new gates.

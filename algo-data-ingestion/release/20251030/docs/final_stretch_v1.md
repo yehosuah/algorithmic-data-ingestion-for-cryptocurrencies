@@ -1,8 +1,8 @@
 # Final Stretch – Production Checklist (Calmon Stack)
 
-Last updated: 2025-11-10 04:13 UTC (archival snapshot refreshed)
+Last updated: 2025-11-13 04:43 UTC (archival snapshot refreshed)
 
-> Update 2025-11-10: Revalidated this archival snapshot against the release/20251030 export that now includes scheduler->Redis inference jobs and the trading dry-run Prometheus hooks from app/trading.
+> Update 2025-11-13: Noted that sanitizer + symbol-gate workflows and the new parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) live in the active checklist; this archive remains pegged to release/20251030 for historical comparisons.
 
 Scope: Align the relaxed-gate Horizon-120 XGB, Calmon TCN suite, and elastic-net blender for a deployable release, with manifest-driven governance and monitoring.
 

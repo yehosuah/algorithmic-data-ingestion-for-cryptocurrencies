@@ -1,8 +1,8 @@
 # Subtask 1 – TCN Turnover Tightening
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Subtask description now references the release/20251030 TCN artifacts plus the app/trading metrics used in rehearsal.
+> Update 2025-11-13: Added the sanitized multi-symbol feed + symbol-gate generator and the feature parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so TCN turnover tweaks cite the same gates/metrics enforced in scheduler + trading.
 
 ## Goal
 Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity > 1.0 (5 bps costs).
@@ -10,6 +10,7 @@ Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity
 ## Environment
 - Python 3.11 virtualenv (`.venv`) rebuilt fresh.
 - Key deps: torch 2.3.1, scikit-learn 1.5.2, xgboost 2.1.1.
+- Multi-symbol dataset cleaned via `training.data.sanitize_market_dataset` (`datasets/market_multi_3symbol_1m.parquet`) plus gate payload from `scripts/compute_symbol_gate_config.py` (`release/symbol_gates/market_multi_3symbol_1m.json`) so BTC/ETH/SOL share consistent spread/rvol caps during training and scheduler/trading inference.
 
 ## Command
 ```bash
@@ -43,6 +44,7 @@ Reduce turnover for the 120-bar horizon TCN model while keeping post-cost equity
 - Oct 2025 forward replay (`models/oos_replay_summary_latest.json`) now records deployable coverage: `gate_hits 31`, `toggle_count 62`, `gate_fraction 7.71e-4`, `final_equity 1.94`. Keep the CI guardrail (`gate_fraction ≥ 5e-4`, `final_equity ≥ 1.2`) green as thresholds evolve.
 - `training/infer.predict_tcn` now batches inference by stride, letting us probe stride‑1 gate experiments without exhausting memory.
 - The scheduler/trading dry run consumes this manifest via `INFER_JOBS`; verify queue depth and `trading_trade_attempts_total` when adjusting stride/thresholds so live rehearsals mirror replay stats.
+- After each stride/threshold experiment, export a feature slice (`scripts/export_feature_slice.py`) and log `scripts/compare_feature_stats.py --train datasets/market_multi_3symbol_1m.parquet --live /tmp/features_debug.parquet` output to `release/calibration/latest/tcn_stride_parity.json` so reviewers can see how `hl_spread`, `hl_spread_z`, `rvol_20`, and `base_prob` drifted before accepting turnover gains.
 
 ## Next Steps
 - Maintain the deployable gate above the 5e-4 floor with the guardrail; document fallback behaviour if coverage regresses.

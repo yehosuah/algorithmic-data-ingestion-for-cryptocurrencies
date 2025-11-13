@@ -1,8 +1,8 @@
 # Subtask 2 – Horizon-120 XGB Baseline
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Base XGB notes now link to release/20251030 outputs and the scheduler->trading instrumentation guarding coverage.
+> Update 2025-11-13: Folded in the sanitized multi-symbol feed + symbol-gate generator and the feature parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so the base retrain mirrors the gates/metrics enforced downstream in scheduler + trading.
 
 ## Goal
 Retrain the base XGBoost classifier on the 2024–2025 minute feed using the relaxed Calmon gate so post-cost equity exceeds 1.0 at 5 bps while preserving a deployable inference mask.
@@ -22,6 +22,7 @@ Retrain the base XGBoost classifier on the 2024–2025 minute feed using the rel
   --threshold-criterion final_equity \
   --diagnostic-thresholds 0.5,0.55,0.6,0.65
 ```
+- Swap `--data` for the sanitized multi-symbol feed (`datasets/market_multi_3symbol_1m.parquet`, produced via `training.data.sanitize_market_dataset`) and keep the matching gate JSON in lockstep by running `scripts/compute_symbol_gate_config.py --data datasets/market_multi_3symbol_1m.parquet --out release/symbol_gates/market_multi_3symbol_1m.json`; the CLI auto-loads configs whose filenames match the dataset stem.
 
 ## Result (`models/base_xgb_h120_calmon_spread0/report.json`)
 - `final_equity`: **4.482**
@@ -44,3 +45,4 @@ Retrain the base XGBoost classifier on the 2024–2025 minute feed using the rel
 4. During dry-run rehearsals, confirm Redis queue depth and audit logs mirror the 12 deployable base trades before promoting threshold adjustments.
 5. Before tagging a release, run the manifest/report parity sweep (`python - <<'PY' ...` helper or `pytest tests/regression/test_manifest_gating.py`) so `prob_gate_min`, `hl_spread_z_max`, and `rvol20_max` stay locked to the validated report values.
 6. When training updates shift gate targets, overwrite manifests by re-exporting from the refreshed `report.json` artifacts (never hand-edit inference gates) and repeat the parity + regression checks to document the new thresholds.
+7. Attach feature parity output from `python scripts/export_feature_slice.py --output /tmp/features_debug.parquet` + `python scripts/compare_feature_stats.py --train datasets/market_multi_3symbol_1m.parquet --live /tmp/features_debug.parquet --out release/calibration/latest/base_parity.json` whenever widening gates so reviewers have concrete `hl_spread`, `hl_spread_z`, `rvol_20`, and `base_prob` drift data.

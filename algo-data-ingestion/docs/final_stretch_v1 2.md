@@ -1,8 +1,8 @@
 # Final Stretch – Snapshot Redirect
 
-Last updated: 2025-11-10 04:13 UTC
+Last updated: 2025-11-13 04:43 UTC
 
-> Update 2025-11-10: Redirect clarifies this snapshot maps to release/20251030 and points readers to the scheduler/trading wiring now in docs.
+> Update 2025-11-13: Redirect now highlights the sanitized multi-symbol feed + symbol-gate generator and the parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) documented in `docs/final_stretch_v1.md`, which the Calmon stack now treats as mandatory before sign-off.
 
 This document has been superseded by `docs/final_stretch_v1.md`, which tracks the current production checklist for the Calmon stack (base XGB, TCN suite, elastic-net blender).
 

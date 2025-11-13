@@ -1,8 +1,8 @@
 # Subtask 2 – Horizon-120 XGB Baseline Refresh
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Captured how the release/20251030 base manifests and the new trading dry-run instrumentation factor into this workstream.
+> Update 2025-11-13: Folded in the sanitized multi-symbol feed + symbol-gate generator and the feature parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so this workstream references the same gates/metrics enforced downstream.
 
 ## Run
 ```
@@ -19,6 +19,7 @@ _Last updated: 2025-11-10 04:13 UTC_
   --threshold-criterion final_equity \
   --diagnostic-thresholds 0.5,0.55,0.6,0.65
 ```
+- Swap to the sanitized multi-symbol feed (`datasets/market_multi_3symbol_1m.parquet` generated via `training.data.sanitize_market_dataset`) plus the matching gate payload (`release/symbol_gates/market_multi_3symbol_1m.json` from `scripts/compute_symbol_gate_config.py`) when retraining across BTC/ETH/SOL so manifests, scheduler, and trading enforce identical per-symbol caps.
 
 ## Result (`models/base_xgb_h120_calmon_spread0/report.json`)
 - `final_equity` **4.482**
@@ -31,6 +32,7 @@ _Last updated: 2025-11-10 04:13 UTC_
 - RSS audit passes; spread stress (`spread_scale ∈ {0,0.05,0.1,0.2}`) leaves equity unchanged, indicating resilience to moderate cost inflation.
 - Oct 2025 forward replay (`models/oos_replay_summary_latest.json`, 40 201 rows) now logs 12 deployable gate hits (8 trades, `final_equity 1.2336`, `gate_coverage 2.99e-4`), so lock the thresholds in release notes and monitor coverage for drift.
 - Scheduler inference jobs now broadcast this manifest to the trading dry run; watch `scheduler_decision_messages_enqueued_total` and `trading_trade_attempts_total` when experimenting with new thresholds.
+- After each retrain, export a scheduler slice and capture `scripts/compare_feature_stats.py --train datasets/market_multi_3symbol_1m.parquet --live /tmp/features_debug.parquet --out release/calibration/latest/subtask2_base_parity.json` so reviewers can see how `hl_spread`, `hl_spread_z`, `rvol_20`, and `base_prob` moved before sign-off.
 
 ## Deployable Gate Update
 - Manifest inference mask now simply enforces `prob ≥ 0.2`, `min_hold 10`, `long_only`; spread and volatility caps are validated in the trading layer. CI still enforces manifest alignment via `tests/regression/test_manifest_gating.py` and shortlist viability via `test_report_shortlist.py`.

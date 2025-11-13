@@ -1,13 +1,14 @@
 # Probability Calibration Refresh (Nov 2025)
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Calibration workflow is now tied to the release/20251030 drop and the scheduler/trading watchers that consume the refreshed calibrators.
+> Update 2025-11-13: Folded in the sanitizer-driven multi-symbol feed plus the parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so calibration refreshes cite the same symbol-aware gates and drift checks now enforced by scheduler/trading.
 
 ## Overview
 
 - **Issue:** live probabilities from the base XGB, TCN, and blender manifests were saturating near 0/1, leaving the dual-threshold gate almost binary.
 - **Dataset:** `datasets/blender_matrix_2025-09_to_2025-11_oos.parquet` rebuilt via `scripts/build_blender_matrix.py` from the latest feature pipeline outputs (market + RSS features, base + TCN scores).
+- **Gate payload:** `release/symbol_gates/market_multi_3symbol_1m.json` (generated via `scripts/compute_symbol_gate_config.py`) anchors the per-symbol `hl_spread`, `rvol`, and liquidity caps that scheduler/trading enforce alongside the calibrated probabilities.
 - **Workflow:** `scripts/refresh_calibration.py` now fits post-hoc calibrators, emits reliability/histogram plots, and persists the calibrator parameters under `models/<manifest>/calibration/`.
 - **Artifacts:** metrics + plots land in `release/calibration/2025-11-oos_stride2/` and are referenced by `release/calibration/2025-11-oos_stride2/calibration_summary.json`.
 
@@ -49,5 +50,6 @@ Reliability curves (`*_reliability.png`) & histograms (`*_hist.png`) in the rele
 - `training/infer.load_base_predictor` / `predict_base` and `load_tcn_predictor` / `predict_tcn` automatically detect `calibration/<prob_col>.json` under each manifest and apply the saved calibrator at inference time (scheduler jobs, scoring API, dataset builders, etc.).
 - `app.ingestion_service.scoring.BlenderRunner` now loads the blender calibrator and emits calibrated probabilities to downstream gates.
 - The blender manifest (`models/blender_h120_v6/manifest.json`) now enforces `prob_gate_min = 0.55` for both training and inference sections, and `threshold.txt` has been updated to `0.55`. This matches the `select_prob_threshold` sweep on the calibrated probabilities (gate coverage ≈19.4%, final-equity criterion 4.48x).
+- After any calibration refresh, export a scheduler slice and diff it via `scripts/compare_feature_stats.py` so the release folder (e.g., `release/calibration/latest/feature_parity.json`) documents live vs training drift across `hl_spread`, `hl_spread_z`, `rvol_20`, and `base_prob` before manifests are widened.
 
 To disable a calibrator, remove the corresponding JSON/joblib pair from `models/<manifest>/calibration/` and re-run inference.

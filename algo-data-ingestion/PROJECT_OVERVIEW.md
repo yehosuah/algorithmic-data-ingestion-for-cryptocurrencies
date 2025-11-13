@@ -1,8 +1,13 @@
 # Algo Data Ingestion – Comprehensive Project Dossier
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Highlighted how the release/20251030 artifacts pair with the new docker-compose trading worker, Redis queue governance, and Grafana monitoring wired up in app/trading and monitoring/.
+> Update 2025-11-13: Captured the symbol-aware gate refresh (multi-symbol dataset, sanitizer, parity helpers) plus the trading-state instrumentation so every manifest, scheduler job, and dry-run metric references the same caps and datasets.
+
+### 0. 2025-11-13 Refresh Highlights
+- **Symbol-aware relaxed gate** – `datasets/market_multi_3symbol_1m.parquet` (BTC/ETH/SOL) now sits beside the single-symbol feeds; `scripts/compute_symbol_gate_config.py` produces `release/symbol_gates/market_multi_3symbol_1m.json` so manifests, scheduler jobs, and `TRADING_MODELS` enforce identical `hl_spread`, `rvol`, and liquidity caps.
+- **Feature parity workflow** – `training/data.sanitize_market_dataset` de-dupes (timestamp, symbol) pairs and clamps price/volatility outliers before augmentation; `scripts/export_feature_slice.py` + `scripts/compare_feature_stats.py` ship a repeatable way to diff live Redis slices against the training parquet and write parity payloads into `release/calibration/latest`.
+- **Trading observability** – `.env` now defaults Redis-backed trading state/audits plus the metrics exporter (`TRADING_METRICS_PORT=9010`). Grafana dashboards ingest `trading_trade_attempts_total`, `trading_gate_toggles_total`, and the new parity outputs so runbooks can cite the exact counters when verifying coverage.
 
 ---
 

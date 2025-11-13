@@ -1,8 +1,8 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Folded the release/20251030 bundle plus the scheduler->trading dry-run instrumentation (Redis queue, app/trading metrics, Grafana dashboards) into this quickstart so it mirrors the docker-compose stack.
+> Update 2025-11-13: Folded in the multi-symbol training feed + sanitizers, documented the new parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`, `compute_symbol_gate_config.py`), and wired those instructions into the docker stack so the scheduler/trading loop enforces the same symbol-aware gates as the manifests.
 
 End-to-end ingestion for **market**, **on-chain**, **social**, and **news** data with a Redis feature store, admin backfills/TTL sweeps, a scheduler, and monitoring (Prometheus + Grafana).
 
@@ -75,6 +75,8 @@ Each payload carries manifest metadata, side, and probability, so the trading wo
 - Persist per-symbol state with the configured backend (`file`, `redis`, `postgres`) and mirror audit events (`gate_toggle`, `trade`) to Redis streams or Postgres tables.
 - Expose Prometheus counters/gauges (`trading_trade_attempts_total`, `trading_trade_notional_total`, `trading_gate_toggles_total`, `trading_position_active`, `trading_realized_pnl_total`) on `TRADING_METRICS_PORT` (default 9010).
 
+> Tip: Let `scheduler` and `trading` run for at least an hour during rehearsals without restarting them—the extra runway keeps the `rvol_20` rolling window stable and gives `trading_trade_attempts_total` / `trading_gate_toggles_total` time to move off zero. Capture start/end counter values in your dry-run log.
+
 Useful helpers:
 - `python scripts/verify_trading_redis.py` inspects the Redis position hash and audit stream.
 - Grafana dashboard `monitoring/grafana/dashboards/trading-overview.json` surfaces queue depth, gate coverage, and trade attempt metrics; alert rules now include stale decision queue detection.
@@ -82,6 +84,32 @@ Useful helpers:
 > **Recovery plan:** Whenever live coverage or PnL drifts from the training reports, follow the authoritative checklist in `docs/live_trading_recovery_plan.md`. Treat that document as the source of truth for remediation steps before adjusting manifests or redeploying.
 
 ---
+
+## Feature Parity & Gate Calibration
+
+- `datasets/market_multi_3symbol_1m.parquet` (≈1.19 M rows across BTC/ETH/SOL) now powers the relaxed gate. Run `training/data.sanitize_market_dataset` before retraining so duplicates/outliers are removed and symbol-level liquidity columns stay stable.
+- Export a scheduler-style slice straight from the data lake plus manifests:
+  ```bash
+  python scripts/export_feature_slice.py \
+    --data-lake-root data_lake/market \
+    --base-manifest base_xgb_cost_spread \
+    --symbols BTC/USDT,ETH/USDT,SOL/USDT \
+    --output /tmp/features_debug.parquet
+  ```
+- Compare training vs live distributions to catch parity drift (`hl_spread`, `hl_spread_z`, `rvol_20`, `base_prob`) before changing gates:
+  ```bash
+  python scripts/compare_feature_stats.py \
+    --train datasets/market_multi_3symbol_1m.parquet \
+    --live /tmp/features_debug.parquet \
+    --out release/calibration/latest/feature_parity.json
+  ```
+- Whenever the dataset refreshes, regenerate per-symbol gate caps so manifests, scheduler jobs, and `TRADING_MODELS` stay in lockstep:
+  ```bash
+  python scripts/compute_symbol_gate_config.py \
+    --data datasets/market_multi_3symbol_1m.parquet \
+    --out release/symbol_gates/market_multi_3symbol_1m.json
+  ```
+- `app/features/factory/market_factory.py` now drops OHLCV rows whose `(high-low)/close` exceeds 1 %, preventing hl_spread/rvol explosions before augmentation—mirror that expectation when debugging sparse exchanges.
 
 ## Environment
 

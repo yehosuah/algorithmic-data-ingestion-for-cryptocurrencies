@@ -1,16 +1,18 @@
 # Deployability Runbook (TCN Suite Refresh – Oct 2025)
 
-_Last updated: 2025-11-10 04:13 UTC_
+_Last updated: 2025-11-13 04:43 UTC_
 
-> Update 2025-11-10: Runbook ties deployability tasks to the release/20251030 manifests plus the docker-compose trading worker (Redis/Postgres state, `scripts/verify_trading_redis.py`).
+> Update 2025-11-13: Folded in the sanitizer + symbol-gate workflow and the feature parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so deployability steps reference the gates/metrics enforced by scheduler + trading.
 
 ## Immediate Follow-Ups
 - **Refresh shortlist** – `python3 scripts/report_shortlist.py --models-root models --out models/report_shortlist.json` to surface the updated TCN manifests alongside base/blender.
+- **Freeze sanitizer + gate payload** – Re-run `training.data.sanitize_market_dataset` on the multi-symbol parquet and `scripts/compute_symbol_gate_config.py --data datasets/market_multi_3symbol_1m.parquet` so the release bundle ships with `release/symbol_gates/market_multi_3symbol_1m.json` that scheduler/trading already consume.
 - **Assemble release bundle** – Package manifests, `report.json`, `tcn_gate_replay_summary.json`, `oos_replay_summary_latest.json`, `live_gate_coverage.csv`, and the forward matrix parquet per `docs/final_stretch_v1.md`.
 - **CI gate coverage check** – GitHub Actions already runs `scripts/run_oos_eval.py --family tcn --stride 30` for h60/h120/h180; keep the thresholds strict (`gate_coverage < 5e-4` or `final_equity < 1.2` triggers failure) and mirror the guardrail locally before adjusting manifests.
 - **Documentation touch-up** – Update `docs/oct_2025_forward_replay.md` and `TRAINING_STATUS.md` with the new TCN gate thresholds/coverage before circulating status reports.
 - **Monitoring baseline update** – Append Oct 2025 figures to `live_gate_coverage.csv` so alert thresholds reflect the relaxed yet deployable gates.
 - **Trading rehearsal plan** – Populate `INFER_JOBS`/`TRADING_MODELS`, review `docs/weeklong_dry_run_checklist.md`, and schedule a 7-day paper-trading run logging queue depth, trade attempts, and faux P&L.
+- **Feature parity proof** – At the end of each dry run, export a scheduler slice (`scripts/export_feature_slice.py`) and store the diff vs sanitized training data via `scripts/compare_feature_stats.py --train datasets/market_multi_3symbol_1m.parquet --live /tmp/features_debug.parquet --out release/calibration/latest/tcn_parity.json`; attach the JSON to deployment notes before widening gates.
 
 ## Connecting to Live Trading
 - **Manifest enforcement in inference**  
