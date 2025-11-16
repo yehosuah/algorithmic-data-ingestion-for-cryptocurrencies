@@ -350,10 +350,16 @@ def _update_inference_metrics(
     sigma = _compute_min_monthly_sigma(df, prob_series)
     observe_probability_sigma(artifacts.model_label, sigma)
 
-def load_base_predictor(base_dir: Path, prob_column: str = "base_prob"):
+def load_base_predictor(
+    base_dir: Path,
+    prob_column: str = "base_prob",
+    *,
+    apply_calibration: bool = True,
+):
     feat_cols = json.loads(_read_text_retry(base_dir / "feature_list.json"))
     calib_path = base_dir / "calibrator.joblib"
-    if calib_path.exists():
+    use_calibrator = apply_calibration and calib_path.exists()
+    if use_calibrator:
         calib = joblib.load(calib_path)
     else:
         # Load raw booster model if calibrator absent
@@ -376,7 +382,8 @@ def load_base_predictor(base_dir: Path, prob_column: str = "base_prob"):
             calib.n_classes_ = 2
         except AttributeError:
             pass
-    _attach_posthoc_calibrator(calib, base_dir, prob_column or "base_prob")
+    if apply_calibration:
+        _attach_posthoc_calibrator(calib, base_dir, prob_column or "base_prob")
     return calib, feat_cols
 
 

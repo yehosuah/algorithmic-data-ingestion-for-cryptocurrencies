@@ -16,12 +16,11 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from training.calibration_utils import (
-    fit_best_calibrator,
-)
+from training.calibration_utils import fit_best_calibrator
 from training.calibration_store import save_calibrator
 from training.data import load_parquet_dataset
 from training.blender import build_blender_features
+from training.infer import load_base_predictor, predict_base
 
 import joblib
 
@@ -97,6 +96,18 @@ def _ensure_blender_prob(df: pd.DataFrame, blender_dir: Path) -> pd.Series:
         raise ValueError("Blender feature matrix is empty; verify dataset columns.")
     probabilities = model.predict_proba(X.values)[:, 1]
     series = pd.Series(probabilities, index=X.index, name="blender_prob").astype(float)
+    aligned = pd.Series(index=df.index, dtype=float)
+    aligned.loc[series.index] = series
+    return aligned
+
+
+def _compute_base_probabilities(df: pd.DataFrame, base_dir: Path) -> pd.Series:
+    """
+    Re-score the dataset with the raw base model so calibration can operate on
+    pre-calibrated probabilities instead of the previously clipped outputs.
+    """
+    calib, feat_cols = load_base_predictor(base_dir, apply_calibration=False)
+    series = predict_base(df, calib, feat_cols).astype(float)
     aligned = pd.Series(index=df.index, dtype=float)
     aligned.loc[series.index] = series
     return aligned
@@ -233,6 +244,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     start = _parse_timestamp(args.start_date)
     end = _parse_timestamp(args.end_date)
     df = _filter_frame(df, start, end)
+
+    # Always recompute base probabilities from the raw booster so calibration
+    # does not double-fit already-clipped outputs.
+    if "base_prob" in df.columns:
+        df = df.rename(columns={"base_prob": "base_prob_prev"})
+    try:
+        df["base_prob"] = _compute_base_probabilities(df, base_dir)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        raise RuntimeError(f"Failed to rescore base probabilities: {exc}") from exc
 
     if "blender_prob" not in df.columns:
         df["blender_prob"] = _ensure_blender_prob(df, blender_dir)

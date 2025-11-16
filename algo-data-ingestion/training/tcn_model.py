@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+import json
 from pathlib import Path
 from typing import Tuple, Dict, Optional, Callable
 
@@ -11,6 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
+from .model_registry import BaseModel, register_model
 
 
 class Chomp1d(nn.Module):
@@ -186,3 +188,135 @@ def save_tcn(
         if "timestamp" in df_logits.columns:
             df_logits["timestamp"] = pd.to_datetime(df_logits["timestamp"], utc=True)
         df_logits.to_parquet(out_dir / "fold_logits.parquet", index=False)
+
+
+class TCNModel(BaseModel):
+    """
+    Registry-friendly wrapper for the TinyTCN.
+    """
+
+    def __init__(self, config: Optional[Dict] = None):
+        cfg = {
+            "kernel_size": 3,
+            "channels": (32, 32),
+            "dropout": 0.05,
+            "epochs": 10,
+            "batch_size": 256,
+            "lr": 1e-3,
+            "weight_decay": 1e-4,
+            "class_weight": None,
+            "calibration_method": "isotonic",
+        }
+        if config:
+            cfg.update(config)
+        # normalize channels
+        ch = cfg.get("channels", (32, 32))
+        if isinstance(ch, str):
+            ch = tuple(int(x) for x in ch.split(",") if x.strip())
+        cfg["channels"] = tuple(int(x) for x in ch)
+        self.config = cfg
+        self.model: Optional[TinyTCN] = None
+        self.calibrator: Optional[CalibratedClassifierCV] = None
+        self.n_inputs: Optional[int] = None
+
+    def _ensure_ch_last_to_ch_first(self, arr: np.ndarray) -> np.ndarray:
+        if arr.ndim != 3:
+            raise ValueError(f"Expected 3D input (N, L, F) or (N, C, L); got shape {arr.shape}")
+        # Heuristic: if middle dim is small it is probably channels-first already
+        return arr if arr.shape[1] <= arr.shape[2] else np.transpose(arr, (0, 2, 1))
+
+    def fit(self, X_train, y_train, **kwargs):
+        X_arr = self._ensure_ch_last_to_ch_first(np.asarray(X_train))
+        y_arr = np.asarray(y_train).astype(np.float32)
+        self.n_inputs = X_arr.shape[1]
+
+        val_data = kwargs.get("val_data")
+        val_tuple = None
+        if val_data is not None:
+            X_val, y_val = val_data
+            X_val_arr = self._ensure_ch_last_to_ch_first(np.asarray(X_val))
+            y_val_arr = np.asarray(y_val).astype(np.float32)
+            val_tuple = (X_val_arr, y_val_arr)
+
+        tcfg = TrainConfig(
+            epochs=int(self.config.get("epochs", 10)),
+            lr=float(self.config.get("lr", 1e-3)),
+            batch_size=int(self.config.get("batch_size", 256)),
+            weight_decay=float(self.config.get("weight_decay", 1e-4)),
+            class_weight=self.config.get("class_weight"),
+        )
+        model, logits_train, logits_val = train_tcn(
+            X_arr,
+            y_arr,
+            val=val_tuple,
+            kernel_size=int(self.config.get("kernel_size", 3)),
+            channels=tuple(self.config.get("channels", (32, 32))),
+            dropout=float(self.config.get("dropout", 0.05)),
+            config=tcfg,
+        )
+        self.model = model
+        self.calibrator = None
+        calib_method = self.config.get("calibration_method", "isotonic")
+        if val_tuple is not None and logits_val is not None:
+            self.calibrator = calibrate_logits(logits_val, val_tuple[1], method=calib_method)
+        elif logits_train is not None:
+            # Fallback: calibrate on train logits if no validation provided
+            self.calibrator = calibrate_logits(logits_train, y_arr, method=calib_method)
+        return self
+
+    def _logits(self, X: np.ndarray) -> np.ndarray:
+        if self.model is None:
+            raise RuntimeError("TCNModel not trained; call fit first.")
+        X_arr = self._ensure_ch_last_to_ch_first(np.asarray(X))
+        device = next(self.model.parameters()).device
+        with torch.no_grad():
+            logits = self.model(torch.tensor(X_arr, dtype=torch.float32, device=device)).view(-1).cpu().numpy()
+        return logits
+
+    def predict_proba(self, X):
+        logits = self._logits(np.asarray(X))
+        prob = 1.0 / (1.0 + np.exp(-np.clip(logits, -20, 20)))
+        if self.calibrator is not None:
+            prob = self.calibrator.predict_proba(logits.reshape(-1, 1))[:, 1]
+        return prob
+
+    def save(self, path: str) -> None:
+        if self.model is None:
+            raise RuntimeError("Cannot save an untrained model.")
+        out_dir = Path(path)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        torch.save(self.model.state_dict(), out_dir / "model.pt")
+        meta = {
+            "config": self.config,
+            "n_inputs": self.n_inputs,
+        }
+        (out_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+        if self.calibrator is not None:
+            joblib.dump(self.calibrator, out_dir / "calibrator.joblib")
+
+    @classmethod
+    def load(cls, path: str):
+        p = Path(path)
+        meta = {}
+        if (p / "meta.json").exists():
+            meta = json.loads((p / "meta.json").read_text())
+        obj = cls(meta.get("config", {}))
+        obj.n_inputs = meta.get("n_inputs")
+        if obj.n_inputs is None:
+            raise ValueError("Missing n_inputs in TCN metadata; cannot load model.")
+        model = TinyTCN(
+            obj.n_inputs,
+            channels=tuple(obj.config.get("channels", (32, 32))),
+            kernel_size=int(obj.config.get("kernel_size", 3)),
+            dropout=float(obj.config.get("dropout", 0.05)),
+        )
+        state_path = p / "model.pt"
+        model.load_state_dict(torch.load(state_path, map_location="cpu"))
+        obj.model = model
+        calib_path = p / "calibrator.joblib"
+        if calib_path.exists():
+            obj.calibrator = joblib.load(calib_path)
+        return obj
+
+
+register_model("tcn", TCNModel)

@@ -38,6 +38,12 @@ env
 # Parquet/data lake (ignore at any depth)
 **/data_lake/
 tests/data_lake/
+release/calibration/latest/live_prob_samples*.parquet
+release/calibration/latest/live_prob_samples*_tagged.parquet
+release/calibration/latest/live_prob_samples_stress*.parquet
+release/calibration/latest/live_prob_hourly*/
+release/calibration/latest/live_prob_hourly_stress*/
+release/calibration/live_recalibration_latest/
 
 # Ignore Python caches everywhere
 **/__pycache__/

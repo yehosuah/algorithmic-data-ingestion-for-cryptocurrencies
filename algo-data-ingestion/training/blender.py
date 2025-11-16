@@ -3,6 +3,7 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union
+import json
 
 import joblib
 import numpy as np
@@ -13,6 +14,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
+from .model_registry import BaseModel, register_model
 from .thresholds import select_prob_threshold
 from .reporting import ensure_kpi_schema, social_signal_audit
 BLENDER_NON_FEAT = {"timestamp", "y_dir", "ret_next", "dt", "symbol", "exchange", "timeframe", "feature_version", "close"}
@@ -577,4 +579,68 @@ def save_blender(out_dir: Path, model: object, feat_cols: List[str], threshold: 
     (out_dir / "blender_features.txt").write_text("\n".join(feat_cols))
     (out_dir / "threshold.txt").write_text(str(float(threshold)))
     sanitized = ensure_kpi_schema(report)
-    (out_dir / "report.json").write_text(__import__("json").dumps(sanitized, indent=2))
+    (out_dir / "report.json").write_text(json.dumps(sanitized, indent=2))
+
+
+class BlenderModel(BaseModel):
+    """
+    Simple blender that trains a logistic regression on base model probabilities.
+    """
+
+    def __init__(self, base_model_names: Optional[List[str]] = None, config: Optional[Dict] = None):
+        self.base_model_names = base_model_names or []
+        self.config = config or {}
+        penalty = self.config.get("penalty", "l2")
+        C = float(self.config.get("C", 1.0))
+        solver = self.config.get("solver", "lbfgs")
+        self.model = Pipeline([
+            ("scaler", StandardScaler()),
+            ("lr", LogisticRegression(max_iter=1000, penalty=penalty, C=C, solver=solver)),
+        ])
+
+    def _stack(self, base_preds: Dict[str, np.ndarray]) -> np.ndarray:
+        used = self.base_model_names or list(base_preds.keys())
+        missing = [m for m in used if m not in base_preds]
+        if missing:
+            raise KeyError(f"Missing base predictions for {missing}")
+        cols = [np.asarray(base_preds[m]).reshape(-1) for m in used]
+        X = np.column_stack(cols)
+        return X
+
+    def fit(self, base_preds: Dict[str, np.ndarray], y_train: np.ndarray):
+        X = self._stack(base_preds)
+        y = np.asarray(y_train).astype(int)
+        mask = np.isfinite(X).all(axis=1) & np.isfinite(y)
+        X_use = X[mask]
+        y_use = y[mask]
+        if len(y_use) == 0:
+            raise ValueError("No valid samples to train BlenderModel; check base predictions coverage.")
+        self.model.fit(X_use, y_use)
+        return self
+
+    def predict_proba(self, base_preds: Dict[str, np.ndarray]):
+        X = self._stack(base_preds)
+        return self.model.predict_proba(X)[:, 1]
+
+    def save(self, path: str) -> None:
+        out_dir = Path(path)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        joblib.dump(self.model, out_dir / "blender.joblib")
+        meta = {
+            "base_model_names": self.base_model_names,
+            "config": self.config,
+        }
+        (out_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+
+    @classmethod
+    def load(cls, path: str):
+        p = Path(path)
+        meta = {}
+        if (p / "meta.json").exists():
+            meta = json.loads((p / "meta.json").read_text())
+        obj = cls(meta.get("base_model_names"), meta.get("config"))
+        obj.model = joblib.load(p / "blender.joblib")
+        return obj
+
+
+register_model("blender", BlenderModel)

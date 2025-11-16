@@ -1,0 +1,81 @@
+columns:
+  timestamp:
+    dtype: datetime64[ns, UTC]
+    role: time
+    tz: UTC
+  dt:
+    dtype: string
+    role: other
+  symbol:
+    dtype: category
+    role: key
+  exchange:
+    dtype: string
+    role: primitive_volume
+  timeframe:
+    dtype: string
+    role: primitive_volume
+  feature_version:
+    dtype: string
+    role: other
+  ret_1:
+    dtype: float64
+    role: derived_feature
+  logret_1:
+    dtype: float64
+    role: derived_feature
+  rvol_5:
+    dtype: float64
+    role: derived_feature
+  rvol_20:
+    dtype: float64
+    role: derived_feature
+  ema_12:
+    dtype: float64
+    role: other
+  ema_26:
+    dtype: float64
+    role: other
+  macd:
+    dtype: float64
+    role: other
+  macd_signal_9:
+    dtype: float64
+    role: other
+  rsi_14:
+    dtype: float64
+    role: other
+  hl_spread:
+    dtype: float64
+    role: other
+  oi_obv:
+    dtype: float64
+    role: other
+  rvol5:
+    dtype: float64
+    role: other
+  rvol20:
+    dtype: float64
+    role: other
+  close:
+    dtype: float64
+    role: primitive_ohlc
+  ret_next:
+    dtype: float64
+    role: other
+  y_dir:
+    dtype: int64
+    role: other
+  sym_btc:
+    dtype: float64
+    role: other
+  sym_eth:
+    dtype: float64
+    role: other
+  sym_sol:
+    dtype: float64
+    role: other
+meta:
+  freq: 1min
+  source: market_multi_3symbol_1m.parquet
+  timestamp_column: timestamp

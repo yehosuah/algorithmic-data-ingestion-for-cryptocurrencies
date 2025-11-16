@@ -1,0 +1,29 @@
+dimensions:
+- name: vol_regime
+  buckets:
+  - 1.9118496969184343e-05
+  - 0.00035496092404814223
+  - 0.000511674550191243
+  - 0.0007492527285795936
+  - 2.8492304637082237
+  column: feat_realized_vol_1h
+- name: liquidity_regime
+  buckets:
+  - 0.0
+  - 713531902.5050161
+  - 2003537835.275989
+  - 2915884298.477187
+  - 6505957610.68574
+  column: feat_turnover_proxy_1h
+- name: spread_regime
+  buckets:
+  - 0.0
+  - 3.4719858881796237
+  - 7.6644726146075115
+  - 99.94330401205313
+  column: feat_spread_bps
+- name: event_flag
+  definition: abs(return) >= 99th percentile
+  column: event_flag
+composite_format: vol{v}_liq{l}_spr{s}_ev{e}
+label_horizon_minutes: 15

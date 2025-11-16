@@ -1,0 +1,74 @@
+labels:
+- name: directional_15m
+  type: directional
+  horizon_minutes: 15
+  stats:
+    type: binary
+    pos_rate: 0.502588585423319
+    count: 1193509
+    entropy: 0.9999806626799743
+  naive_strategy:
+    count: 599844
+    pnl_sum: 12328.23113214525
+    pnl_mean: 0.020552395509741285
+    sharpe_like: 0.004576976731914325
+    hit_rate: 0.6302371950040344
+  base_signal: null
+  edge_threshold: null
+  histogram: reports/label_hist_directional_15m.png
+- name: cost_adjusted_15m
+  type: cost_adjusted
+  horizon_minutes: 15
+  stats:
+    type: binary
+    pos_rate: 0.31675002031823807
+    count: 1193509
+    entropy: 0.9008121450701896
+  naive_strategy:
+    count: 378044
+    pnl_sum: 13058.442544830392
+    pnl_mean: 0.03454212352221009
+    sharpe_like: 0.0061374234655825685
+    hit_rate: 1.0
+  base_signal: null
+  edge_threshold: null
+  histogram: reports/label_hist_cost_adjusted_15m.png
+- name: net_return_15m
+  type: continuous
+  horizon_minutes: 15
+  stats:
+    type: continuous
+    count: 1193479
+    mean: 0.008256550793120283
+    std: 3.2044446513697524
+    p01: -0.009924124816669605
+    p05: -0.005463228195343032
+    p50: -0.000789578798213023
+    p95: 0.0027141540282679057
+    p99: 0.006139792200510735
+  naive_strategy: {}
+  base_signal: null
+  edge_threshold: null
+  histogram: reports/label_hist_net_return_15m.png
+- name: meta_15m_feat_log_return_1m
+  type: meta
+  horizon_minutes: 15
+  stats:
+    type: binary
+    pos_rate: 0.15244459823930948
+    count: 1193509
+    entropy: 0.615924249425048
+  naive_strategy:
+    count: 181944
+    pnl_sum: 10847.623840949094
+    pnl_mean: 0.059620673619075616
+    sharpe_like: 0.007984077540296706
+    hit_rate: 1.0
+  base_signal: feat_log_return_1m
+  edge_threshold: 0.0
+  histogram: reports/label_hist_meta_15m_feat_log_return_1m.png
+primary_label: cost_adjusted_15m
+secondary_labels:
+- directional_15m
+- net_return_15m
+- meta_15m_feat_log_return_1m

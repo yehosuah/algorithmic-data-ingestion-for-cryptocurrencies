@@ -1,6 +1,9 @@
 from __future__ import annotations
+import json
 from pathlib import Path
-from typing import List, Tuple, Optional, Sequence, Dict
+from typing import List, Tuple, Optional, Sequence, Dict, Any
+
+import yaml
 
 import numpy as np
 import pandas as pd
@@ -183,3 +186,73 @@ def ensure_labels(df: pd.DataFrame) -> pd.DataFrame:
     if "timestamp" in out.columns:
         out = out.iloc[:-1].copy()  # drop last unlabeled row
     return out
+
+
+def load_canonical_contract(path: str | Path) -> Dict[str, Any]:
+    """
+    Load the canonical training contract (YAML/JSON) generated in task 7.1.
+    """
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"Contract not found: {p}")
+    text = p.read_text()
+    if p.suffix.lower() in {".json"}:
+        contract = json.loads(text)
+    else:
+        contract = yaml.safe_load(text)
+    contract = contract or {}
+    contract["_contract_path"] = str(p)
+    return contract
+
+
+def _resolve_dataset_path(contract: Dict[str, Any]) -> Path:
+    ds = contract.get("dataset", {}) if isinstance(contract, dict) else {}
+    raw_path = ds.get("path")
+    if raw_path is None:
+        raise KeyError("Dataset path missing in contract under dataset.path")
+    base = Path(contract.get("_contract_path", "")).expanduser()
+    root = base.parent if base.exists() else Path(".")
+    ds_path = Path(raw_path)
+    candidates = []
+    if not ds_path.is_absolute():
+        candidates.append((root / ds_path).resolve())
+        # Also allow relative to project root if contract lives in configs/
+        candidates.append((root.parent / ds_path).resolve())
+        candidates.append(ds_path.resolve())
+    else:
+        candidates.append(ds_path)
+    for c in candidates:
+        if c.exists():
+            return c
+    # Fallback to first candidate for error message
+    return candidates[0] if candidates else ds_path
+
+
+def load_training_dataset(contract: Dict[str, Any]) -> pd.DataFrame:
+    """
+    Load the canonical dataset defined by the contract and attach metadata.
+
+    The returned DataFrame is sorted by timestamp & symbol and exposes
+    feature_cols, label_col and regime_cols via ``df.attrs``.
+    """
+    ds_path = _resolve_dataset_path(contract)
+    df = load_parquet_dataset(ds_path)
+    if "timestamp" in df.columns:
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+    sort_cols = [c for c in ["symbol", "timestamp"] if c in df.columns]
+    if sort_cols:
+        df = df.sort_values(sort_cols).reset_index(drop=True)
+
+    feature_cols = contract.get("features", {}).get("core", []) if isinstance(contract, dict) else []
+    label_col = contract.get("labels", {}).get("primary") if isinstance(contract, dict) else None
+    regime_cols = []
+    for dim in contract.get("regimes", {}).get("dimensions", []):
+        col = dim.get("column")
+        if col:
+            regime_cols.append(col)
+
+    df.attrs["feature_cols"] = feature_cols
+    df.attrs["label_col"] = label_col
+    df.attrs["regime_cols"] = regime_cols
+    df.attrs["contract"] = contract
+    return df

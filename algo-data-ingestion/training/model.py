@@ -12,6 +12,7 @@ from sklearn.metrics import roc_auc_score
 import xgboost as xgb
 
 from .reporting import ensure_kpi_schema
+from .model_registry import BaseModel, register_model
 
 NON_FEAT = {"timestamp","dt","symbol","exchange","timeframe","feature_version","close","ret_next","y_dir"}
 _NON_FEAT_PREFIXES = ("ret_next",)
@@ -109,3 +110,83 @@ def save_artifacts(out_dir: Path, booster: xgb.XGBClassifier, calib: CalibratedC
         },
     }
     (out_dir/"manifest.json").write_text(json.dumps(manifest, indent=2))
+
+
+class XGBModel(BaseModel):
+    """
+    Thin wrapper around the existing XGBoost workflow, suitable for the model registry.
+    """
+
+    def __init__(self, config: Optional[Dict] = None):
+        default_params = {
+            "n_estimators": 500,
+            "max_depth": 5,
+            "learning_rate": 0.05,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "objective": "binary:logistic",
+            "tree_method": "hist",
+            "eval_metric": "logloss",
+        }
+        self.config: Dict = default_params.copy()
+        if config:
+            self.config.update(config)
+        self.model: Optional[xgb.XGBClassifier] = None
+        self.feature_cols: Optional[List[str]] = None
+
+    def fit(self, X_train, y_train, **kwargs):
+        X_df = X_train if isinstance(X_train, pd.DataFrame) else pd.DataFrame(X_train)
+        self.feature_cols = list(X_df.columns)
+        params = self.config.copy()
+
+        model = xgb.XGBClassifier(**params)
+        fit_kwargs: Dict = {"verbose": False}
+        sample_weight = kwargs.get("sample_weight")
+        if sample_weight is not None:
+            fit_kwargs["sample_weight"] = sample_weight
+
+        val_data = kwargs.get("val_data")
+        if val_data is not None:
+            X_val, y_val = val_data
+            fit_kwargs["eval_set"] = [(np.asarray(X_val), np.asarray(y_val))]
+
+        model.fit(X_df.values, np.asarray(y_train), **fit_kwargs)
+        self.model = model
+        return self
+
+    def predict_proba(self, X):
+        if self.model is None:
+            raise RuntimeError("XGBModel not trained; call fit first.")
+        X_df = X if isinstance(X, pd.DataFrame) else pd.DataFrame(X, columns=self.feature_cols)
+        if self.feature_cols:
+            X_df = X_df[self.feature_cols]
+        return self.model.predict_proba(X_df.values)[:, 1]
+
+    def save(self, path: str) -> None:
+        if self.model is None:
+            raise RuntimeError("Cannot save an untrained model.")
+        out_dir = Path(path)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        self.model.get_booster().save_model(str(out_dir / "model.json"))
+        meta = {
+            "config": self.config,
+            "feature_cols": self.feature_cols,
+        }
+        (out_dir / "meta.json").write_text(json.dumps(meta, indent=2))
+
+    @classmethod
+    def load(cls, path: str):
+        p = Path(path)
+        meta = {}
+        if (p / "meta.json").exists():
+            meta = json.loads((p / "meta.json").read_text())
+        obj = cls(meta.get("config", {}))
+        model = xgb.XGBClassifier(**obj.config)
+        model.load_model(str(p / "model.json"))
+        obj.model = model
+        obj.feature_cols = meta.get("feature_cols")
+        return obj
+
+
+# Register the model for downstream scripts
+register_model("xgb", XGBModel)

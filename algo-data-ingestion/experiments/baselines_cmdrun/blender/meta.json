@@ -1,0 +1,6 @@
+{
+  "base_model_names": [
+    "xgb"
+  ],
+  "config": {}
+}

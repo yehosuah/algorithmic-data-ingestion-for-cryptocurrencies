@@ -1,0 +1,324 @@
+features:
+- name: feat_log_return_1m
+  formula: See features.feature_engineering.feat_log_return_1m
+  family: trend
+  type: core
+  stats:
+    missing_rate: 2.51356487175792e-06
+    mean: 9.532826593006919e-07
+    std: 0.020045686775217293
+    skew: -1.9293076359215005
+    p01: -0.002025939490116002
+    p05: -0.0010413008794074585
+    p25: -0.00029457779673336404
+    p50: 0.0
+    p75: 0.00029786770227069326
+    p95: 0.0010406954325894446
+    p99: 0.002025949369128457
+    psi_mean: 0.0002001272170693329
+- name: feat_log_return_5m
+  formula: See features.feature_engineering.feat_log_return_5m
+  family: trend
+  type: core
+  stats:
+    missing_rate: 1.2567824358789601e-05
+    mean: 4.756773889298579e-06
+    std: 0.023748752874552644
+    skew: -5.006087520551913
+    p01: -0.004513890416731456
+    p05: -0.0023151352413769643
+    p25: -0.0006753478590972861
+    p50: 0.0
+    p75: 0.0006924715002476489
+    p95: 0.0023163910357791185
+    p99: 0.004508256858988605
+    psi_mean: 0.00044419876407933456
+- name: feat_log_return_15m
+  formula: See features.feature_engineering.feat_log_return_15m
+  family: trend
+  type: core
+  stats:
+    missing_rate: 3.7703473076368804e-05
+    mean: 1.413723490882219e-05
+    std: 0.032334316664593465
+    skew: -3.325407768552037
+    p01: -0.007830699250179691
+    p05: -0.003954235498398795
+    p25: -0.0011629562276329608
+    p50: 1.0382729664470958e-05
+    p75: 0.0012078054521187376
+    p95: 0.003974015668346807
+    p99: 0.007843008351962213
+    psi_mean: 0.0009255197551312409
+- name: feat_rolling_return_15m
+  formula: See features.feature_engineering.feat_rolling_return_15m
+  family: trend
+  type: core
+  stats:
+    missing_rate: 2.51356487175792e-06
+    mean: 1.4155311940105766e-05
+    std: 0.03233374997584748
+    skew: -3.325467258068119
+    p01: -0.007830619606187384
+    p05: -0.003954184719363596
+    p25: -0.0011629383375328928
+    p50: 1.0404753686188428e-05
+    p75: 0.0012078080429045457
+    p95: 0.003974026738937653
+    p99: 0.00784285105251641
+    psi_mean: 0.0009257066546919535
+- name: feat_rolling_return_1h
+  formula: See features.feature_engineering.feat_rolling_return_1h
+  family: trend
+  type: core
+  stats:
+    missing_rate: 2.51356487175792e-06
+    mean: 5.569039800464025e-05
+    std: 0.04038065964982385
+    skew: -0.35392916366587185
+    p01: -0.016339393230238742
+    p05: -0.007871592194973687
+    p25: -0.002187852924057765
+    p50: 7.228711740836502e-05
+    p75: 0.0023794303207420597
+    p95: 0.007885290531255862
+    p99: 0.016031929454521445
+    psi_mean: 0.0019046803004406608
+- name: feat_realized_vol_15m
+  formula: See features.feature_engineering.feat_realized_vol_15m
+  family: vol
+  type: core
+  stats:
+    missing_rate: 5.02712974351584e-06
+    mean: 0.0007032503504962317
+    std: 0.02061697427134515
+    skew: 184.33004887458497
+    p01: 9.773448653258386e-05
+    p05: 0.00017130395246438106
+    p25: 0.000321920358300773
+    p50: 0.00048047489437851
+    p75: 0.0007243478936161909
+    p95: 0.001335615808450956
+    p99: 0.0021034852330278917
+    psi_mean: 0.0022982142996718718
+- name: feat_realized_vol_1h
+  formula: See features.feature_engineering.feat_realized_vol_1h
+  family: vol
+  type: core
+  stats:
+    missing_rate: 5.02712974351584e-06
+    mean: 0.0007730656245867985
+    std: 0.02018867512537149
+    skew: 127.60507083818288
+    p01: 0.00012948222082552458
+    p05: 0.00020469549200457447
+    p25: 0.00035496092404814223
+    p50: 0.000511674550191243
+    p75: 0.0007492527285795936
+    p95: 0.001319903281697248
+    p99: 0.001969941076803868
+    psi_mean: 0.005666676964057932
+- name: feat_vol_of_vol_1h
+  formula: See features.feature_engineering.feat_vol_of_vol_1h
+  family: vol
+  type: core
+  stats:
+    missing_rate: 1.508138923054752e-05
+    mean: 0.00016393753846247774
+    std: 0.009374034716282408
+    skew: 107.32398486401497
+    p01: 8.184455128488337e-06
+    p05: 1.263132897429284e-05
+    p25: 2.535624186408916e-05
+    p50: 4.389508034245369e-05
+    p75: 8.073887433155168e-05
+    p95: 0.0002006061857700998
+    p99: 0.00039909102242585655
+    psi_mean: 0.0034280291677275085
+- name: feat_spread_bps
+  formula: See features.feature_engineering.feat_spread_bps
+  family: microstructure
+  type: core
+  stats:
+    missing_rate: 0.0
+    mean: 7.213833493782305
+    std: 7.3129253598380455
+    skew: 3.1393110684627086
+    p01: 0.000906305996393557
+    p05: 0.28194441363532174
+    p25: 2.659825582951129
+    p50: 5.266364924791764
+    p75: 9.37939673508573
+    p95: 20.29285712389295
+    p99: 35.26858127120735
+    psi_mean: 0.0013173580663454157
+- name: feat_rolling_volume_15m
+  formula: See features.feature_engineering.feat_rolling_volume_15m
+  family: microstructure
+  type: core
+  stats:
+    missing_rate: 8.378549572526401e-07
+    mean: 1012371.4259996116
+    std: 1710954.8266559283
+    skew: 1.5455537028732975
+    p01: 37.30820479999721
+    p05: 67.74391999999716
+    p25: 173.22806000000037
+    p50: 464.6493699999919
+    p75: 1471101.2448750194
+    p95: 5135836.481084035
+    p99: 5983475.566031624
+    psi_mean: 0.47318672566716335
+- name: feat_turnover_proxy_1h
+  formula: See features.feature_engineering.feat_turnover_proxy_1h
+  family: microstructure
+  type: core
+  stats:
+    missing_rate: 0.0
+    mean: 1925034036.9142241
+    std: 1372691052.627362
+    skew: 0.4799104630344011
+    p01: 19238898.316212703
+    p05: 107484125.16953945
+    p25: 713531902.5050161
+    p50: 2003537835.275989
+    p75: 2915884298.477187
+    p95: 4246410139.9816804
+    p99: 5336625202.13811
+    psi_mean: 2.007454088427188
+- name: feat_relative_strength_vs_basket
+  formula: See features.feature_engineering.feat_relative_strength_vs_basket
+  family: cross_asset
+  type: experimental
+  stats:
+    missing_rate: 0.6260720354178048
+    mean: -3.9802569604659065e-21
+    std: 0.05482872812671568
+    skew: 2.760148747164186e-08
+    p01: -0.0035571937253762796
+    p05: -0.0018856292906070493
+    p25: -0.00060875473439026
+    p50: 1.0066508959738485e-07
+    p75: 0.0006082941661178509
+    p95: 0.001885939219605781
+    p99: 0.0035595160528493486
+    psi_mean: 0.0005904892319313275
+- name: feat_cross_corr_15m
+  formula: See features.feature_engineering.feat_cross_corr_15m
+  family: cross_asset
+  type: core
+  stats:
+    missing_rate: 0.002426427956203646
+    mean: 0.944792569911174
+    std: 0.14206711457954488
+    skew: -3.309329271698639
+    p01: 0.33086292148656843
+    p05: 0.6304245640033078
+    p25: 0.9999999826788768
+    p50: 0.9999999999999808
+    p75: 1.0000000000003542
+    p95: 1.0000000000022242
+    p99: 1.0000000000070877
+    psi_mean: 0.05654238066993763
+- name: feat_vol_bucket_id_raw
+  formula: See features.feature_engineering.feat_vol_bucket_id_raw
+  family: regime
+  type: core
+  stats:
+    missing_rate: 5.02712974351584e-06
+    mean: 0.0007730656245867985
+    std: 0.02018867512537149
+    skew: 127.60507083818288
+    p01: 0.00012948222082552458
+    p05: 0.00020469549200457447
+    p25: 0.00035496092404814223
+    p50: 0.000511674550191243
+    p75: 0.0007492527285795936
+    p95: 0.001319903281697248
+    p99: 0.001969941076803868
+    psi_mean: 0.005666676964057932
+- name: feat_liquidity_metric_raw
+  formula: See features.feature_engineering.feat_liquidity_metric_raw
+  family: regime
+  type: core
+  stats:
+    missing_rate: 8.378549572526401e-07
+    mean: 1012371.4259996116
+    std: 1710954.8266559283
+    skew: 1.5455537028732975
+    p01: 37.30820479999721
+    p05: 67.74391999999716
+    p25: 173.22806000000037
+    p50: 464.6493699999919
+    p75: 1471101.2448750194
+    p95: 5135836.481084035
+    p99: 5983475.566031624
+    psi_mean: 0.47318672566716335
+- name: feat_hour_of_day_sin
+  formula: See features.feature_engineering.feat_hour_of_day_sin
+  family: calendar
+  type: core
+  stats:
+    missing_rate: 0.0
+    mean: 0.00020800278434912763
+    std: 0.7071321740256505
+    skew: -0.0002017704284835886
+    p01: -0.9995335908367129
+    p05: -0.9876883405951377
+    p25: -0.7071067811865475
+    p50: 1.2246467991473532e-16
+    p75: 0.7071067811865476
+    p95: 0.9876883405951378
+    p99: 0.9995335908367129
+    psi_mean: 2.3346135437583186e-05
+- name: feat_hour_of_day_cos
+  formula: See features.feature_engineering.feat_hour_of_day_cos
+  family: calendar
+  type: core
+  stats:
+    missing_rate: 0.0
+    mean: -0.0008622104956673642
+    std: 0.7070814236286089
+    skew: 0.0019807360782961025
+    p01: -0.9995335908367129
+    p05: -0.9876883405951377
+    p25: -0.7071067811865477
+    p50: -1.8369701987210297e-16
+    p75: 0.7071067811865474
+    p95: 0.9876883405951377
+    p99: 0.9995335908367129
+    psi_mean: 2.54475608138596e-05
+- name: feat_day_of_week_sin
+  formula: See features.feature_engineering.feat_day_of_week_sin
+  family: calendar
+  type: core
+  stats:
+    missing_rate: 0.0
+    mean: 0.000523515521019448
+    std: 0.7067696470806769
+    skew: -0.0013531951370321
+    p01: -0.9749279121818236
+    p05: -0.9749279121818236
+    p25: -0.7818314824680299
+    p50: 0.0
+    p75: 0.7818314824680298
+    p95: 0.9749279121818236
+    p99: 0.9749279121818236
+    psi_mean: 0.00047227365911554973
+- name: feat_day_of_week_cos
+  formula: See features.feature_engineering.feat_day_of_week_cos
+  family: calendar
+  type: core
+  stats:
+    missing_rate: 0.0
+    mean: 0.0074019386104682075
+    std: 0.7074054290230506
+    skew: -0.015104384635886215
+    p01: -0.9009688679024191
+    p05: -0.9009688679024191
+    p25: -0.900968867902419
+    p50: -0.22252093395631434
+    p75: 0.6234898018587336
+    p95: 1.0
+    p99: 1.0
+    psi_mean: 9.360833562404787e-05
