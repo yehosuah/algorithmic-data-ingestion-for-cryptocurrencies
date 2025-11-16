@@ -34,6 +34,12 @@ TRADING_POSITION_ACTIVE = Gauge(
     labelnames=("model", "symbol"),
 )
 
+TRADING_DECISION_QUEUE_DEPTH = Gauge(
+    "trading_decision_queue_depth",
+    "Depth of the Redis decision queue consumed by the trading service.",
+    labelnames=("queue",),
+)
+
 
 def record_gate_toggle(model: str, symbol: str, gate_pass: bool) -> None:
     state = "open" if gate_pass else "closed"
@@ -68,3 +74,7 @@ def record_realized_pnl(model: str, symbol: str, pnl: float) -> None:
 
 def set_position_active(model: str, symbol: str, active: bool) -> None:
     TRADING_POSITION_ACTIVE.labels(model=model, symbol=symbol).set(1.0 if active else 0.0)
+
+
+def record_decision_queue_depth(queue: str, depth: int) -> None:
+    TRADING_DECISION_QUEUE_DEPTH.labels(queue=queue).set(max(0, int(depth)))

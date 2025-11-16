@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from redis import asyncio as aioredis
 
 from app.monitoring.trading_metrics import (
+    record_decision_queue_depth,
     record_gate_toggle,
     record_realized_pnl,
     record_trade_attempt,
@@ -178,6 +179,7 @@ class TradingService:
                 f"Failed to connect to Redis decision queue at {self.config.decision_queue_url}"
             ) from exc
         await self._reset_stale_positions()
+        await self._warm_last_processed_ts()
         self._running = True
         self._poll_task = asyncio.create_task(self._poll_loop())
 
@@ -289,6 +291,53 @@ class TradingService:
         except Exception as exc:
             logger.warning("Failed to persist last processed timestamp for %s: %s", state_key, exc)
 
+    async def _clear_last_processed_ts(self, state_key: str) -> None:
+        if not self.config.last_timestamp_hash or self._redis is None:
+            return
+        try:
+            await self._redis.hdel(self.config.last_timestamp_hash, state_key)
+        except Exception as exc:
+            logger.warning("Failed to clear last processed timestamp for %s: %s", state_key, exc)
+
+    async def _warm_last_processed_ts(self) -> None:
+        if not self.config.last_timestamp_hash or self._redis is None:
+            return
+        grace_bars = max(0, int(self.config.last_timestamp_grace_bars))
+        if grace_bars <= 0:
+            return
+        now = datetime.now(timezone.utc)
+        for model_cfg in self.config.trading_models:
+            last_ts = await self._read_last_processed_ts(model_cfg.state_key)
+            if last_ts is None:
+                continue
+            lag_seconds = max(0.0, (now - last_ts).total_seconds())
+            bar_seconds = max(1, model_cfg.bar_seconds)
+            grace_seconds = bar_seconds * grace_bars
+            if lag_seconds < grace_seconds:
+                continue
+            await self._clear_last_processed_ts(model_cfg.state_key)
+            logger.info(
+                "Cleared last processed timestamp for %s after %.0fs downtime (grace=%ss, bars=%d)",
+                model_cfg.state_key,
+                lag_seconds,
+                grace_seconds,
+                grace_bars,
+            )
+
+    async def _record_queue_depth(self) -> None:
+        if self._redis is None:
+            return
+        try:
+            depth = await self._redis.llen(self.config.decision_queue_key)
+        except Exception as exc:
+            logger.debug(
+                "Failed to sample decision queue depth for %s: %s",
+                self.config.decision_queue_key,
+                exc,
+            )
+            return
+        record_decision_queue_depth(self.config.decision_queue_key, int(depth))
+
     async def _filter_stale_decisions(
         self,
         model_cfg: TradingModelConfig,
@@ -331,6 +380,7 @@ class TradingService:
                     continue
             try:
                 assert self._redis is not None
+                await self._record_queue_depth()
                 result = await self._redis.blpop(
                     self.config.decision_queue_key,
                     timeout=timeout,

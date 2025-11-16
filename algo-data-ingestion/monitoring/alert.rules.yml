@@ -90,3 +90,14 @@ groups:
       summary: Blender gate coverage drifted ({{ $labels.model }})
       description: Rolling 24h coverage for the blender gate deviated beyond the calibrated
         ±3pp band. Regenerate OOS matrices and refresh calibration if coverage stays out of range.
+- name: trading
+  rules:
+  - alert: TradingDecisionQueueLag
+    expr: trading_decision_queue_depth{queue="trading:decisions"} > 5
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: Trading decision queue backlog
+      description: |
+        Redis LLEN trading:decisions (>5) stayed elevated for 1m while scheduler_decision_messages_enqueued_total keeps climbing. Scale the trading service or drain the queue before timestamps grow stale.

@@ -23,6 +23,7 @@ from training.infer import (
     predict_base,
     predict_tcn,
 )
+from app.monitoring.probability_sampler import record_probability_samples
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,17 @@ class BaseXGBRunner(BaseRunner):
         frame = df.copy()
         prob_col = self.artifacts.prob_column or "base_prob"
         frame[prob_col] = prob_series
+        try:
+            record_probability_samples(
+                model_label=self.label,
+                prob_column=prob_col,
+                df=frame,
+                prob_series=prob_series,
+                source="ingestion_service",
+                extra={"runner": "base_xgb"},
+            )
+        except Exception:
+            logger.debug("Probability sampling failed for base runner %s", self.label, exc_info=True)
 
         # Prepare payload with manifest gate decision embedded.
         payload = prepare_decision_payload(
@@ -144,6 +156,17 @@ class TCNRunner(BaseRunner):
             raise ValueError("No overlap between feature rows and TCN probabilities")
 
         prob_series = merged[prob_col].astype(float)
+        try:
+            record_probability_samples(
+                model_label=self.label,
+                prob_column=prob_col,
+                df=merged,
+                prob_series=prob_series,
+                source="ingestion_service",
+                extra={"runner": "tcn"},
+            )
+        except Exception:
+            logger.debug("Probability sampling failed for TCN runner %s", self.label, exc_info=True)
         payload = prepare_decision_payload(
             self.label,
             merged,

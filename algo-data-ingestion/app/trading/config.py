@@ -65,7 +65,7 @@ class TradingConfig(BaseSettings):
     decision_queue_url: str = Field("redis://localhost:6379/0", alias="DECISION_QUEUE_URL")
     decision_queue_key: str = Field("trading:decisions", alias="DECISION_QUEUE_KEY")
     last_timestamp_hash: str = Field("trading:last_processed_ts", alias="TRADING_LAST_TS_HASH")
-    redis_poll_timeout: int = Field(5, alias="TRADING_QUEUE_POLL_TIMEOUT")
+    redis_poll_timeout: int = Field(1, alias="TRADING_QUEUE_POLL_TIMEOUT")
     dry_run: bool = Field(True, alias="TRADING_DRY_RUN")
     models_root: Path = Field(Path("models"), alias="MODELS_ROOT")
     state_path: Path = Field(Path("data_lake/trading/state.json"), alias="TRADING_STATE_PATH")
@@ -85,6 +85,7 @@ class TradingConfig(BaseSettings):
     metrics_port: int = Field(9010, alias="TRADING_METRICS_PORT")
     trading_models: List[TradingModelConfig] = Field(default_factory=list, alias="TRADING_MODELS")
     log_level: str = Field("INFO", alias="TRADING_LOG_LEVEL")
+    last_timestamp_grace_bars: int = Field(3, alias="TRADING_LAST_TS_GRACE_BARS", ge=0)
 
     model_config = SettingsConfigDict(
         env_file=".env",

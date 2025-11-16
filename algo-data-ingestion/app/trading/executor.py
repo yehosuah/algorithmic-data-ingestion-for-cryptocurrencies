@@ -67,6 +67,35 @@ class OrderExecutor:
         bid = float(ticker.get("bid") or 0.0)
         ask = float(ticker.get("ask") or 0.0)
         if bid <= 0 or ask <= 0:
+            # Fallback to the freshest order book snapshot when the ticker
+            # payload drops bid/ask (common on sandbox endpoints).
+            try:
+                order_book = await adapter.fetch_order_book(symbol, limit=5)
+            except Exception:
+                order_book = None
+            if order_book is not None:
+                best_bid = 0.0
+                best_ask = 0.0
+                for row in order_book.itertuples(index=False):
+                    side = getattr(row, "side", "").lower()
+                    price = float(getattr(row, "price", 0.0) or 0.0)
+                    if price <= 0:
+                        continue
+                    if side == "bid":
+                        best_bid = max(best_bid, price)
+                    elif side == "ask":
+                        if best_ask == 0.0 or price < best_ask:
+                            best_ask = price
+                if best_bid > 0 and best_ask > 0 and best_bid < best_ask:
+                    logger.debug(
+                        "Recovered bid/ask for %s %s via order book fallback (%.6f/%.6f)",
+                        exchange,
+                        symbol,
+                        best_bid,
+                        best_ask,
+                    )
+                    bid, ask = best_bid, best_ask
+        if bid <= 0 or ask <= 0:
             return OrderDecision(
                 executed=False,
                 reason="invalid_bid_ask",

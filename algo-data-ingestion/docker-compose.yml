@@ -113,9 +113,9 @@ services:
       - DECISION_QUEUE_KEY=trading:decisions
       - INFER_DEFAULT_STRIDE=2
       - INFER_JOBS=[
-          {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":1440,"history_minutes":2880,"base_model":"base_xgb_cost_spread","tcn_model":"tcn_h120_calmon_relaxed","blender_model":"blender_h120_v6","stride":2,"include_features":false,"queue_key":"trading:decisions","cron":"*/1 * * * *"},
-          {"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":1440,"history_minutes":2880,"base_model":"base_xgb_cost_spread","tcn_model":"tcn_h120_calmon_relaxed","blender_model":"blender_h120_v6","stride":2,"include_features":false,"queue_key":"trading:decisions","cron":"*/1 * * * *"},
-          {"exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":1440,"history_minutes":2880,"base_model":"base_xgb_cost_spread","tcn_model":"tcn_h120_calmon_relaxed","blender_model":"blender_h120_v6","stride":2,"include_features":false,"queue_key":"trading:decisions","cron":"*/1 * * * *"}
+          {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":1440,"history_minutes":2880,"base_model":"base_xgb_cost_spread","tcn_model":"tcn_h120_calmon_relaxed","blender_model":"blender_h120_v6","stride":2,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *"},
+          {"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":1440,"history_minutes":2880,"base_model":"base_xgb_cost_spread","tcn_model":"tcn_h120_calmon_relaxed","blender_model":"blender_h120_v6","stride":2,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *"},
+          {"exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":1440,"history_minutes":2880,"base_model":"base_xgb_cost_spread","tcn_model":"tcn_h120_calmon_relaxed","blender_model":"blender_h120_v6","stride":2,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *"}
         ]
       - MARKET_JOBS=[
           {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":240,"cron":"*/5 * * * *"},

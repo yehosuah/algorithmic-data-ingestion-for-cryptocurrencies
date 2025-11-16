@@ -42,6 +42,7 @@ from training.infer import (
 from training.calibration_store import load_calibrator, LoadedCalibrator
 from training.calibration_utils import apply_posthoc_calibration
 from app.monitoring.model_metrics import observe_gate_coverage, record_gate_coverage_sample
+from app.monitoring.probability_sampler import record_probability_samples
 from collections import defaultdict
 
 _MODEL_SYMBOL_COVERAGE: Dict[str, Dict[str, float]] = defaultdict(dict)
@@ -114,6 +115,7 @@ MODELS_ROOT: Path = Path(os.getenv("MODELS_ROOT", "models")).expanduser().resolv
 DATA_LAKE_ROOT: Path = Path(os.getenv("DATA_LAKE_ROOT", "/app/data_lake/market")).expanduser().resolve()
 DECISION_QUEUE_URL: str = os.getenv("DECISION_QUEUE_URL") or os.getenv("REDIS_URL", "redis://redis:6379/0")
 DECISION_QUEUE_KEY: str = os.getenv("DECISION_QUEUE_KEY", "trading:decisions")
+DEFAULT_DECISION_PAYLOAD_ITEMS: int = max(1, int(os.getenv("DECISION_PAYLOAD_ITEMS", "3")))
 DEFAULT_INFER_STRIDE: int = max(1, int(os.getenv("INFER_DEFAULT_STRIDE", "30")))
 DEFAULT_HISTORY_MARGIN_MIN: int = max(0, int(os.getenv("INFER_HISTORY_MARGIN_MIN", "120")))
 
@@ -238,6 +240,7 @@ class InferenceJob:
     blender_path: Optional[str]
     stride: int
     include_features: bool
+    max_decision_items: int
     queue_url: str
     queue_key: str
     cron: str
@@ -276,6 +279,20 @@ def _parse_inference_jobs(raw: str) -> List[InferenceJob]:
         history_minutes = int(history_raw) if history_raw not in (None, "", "None") else 0
         stride = max(1, int(entry.get("stride", DEFAULT_INFER_STRIDE)))
         include_features = _coerce_bool(entry.get("include_features", False))
+        raw_max_items = entry.get("max_decision_items")
+        if raw_max_items in (None, "", "None"):
+            max_decision_items = DEFAULT_DECISION_PAYLOAD_ITEMS
+        else:
+            try:
+                max_decision_items = max(1, int(raw_max_items))
+            except (TypeError, ValueError):
+                log.warning(
+                    "INFER_JOBS[%d] has invalid max_decision_items=%r; defaulting to %d",
+                    idx,
+                    raw_max_items,
+                    DEFAULT_DECISION_PAYLOAD_ITEMS,
+                )
+                max_decision_items = DEFAULT_DECISION_PAYLOAD_ITEMS
 
         base_model = str(entry.get("base_model") or "").strip() or None
         base_path = str(entry.get("base_path") or "").strip() or (base_model or None)
@@ -318,6 +335,7 @@ def _parse_inference_jobs(raw: str) -> List[InferenceJob]:
                 blender_path=blender_path,
                 stride=stride,
                 include_features=include_features,
+                max_decision_items=max_decision_items,
                 queue_url=queue_url,
                 queue_key=queue_key,
                 cron=cron_expr,
@@ -556,7 +574,20 @@ async def _enqueue_payload(job: InferenceJob, payload: Dict[str, Any], now: date
         missing_ts,
         min_ts_str,
     )
-    if not new_items:
+    limit = max(1, int(job.max_decision_items or DEFAULT_DECISION_PAYLOAD_ITEMS))
+    selected_items = new_items[-limit:] if new_items else []
+    selected_count = len(selected_items)
+    trimmed = new_count - selected_count
+    if trimmed > 0:
+        log.debug(
+            "Trimming %d decision(s) for job=%s model=%s limit=%d new_items=%d",
+            trimmed,
+            job.job_id,
+            model_label,
+            limit,
+            new_count,
+        )
+    if not selected_items:
         return 0
 
     client = _get_queue_client(job.queue_url)
@@ -565,7 +596,7 @@ async def _enqueue_payload(job: InferenceJob, payload: Dict[str, Any], now: date
     artifact_dir = payload.get("artifact_dir")
 
     messages: List[str] = []
-    for item in new_items:
+    for item in selected_items:
         ts = pd.to_datetime(item.get("timestamp"), utc=True, errors="coerce")
         if ts is pd.NaT:
             continue
@@ -594,7 +625,7 @@ async def _enqueue_payload(job: InferenceJob, payload: Dict[str, Any], now: date
             "enqueue_stats_no_messages job=%s model=%s new_items=%d dropped_ts=%d",
             job.job_id,
             model_label,
-            new_count,
+            selected_count,
             missing_ts,
         )
         return 0
@@ -770,6 +801,20 @@ def _run_inference_sync(job: InferenceJob, now: datetime) -> List[Dict[str, Any]
         prob_col = artifacts.prob_column or "base_prob"
         working = working.copy()
         working[prob_col] = prob_series
+        try:
+            record_probability_samples(
+                model_label=job.base_model or artifacts.model_label,
+                prob_column=prob_col,
+                df=working,
+                prob_series=prob_series,
+                source="scheduler",
+                symbol=job.symbol,
+                timeframe=job.timeframe,
+                job_id=job.job_id,
+                extra={"exchange": job.exchange, "model_kind": "base"},
+            )
+        except Exception:
+            log.debug("Probability sampling failed for base model %s", job.base_model, exc_info=True)
         base_payload = prepare_decision_payload(
             job.base_model,
             working,
@@ -841,6 +886,20 @@ def _run_inference_sync(job: InferenceJob, now: datetime) -> List[Dict[str, Any]
                 if prob_col != "tcn_prob" and "tcn_prob" in merged.columns and prob_col not in merged.columns:
                     merged[prob_col] = merged["tcn_prob"]
                 prob_series_tcn = merged[prob_col].astype(float)
+                try:
+                    record_probability_samples(
+                        model_label=job.tcn_model or artifacts_tcn.model_label,
+                        prob_column=prob_col,
+                        df=merged,
+                        prob_series=prob_series_tcn,
+                        source="scheduler",
+                        symbol=job.symbol,
+                        timeframe=job.timeframe,
+                        job_id=job.job_id,
+                        extra={"exchange": job.exchange, "model_kind": "tcn", "stride": job.stride},
+                    )
+                except Exception:
+                    log.debug("Probability sampling failed for TCN model %s", job.tcn_model, exc_info=True)
                 tcn_payload = prepare_decision_payload(
                     job.tcn_model,
                     merged,
