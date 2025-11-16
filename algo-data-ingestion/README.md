@@ -1,8 +1,8 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-11-13 04:43 UTC_
+_Last updated: 2025-11-16 05:43 UTC_
 
-> Update 2025-11-13: Folded in the multi-symbol training feed + sanitizers, documented the new parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`, `compute_symbol_gate_config.py`), and wired those instructions into the docker stack so the scheduler/trading loop enforces the same symbol-aware gates as the manifests.
+> Update 2025-11-16: Wired probability sampling into the scheduler/ingestion paths, added the distribution audit + recalibration workflow (`scripts/probability_distribution_audit.py`, refreshed `refresh_calibration.py`), capped enqueued decisions per job (`DECISION_PAYLOAD_ITEMS`/`max_decision_items`) with a queue-depth gauge, and added a restart grace (`TRADING_LAST_TS_GRACE_BARS`) so trading clears stale timestamps after downtime.
 
 End-to-end ingestion for **market**, **on-chain**, **social**, and **news** data with a Redis feature store, admin backfills/TTL sweeps, a scheduler, and monitoring (Prometheus + Grafana).
 
@@ -74,6 +74,9 @@ Each payload carries manifest metadata, side, and probability, so the trading wo
 - Apply min-hold and stale-position guards per `TRADING_MODELS`, using spread checks before routing orders with the CCXT adapter. Set `TRADING_DRY_RUN=0` when moving to live execution.
 - Persist per-symbol state with the configured backend (`file`, `redis`, `postgres`) and mirror audit events (`gate_toggle`, `trade`) to Redis streams or Postgres tables.
 - Expose Prometheus counters/gauges (`trading_trade_attempts_total`, `trading_trade_notional_total`, `trading_gate_toggles_total`, `trading_position_active`, `trading_realized_pnl_total`) on `TRADING_METRICS_PORT` (default 9010).
+- Trim per-job decision payloads to the freshest `DECISION_PAYLOAD_ITEMS` (default 3; override per job with `max_decision_items`) so Redis does not accumulate stale signals; monitor `trading_decision_queue_depth{queue="trading:decisions"}` to ensure the consumer keeps up.
+
+Trading also clears stale dedupe timestamps after restarts when downtime exceeds `TRADING_LAST_TS_GRACE_BARS` bars (default 3) so fresh decisions are not dropped due to old state; increase the grace if using long bar intervals.
 
 > Tip: Let `scheduler` and `trading` run for at least an hour during rehearsals without restarting them—the extra runway keeps the `rvol_20` rolling window stable and gives `trading_trade_attempts_total` / `trading_gate_toggles_total` time to move off zero. Capture start/end counter values in your dry-run log.
 
@@ -255,6 +258,7 @@ NEWS_API_KEY=
 - `MARKET_JOBS` e.g.  
   `[{"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":15,"cron":"*/5 * * * *"}]`
 - `TTL_SWEEP_CRON`, `TTL_SWEEP_PATTERN`, `TTL_SWEEP_TTL`
+- `DECISION_PAYLOAD_ITEMS` caps the number of decision payloads pushed per job run (default 3); override per job with `max_decision_items` inside `INFER_JOBS` when queues get noisy.
 
 **Metrics**
 - Exposed on port `9002` (host-mapped in compose):  
@@ -302,6 +306,47 @@ Common metrics:
 - Scheduler: APScheduler & process metrics on `:9002`
 - Redis: via redis_exporter
 - Model gates: `model_gate_coverage_ratio{model,mode}`, `model_rss_minute_spike_share`, and `model_probability_sigma` expose manifest coverage, RSS health, and probability variance; matching `*_threshold` gauges set from manifests so Prometheus alerts (`monitoring/alert.rules.yml`) fire when coverage or sigma fall below guardrails.
+- Trading queue health: `trading_decision_queue_depth{queue="trading:decisions"}` alarms when scheduler producers outpace the consumer—tune `DECISION_PAYLOAD_ITEMS`/`max_decision_items` or `TRADING_QUEUE_POLL_TIMEOUT` accordingly.
+
+### Probability Distribution Debugging
+- `app.monitoring.probability_sampler` captures pre-gate probability samples for every scheduler/API batch and appends them to `logs/probability_samples/<model>_<prob>.jsonl`.  
+  Configure via:
+  - `PROB_SAMPLE_ENABLED` (default `1`)
+  - `PROB_SAMPLE_ROOT` (default `logs/probability_samples`)
+  - `PROB_SAMPLE_MAX_ROWS` (bounded rows per batch, default `512`)
+  - `PROB_SAMPLE_REDIS_URL`, `PROB_SAMPLE_REDIS_STREAM`, `PROB_SAMPLE_REDIS_MAXLEN` when the feed should also mirror into Redis Streams.
+- Build a rolling drift baseline and stratified KPIs from the live sampler (versus training logits and the last N days of live data):
+  ```bash
+  python3 scripts/probability_distribution_audit.py \
+    --samples logs/probability_samples \
+    --fold-logits models/base_xgb_h120_calmon_spread0/fold_logits.parquet \
+    --fold-column prob_calibrated \
+    --features /tmp/features_debug.parquet \
+    --out-parquet release/calibration/latest/live_prob_samples.parquet \
+    --hourly-dir release/calibration/latest/live_prob_hourly \
+    --summary-out release/calibration/latest/distribution_audit.json
+  ```
+  The script tags each sample with session/regime/symbol buckets, emits KS/PSI/Wasserstein + collapse/saturation flags, and can also generate stress digests (e.g., `distribution_audit_stress.json`) when fed perturbed slices.
+- Plot live vs training distributions (fold logits) and drop the summaries into `release/calibration/latest/`:
+  ```bash
+  python3 scripts/plot_probability_distributions.py \
+    --samples logs/probability_samples/tcn_h120_calmon_relaxed_tcn_prob.jsonl \
+    --model-dir models/tcn_h120_calmon_relaxed \
+    --prob-column tcn_prob \
+    --out release/calibration/latest/live_vs_fold_tcn_prob.png \
+    --summary-out release/calibration/latest/live_vs_fold_tcn_prob.json
+  ```
+- Re-run calibrators on a fresh feature slice to ensure probability sigma hasn't collapsed:
+  ```bash
+  python3 scripts/run_calibrator_check.py \
+    --live /tmp/features_debug.parquet \
+    --base-model models/base_xgb_h120_calmon_spread0 \
+    --tcn-model models/tcn_h120_calmon_relaxed \
+    --tcn-stride 2 \
+    --summary-out release/calibration/latest/calibrator_health.json
+  ```
+  The JSON reports mean/std/quantiles for calibrated and uncalibrated probabilities; alert when the observed σ falls below the manifest's `prob_sigma_guardrail`.
+  Use `scripts/refresh_calibration.py` to re-fit calibrators on live slices—the script now re-scores the raw booster before fitting to avoid double-scaling clipped probabilities.
 
 ---
 
