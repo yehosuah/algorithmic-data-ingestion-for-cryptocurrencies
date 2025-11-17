@@ -13,6 +13,8 @@ import torch.optim as optim
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
 from .model_registry import BaseModel, register_model
+from .metrics import equity_curve, summary_stats
+from .thresholds import select_prob_threshold
 
 
 class Chomp1d(nn.Module):
@@ -90,6 +92,11 @@ class TrainConfig:
     weight_decay: float = 1e-4
     batch_size: int = 256
     class_weight: Optional[float] = None  # weight for positive class
+    early_stopping_patience: int = 5
+    max_grad_norm: float = 1.0
+    cost_bps: float = 5.0
+    long_only: bool = False
+    min_hold_bars: int = 1
 
 
 def train_tcn(
@@ -97,6 +104,7 @@ def train_tcn(
     y: np.ndarray,
     *,
     val: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    val_returns: Optional[np.ndarray] = None,
     kernel_size: int = 3,
     channels: Tuple[int, int] = (32, 32),
     dropout: float = 0.05,
@@ -124,6 +132,9 @@ def train_tcn(
             yield xb, yb
 
     model.train()
+    best_metric = -np.inf
+    best_state = None
+    patience = 0
     for epoch in range(config.epochs):
         perm = np.random.permutation(len(y))
         Xp, yp = X[perm], y[perm]
@@ -133,15 +144,56 @@ def train_tcn(
             logits = model(xb).view(-1)
             loss = loss_fn(logits, yb)
             loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            if config.max_grad_norm and config.max_grad_norm > 0:
+                nn.utils.clip_grad_norm_(model.parameters(), float(config.max_grad_norm))
             opt.step()
             total += float(loss.detach().cpu().item()) * len(yb)
         avg_loss = total / max(1, len(y))
+        monitor_metric = -avg_loss
+        if val is not None:
+            Xv, yv = val
+            with torch.no_grad():
+                logits_val_tmp = model(torch.tensor(Xv, dtype=torch.float32, device=device)).view(-1).cpu().numpy()
+            prob_val = 1.0 / (1.0 + np.exp(-np.clip(logits_val_tmp, -20, 20)))
+            returns = val_returns if val_returns is not None else np.where(yv > 0.5, 1.0, -1.0)
+            prob_series = pd.Series(prob_val, index=np.arange(len(prob_val)))
+            ret_series = pd.Series(returns, index=np.arange(len(prob_val)))
+            thr, _ = select_prob_threshold(
+                ret_series,
+                prob_series,
+                cost_bps=config.cost_bps,
+                long_only=config.long_only,
+                min_hold_bars=config.min_hold_bars,
+            )
+            eq = equity_curve(
+                ret_series,
+                prob_series,
+                threshold=thr,
+                cost_bps=config.cost_bps,
+                long_only=config.long_only,
+                min_hold_bars=config.min_hold_bars,
+            )
+            stats = summary_stats(eq)
+            monitor_metric = stats.get("sharpe", monitor_metric)
+
+        if monitor_metric > best_metric:
+            best_metric = monitor_metric
+            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+            patience = 0
+        else:
+            patience += 1
+
         if progress_cb is not None:
             try:
                 progress_cb(epoch + 1, float(avg_loss))
             except Exception:
                 pass
+
+        if config.early_stopping_patience and patience >= int(config.early_stopping_patience):
+            break
+
+    if best_state is not None:
+        model.load_state_dict(best_state)
 
     model.eval()
     with torch.no_grad():
@@ -206,6 +258,11 @@ class TCNModel(BaseModel):
             "weight_decay": 1e-4,
             "class_weight": None,
             "calibration_method": "isotonic",
+            "early_stopping_patience": 5,
+            "max_grad_norm": 1.0,
+            "cost_bps": 5.0,
+            "long_only": False,
+            "min_hold_bars": 1,
         }
         if config:
             cfg.update(config)
@@ -244,11 +301,17 @@ class TCNModel(BaseModel):
             batch_size=int(self.config.get("batch_size", 256)),
             weight_decay=float(self.config.get("weight_decay", 1e-4)),
             class_weight=self.config.get("class_weight"),
+            early_stopping_patience=int(self.config.get("early_stopping_patience", 5)),
+            max_grad_norm=float(self.config.get("max_grad_norm", 1.0)),
+            cost_bps=float(self.config.get("cost_bps", 5.0)),
+            long_only=bool(self.config.get("long_only", False)),
+            min_hold_bars=int(self.config.get("min_hold_bars", 1)),
         )
         model, logits_train, logits_val = train_tcn(
             X_arr,
             y_arr,
             val=val_tuple,
+            val_returns=kwargs.get("val_returns"),
             kernel_size=int(self.config.get("kernel_size", 3)),
             channels=tuple(self.config.get("channels", (32, 32))),
             dropout=float(self.config.get("dropout", 0.05)),

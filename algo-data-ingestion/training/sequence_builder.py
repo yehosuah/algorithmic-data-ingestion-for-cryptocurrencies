@@ -15,6 +15,7 @@ def build_sequences(
     *,
     group_col: str = "symbol",
     return_index: bool = False,
+    stride: int = 1,
 ) -> Tuple[np.ndarray, np.ndarray] | Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Create leak-free sequences (X_seq, y) grouped by symbol.
@@ -26,6 +27,7 @@ def build_sequences(
         raise ValueError("seq_len must be >= 1")
     if horizon < 0:
         raise ValueError("horizon must be >= 0")
+    stride = max(1, int(stride))
     missing = [c for c in feature_cols if c not in df.columns]
     if missing:
         raise KeyError(f"Missing feature columns for sequence build: {missing}")
@@ -50,7 +52,7 @@ def build_sequences(
         limit = n - seq_len - horizon + 1
         if limit <= 0:
             continue
-        for start in range(limit):
+        for start in range(0, limit, stride):
             end = start + seq_len
             target = end - 1 + horizon
             X_buf.append(feats[start:end])

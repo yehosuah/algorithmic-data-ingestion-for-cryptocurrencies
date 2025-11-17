@@ -1,0 +1,7 @@
+n_splits: 2
+train_window: null
+val_window: "15D"
+min_gap: "1D"
+test_window: null
+step: null
+expanding: true

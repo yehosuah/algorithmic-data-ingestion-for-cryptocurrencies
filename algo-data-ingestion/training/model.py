@@ -50,6 +50,10 @@ def train_xgb(
         "objective": "binary:logistic",
         "tree_method": "hist",
         "eval_metric": "logloss",
+        "min_child_weight": 1.0,
+        "gamma": 0.0,
+        "reg_lambda": 1.0,
+        "reg_alpha": 0.0,
     }
     if params is None:
         params = default_params
@@ -66,7 +70,7 @@ def train_xgb(
     if X_val is not None and y_val is not None and len(X_val) > 0:
         fit_kwargs["eval_set"] = [(X_val.values, y_val.values)]
         if early_stopping_rounds and early_stopping_rounds > 0:
-            print("[XGB] Warning: early stopping not supported for current xgboost.sklearn wrapper; ignoring.")
+            fit_kwargs["early_stopping_rounds"] = int(early_stopping_rounds)
 
     model.fit(X.values, y.values, **fit_kwargs)
     return model
@@ -127,6 +131,11 @@ class XGBModel(BaseModel):
             "objective": "binary:logistic",
             "tree_method": "hist",
             "eval_metric": "logloss",
+            "min_child_weight": 1.0,
+            "gamma": 0.0,
+            "reg_lambda": 1.0,
+            "reg_alpha": 0.0,
+            "early_stopping_rounds": None,
         }
         self.config: Dict = default_params.copy()
         if config:
@@ -149,6 +158,7 @@ class XGBModel(BaseModel):
         if val_data is not None:
             X_val, y_val = val_data
             fit_kwargs["eval_set"] = [(np.asarray(X_val), np.asarray(y_val))]
+            # early_stopping_rounds can be provided via model params; avoid duplicate kwarg
 
         model.fit(X_df.values, np.asarray(y_train), **fit_kwargs)
         self.model = model

@@ -46,6 +46,7 @@ def main(argv: List[str] | None = None) -> int:
     ap.add_argument("--blenders", nargs="+", default=["blender", "stacking_meta", "regime_blender"])
     ap.add_argument("--output_dir", default="experiments/blenders/")
     ap.add_argument("--seq_len", type=int, default=32)
+    ap.add_argument("--seq_stride", type=int, default=1)
     ap.add_argument("--horizon", type=int, default=1)
     ap.add_argument("--test_size", type=float, default=0.2)
     ap.add_argument("--n_folds", type=int, default=4)
@@ -63,6 +64,7 @@ def main(argv: List[str] | None = None) -> int:
     bundle = prepare_canonical_data(
         args.contract,
         seq_len=args.seq_len,
+        seq_stride=args.seq_stride,
         horizon=args.horizon,
         test_size=args.test_size,
     )

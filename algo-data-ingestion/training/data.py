@@ -215,9 +215,9 @@ def _resolve_dataset_path(contract: Dict[str, Any]) -> Path:
     ds_path = Path(raw_path)
     candidates = []
     if not ds_path.is_absolute():
-        candidates.append((root / ds_path).resolve())
-        # Also allow relative to project root if contract lives in configs/
+        # Prefer project-root relative (e.g., data/...) even if contract is under configs/
         candidates.append((root.parent / ds_path).resolve())
+        candidates.append((root / ds_path).resolve())
         candidates.append(ds_path.resolve())
     else:
         candidates.append(ds_path)

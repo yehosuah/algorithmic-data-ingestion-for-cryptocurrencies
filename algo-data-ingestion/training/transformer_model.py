@@ -6,12 +6,17 @@ from typing import Dict, Optional
 
 import joblib
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
 from .model_registry import BaseModel, register_model
 from .tcn_model import calibrate_logits
+from .thresholds import select_prob_threshold
+from .metrics import equity_curve, summary_stats
+from .metrics import equity_curve, summary_stats
+from .thresholds import select_prob_threshold
 
 
 class PositionalEncoding(nn.Module):
@@ -91,6 +96,11 @@ class TransformerModel(BaseModel):
             "weight_decay": 1e-4,
             "pooling": "mean",
             "calibration_method": "isotonic",
+            "early_stopping_patience": 3,
+            "cost_bps": 5.0,
+            "long_only": False,
+            "min_hold_bars": 1,
+            "max_grad_norm": 1.0,
         }
         if config:
             cfg.update(config)
@@ -114,6 +124,15 @@ class TransformerModel(BaseModel):
         y_arr = np.asarray(y_train).astype(float)
         self.n_features = X_arr.shape[2]
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        val_returns = kwargs.get("val_returns")
+        val_data = kwargs.get("val_data")
+        val_tuple = None
+        y_val_arr = None
+        if val_data is not None:
+            X_val, y_val = val_data
+            X_val_arr = np.asarray(X_val, dtype=float)
+            y_val_arr = np.asarray(y_val).astype(float)
+            val_tuple = (X_val_arr, y_val_arr)
         self.model = TransformerClassifier(
             n_features=self.n_features,
             d_model=int(self.config.get("d_model", 64)),
@@ -131,10 +150,16 @@ class TransformerModel(BaseModel):
         )
         loss_fn = nn.BCEWithLogitsLoss()
 
+        max_epochs = int(self.config.get("epochs", 5))
+        patience = int(self.config.get("early_stopping_patience", 0) or 0)
+        best_metric = -np.inf
+        best_state = None
+        patience_ctr = 0
         self.model.train()
-        for _ in range(int(self.config.get("epochs", 5))):
+        for epoch in range(max_epochs):
             perm = np.random.permutation(len(y_arr))
             Xp, yp = X_arr[perm], y_arr[perm]
+            total_loss = 0.0
             for xb, yb in self._iter_batches(Xp, yp):
                 xb = xb.to(device)
                 yb = yb.to(device)
@@ -142,20 +167,58 @@ class TransformerModel(BaseModel):
                 logits = self.model(xb)
                 loss = loss_fn(logits, yb)
                 loss.backward()
-                nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                max_norm = float(self.config.get("max_grad_norm", 1.0) or 0.0)
+                if max_norm > 0:
+                    nn.utils.clip_grad_norm_(self.model.parameters(), max_norm)
                 opt.step()
+                total_loss += float(loss.detach().cpu().item()) * len(yb)
+
+            avg_loss = total_loss / max(1, len(y_arr))
+            monitor_metric = -avg_loss
+            if val_tuple is not None:
+                Xv_arr, yv_arr = val_tuple
+                with torch.no_grad():
+                    logits_val_tmp = self.model(torch.tensor(Xv_arr, dtype=torch.float32, device=device)).cpu().numpy()
+                prob_val = 1.0 / (1.0 + np.exp(-np.clip(logits_val_tmp, -20, 20)))
+                returns = val_returns if val_returns is not None else np.where(yv_arr > 0.5, 1.0, -1.0)
+                prob_series = pd.Series(prob_val, index=np.arange(len(prob_val)))
+                ret_series = pd.Series(returns, index=np.arange(len(prob_val)))
+                thr, _ = select_prob_threshold(
+                    ret_series,
+                    prob_series,
+                    cost_bps=float(self.config.get("cost_bps", 5.0)),
+                    long_only=bool(self.config.get("long_only", False)),
+                    min_hold_bars=int(self.config.get("min_hold_bars", 1)),
+                )
+                eq = equity_curve(
+                    ret_series,
+                    prob_series,
+                    threshold=thr,
+                    cost_bps=float(self.config.get("cost_bps", 5.0)),
+                    long_only=bool(self.config.get("long_only", False)),
+                    min_hold_bars=int(self.config.get("min_hold_bars", 1)),
+                )
+                stats = summary_stats(eq)
+                monitor_metric = stats.get("sharpe", monitor_metric)
+
+            if monitor_metric > best_metric:
+                best_metric = monitor_metric
+                best_state = {k: v.detach().cpu().clone() for k, v in self.model.state_dict().items()}
+                patience_ctr = 0
+            else:
+                patience_ctr += 1
+
+            if patience and patience_ctr >= patience:
+                break
+        if best_state is not None:
+            self.model.load_state_dict(best_state)
 
         self.model.eval()
         with torch.no_grad():
             logits_train = self.model(torch.tensor(X_arr, dtype=torch.float32, device=device)).cpu().numpy()
-            val_data = kwargs.get("val_data")
             logits_val = None
-            y_val_arr = None
-            if val_data is not None:
-                Xv, yv = val_data
-                Xv_arr = np.asarray(Xv, dtype=float)
-                y_val_arr = np.asarray(yv).astype(float)
-                logits_val = self.model(torch.tensor(Xv_arr, dtype=torch.float32, device=device)).cpu().numpy()
+            if val_tuple is not None:
+                logits_val = self.model(torch.tensor(val_tuple[0], dtype=torch.float32, device=device)).cpu().numpy()
         if logits_val is not None and y_val_arr is not None:
             self.calibrator = calibrate_logits(logits_val, y_val_arr, method=self.config.get("calibration_method", "isotonic"))
         elif logits_train is not None:

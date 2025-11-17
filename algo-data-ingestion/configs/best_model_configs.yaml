@@ -1,0 +1,45 @@
+tcn:
+  best_config_id: tcn_trial_011
+  params:
+    batch_size: 128
+    channels: 32,32
+    dropout: 0.05
+    early_stopping_patience: 20
+    epochs: 20
+    horizon: 2
+    kernel_size: 3
+    lr: 0.0003
+    max_grad_norm: 0.5
+    seq_len: 48
+    seq_stride: 10
+    weight_decay: 0.001
+transformer:
+  best_config_id: transformer_trial_023
+  params:
+    batch_size: 64
+    d_model: 256
+    dim_feedforward: 256
+    dropout: 0.2
+    early_stopping_patience: 2
+    epochs: 8
+    horizon: 1
+    lr: 0.0003
+    max_grad_norm: 2.0
+    nhead: 2
+    num_layers: 1
+    seq_len: 64
+    seq_stride: 10
+    weight_decay: 0.0
+xgb:
+  best_config_id: xgb_trial_010
+  params:
+    colsample_bytree: 0.6
+    early_stopping_rounds: 100
+    gamma: 0.5
+    learning_rate: 0.01
+    max_depth: 3
+    min_child_weight: 3.0
+    n_estimators: 50
+    reg_alpha: 0.0
+    reg_lambda: 0.5
+    subsample: 0.8

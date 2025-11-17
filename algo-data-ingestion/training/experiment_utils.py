@@ -11,6 +11,7 @@ import pandas as pd
 from .data import load_canonical_contract, load_training_dataset
 from .sequence_builder import build_sequences
 from .model_registry import get_model_class
+from .time_series_cv import TimeSeriesSplitConfig, make_time_series_splits
 from .walkforward import time_folds
 from .thresholds import select_prob_threshold
 from .metrics import equity_curve, summary_stats
@@ -56,6 +57,7 @@ def prepare_canonical_data(
     seq_len: int = 32,
     horizon: int = 1,
     test_size: float = 0.2,
+    seq_stride: int = 1,
 ) -> DatasetBundle:
     contract = load_canonical_contract(contract_path)
     df = load_training_dataset(contract)
@@ -73,7 +75,15 @@ def prepare_canonical_data(
     test_start = int(n * (1.0 - float(test_size)))
     seq_data = None
     if seq_len and seq_len > 0:
-        X_seq, y_seq, idx = build_sequences(df, feature_cols, label_col, seq_len=seq_len, horizon=horizon, return_index=True)
+        X_seq, y_seq, idx = build_sequences(
+            df,
+            feature_cols,
+            label_col,
+            seq_len=seq_len,
+            horizon=horizon,
+            return_index=True,
+            stride=seq_stride,
+        )
         seq_data = SequenceDataset(X_seq, y_seq, idx)
     return DatasetBundle(
         df=df,
@@ -93,6 +103,7 @@ def generate_cv_predictions(
     *,
     n_folds: int = 4,
     embargo_minutes: int = 60,
+    cv_config: TimeSeriesSplitConfig | None = None,
     model_config: Optional[Dict] = None,
     use_sequences: bool = False,
 ) -> ModelRun:
@@ -116,10 +127,20 @@ def generate_cv_predictions(
         X_tr_all = X_tr_all[order]
         y_tr_all = y_tr_all[order]
         idx_tr_all = idx_tr_all[order]
-        for tr_idx, va_idx in time_folds(meta_df_sorted, n_folds=n_folds, embargo_minutes=embargo_minutes):
+        ret_col = bundle.ret_col if bundle.ret_col in bundle.df.columns else None
+        if cv_config:
+            split_df = meta_df_sorted.assign(idx=idx_tr_all)
+            splits = make_time_series_splits(split_df, "timestamp", cv_config)
+            split_pairs = [(np.where(np.isin(idx_tr_all, s["train_idx"]))[0], np.where(np.isin(idx_tr_all, s["val_idx"]))[0]) for s in splits]
+        else:
+            split_pairs = list(time_folds(meta_df_sorted, n_folds=n_folds, embargo_minutes=embargo_minutes))
+        for tr_idx, va_idx in split_pairs:
             model = ModelCls(model_config or {})
             val_tuple = (X_tr_all[va_idx], y_tr_all[va_idx])
-            model.fit(X_tr_all[tr_idx], y_tr_all[tr_idx], val_data=val_tuple)
+            fit_kwargs = {"val_data": val_tuple}
+            if ret_col:
+                fit_kwargs["val_returns"] = bundle.df.loc[idx_tr_all[va_idx], ret_col].to_numpy()
+            model.fit(X_tr_all[tr_idx], y_tr_all[tr_idx], **fit_kwargs)
             preds = model.predict_proba(X_tr_all[va_idx])
             oof.loc[idx_tr_all[va_idx]] = preds
         final_model = ModelCls(model_config or {})
@@ -133,10 +154,19 @@ def generate_cv_predictions(
     else:
         X_all = df_train[bundle.feature_cols]
         y_all = df_train[bundle.label_col].astype(int)
-        for tr_idx, va_idx in time_folds(df_train, n_folds=n_folds, embargo_minutes=embargo_minutes):
+        ret_col = bundle.ret_col if bundle.ret_col in bundle.df.columns else None
+        if cv_config:
+            splits = make_time_series_splits(df_train, "timestamp", cv_config)
+            split_pairs = [(s["train_idx"], s["val_idx"]) for s in splits]
+        else:
+            split_pairs = list(time_folds(df_train, n_folds=n_folds, embargo_minutes=embargo_minutes))
+        for tr_idx, va_idx in split_pairs:
             model = ModelCls(model_config or {})
             val_tuple = (X_all.iloc[va_idx], y_all.iloc[va_idx])
-            model.fit(X_all.iloc[tr_idx], y_all.iloc[tr_idx], val_data=val_tuple)
+            fit_kwargs = {"val_data": val_tuple}
+            if ret_col:
+                fit_kwargs["val_returns"] = df_train.iloc[va_idx][ret_col].to_numpy()
+            model.fit(X_all.iloc[tr_idx], y_all.iloc[tr_idx], **fit_kwargs)
             preds = model.predict_proba(X_all.iloc[va_idx])
             oof.iloc[va_idx] = preds
         final_model = ModelCls(model_config or {})
@@ -167,9 +197,10 @@ def evaluate_predictions(
     df_eval = bundle.df.loc[prob_series.index].copy()
     df_eval = df_eval.assign(prob=prob_series)
     ret_series = df_eval[bundle.ret_col] if bundle.ret_col in df_eval.columns else pd.Series(0.0, index=df_eval.index)
+    ret_series = ret_series.fillna(0.0)
     spread_series = None
     if spread_col and spread_col in df_eval.columns:
-        spread_series = df_eval[spread_col]
+        spread_series = df_eval[spread_col].fillna(0.0)
     thr, thr_report = select_prob_threshold(
         ret_series,
         prob_series,
@@ -196,9 +227,9 @@ def evaluate_predictions(
         tmp = df_eval.copy()
         tmp["pnl"] = eq["pnl"].values
         for col in bundle.regime_cols:
-            regime_pnl[col] = tmp.groupby(col)["pnl"].sum().to_dict()
+            regime_pnl[col] = {str(k): float(v) for k, v in tmp.groupby(col)["pnl"].sum().to_dict().items()}
         tmp["regime_id"] = compute_regime_id(tmp, bundle.regime_cols)
-        regime_pnl["composite"] = tmp.groupby("regime_id")["pnl"].sum().to_dict()
+        regime_pnl["composite"] = {str(k): float(v) for k, v in tmp.groupby("regime_id")["pnl"].sum().to_dict().items()}
     stats.update({
         "threshold": thr,
         "hit_rate": hit_rate,

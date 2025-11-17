@@ -1,0 +1,62 @@
+[
+  {
+    "model": "xgb",
+    "trial_id": "xgb_trial_010",
+    "mean_sharpe_cv": 218.19207269254215,
+    "mean_pnl_net_cv": 36.99548348499527,
+    "params": {
+      "max_depth": 3,
+      "learning_rate": 0.01,
+      "n_estimators": 50,
+      "subsample": 0.8,
+      "colsample_bytree": 0.6,
+      "min_child_weight": 3.0,
+      "gamma": 0.5,
+      "reg_lambda": 0.5,
+      "reg_alpha": 0.0,
+      "early_stopping_rounds": 100
+    }
+  },
+  {
+    "model": "tcn",
+    "trial_id": "tcn_trial_011",
+    "mean_sharpe_cv": 225.3801557443378,
+    "mean_pnl_net_cv": 3.529378851640786,
+    "params": {
+      "kernel_size": 3,
+      "channels": "32,32",
+      "dropout": 0.05,
+      "lr": 0.0003,
+      "weight_decay": 0.001,
+      "batch_size": 128,
+      "epochs": 20,
+      "early_stopping_patience": 20,
+      "max_grad_norm": 0.5,
+      "seq_len": 48,
+      "seq_stride": 10,
+      "horizon": 2
+    }
+  },
+  {
+    "model": "transformer",
+    "trial_id": "transformer_trial_023",
+    "mean_sharpe_cv": 3.0137111953454827,
+    "mean_pnl_net_cv": 0.0005120308092585,
+    "params": {
+      "d_model": 256,
+      "nhead": 2,
+      "num_layers": 1,
+      "dim_feedforward": 256,
+      "dropout": 0.2,
+      "lr": 0.0003,
+      "weight_decay": 0.0,
+      "batch_size": 64,
+      "epochs": 8,
+      "early_stopping_patience": 2,
+      "max_grad_norm": 2.0,
+      "seq_len": 64,
+      "seq_stride": 10,
+      "horizon": 1
+    }
+  }
+]

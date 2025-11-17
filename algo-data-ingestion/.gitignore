@@ -49,6 +49,9 @@ release/calibration/live_recalibration_latest/
 **/__pycache__/
 **/*.pyc
 
+# Large experiment exports (keep out of git; use data/ or LFS)
+experiments/leaderboard_arch_search.csv
+
 # macOS / Windows system files
 .DS_Store
 Thumbs.db
