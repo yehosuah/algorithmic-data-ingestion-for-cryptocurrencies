@@ -1,13 +1,14 @@
 # Algo Data Ingestion – Comprehensive Project Dossier
 
-_Last updated: 2025-11-13 04:43 UTC_
+_Last updated: 2025-11-17 14:38 UTC_
 
-> Update 2025-11-13: Captured the symbol-aware gate refresh (multi-symbol dataset, sanitizer, parity helpers) plus the trading-state instrumentation so every manifest, scheduler job, and dry-run metric references the same caps and datasets.
+> Update 2025-11-17: Added a time-series CV + random-search lane (`training/time_series_cv.py`, `training/run_hparam_search.py`) with shared search spaces/expanding-window defaults (`configs/hparam_spaces.yaml`, `configs/cv_config.yaml`), promoted the best configs into `configs/best_model_configs.{yaml,json}`, and upgraded the sequence trainers with stride-aware batching plus P&L-aware early stopping (cost/min-hold aware Sharpe) so deployable coverage is monitored during training. The symbol-aware gates, parity helpers, and trading observability from the 2025-11-13 refresh remain in place.
 
-### 0. 2025-11-13 Refresh Highlights
-- **Symbol-aware relaxed gate** – `datasets/market_multi_3symbol_1m.parquet` (BTC/ETH/SOL) now sits beside the single-symbol feeds; `scripts/compute_symbol_gate_config.py` produces `release/symbol_gates/market_multi_3symbol_1m.json` so manifests, scheduler jobs, and `TRADING_MODELS` enforce identical `hl_spread`, `rvol`, and liquidity caps.
-- **Feature parity workflow** – `training/data.sanitize_market_dataset` de-dupes (timestamp, symbol) pairs and clamps price/volatility outliers before augmentation; `scripts/export_feature_slice.py` + `scripts/compare_feature_stats.py` ship a repeatable way to diff live Redis slices against the training parquet and write parity payloads into `release/calibration/latest`.
-- **Trading observability** – `.env` now defaults Redis-backed trading state/audits plus the metrics exporter (`TRADING_METRICS_PORT=9010`). Grafana dashboards ingest `trading_trade_attempts_total`, `trading_gate_toggles_total`, and the new parity outputs so runbooks can cite the exact counters when verifying coverage.
+### 0. 2025-11-17 Refresh Highlights
+- **Hyperparameter search pipeline** – Random-search CLI now runs expanding-window splits (15D validation, 1D gap by default) and logs results under `experiments/hparam_search/<model>/results.csv` + per-trial JSON. `training/promote_best_configs.py` distills the current leaders (`xgb_trial_010`, `tcn_trial_011`, `transformer_trial_023`) into versioned configs for downstream scripts.
+- **Deployability-aware sequence training** – TCN/Transformer training loops now accept stride-aware sequence builders, clip gradients with configurable ceilings, and early-stop on equity/Sharpe computed with `cost_bps`, `long_only`, and `min_hold_bars` when validation returns are provided, keeping stride-1 experiments memory-safe while tracking live-like KPIs.
+- **Dataset contract resolution** – Canonical contracts now prefer project-root-relative paths before falling back to contract-local resolution, reducing surprises when configs live under `configs/` but datasets are stored at repo root or in `data/`.
+- **Symbol-aware gate + monitoring (previous refresh)** – `datasets/market_multi_3symbol_1m.parquet` and `release/symbol_gates/market_multi_3symbol_1m.json` keep manifests, scheduler jobs, and `TRADING_MODELS` aligned on `hl_spread`/`rvol` caps; parity diffs land in `release/calibration/latest` and Grafana panels continue to track queue depth, gate toggles, and parity drift.
 
 ---
 

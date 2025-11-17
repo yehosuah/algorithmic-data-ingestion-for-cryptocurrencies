@@ -1,8 +1,8 @@
 # Walkthrough: Implement with Your Datasets
 
-_Last updated: 2025-11-13 04:43 UTC_
+_Last updated: 2025-11-17 14:38 UTC_
 
-> Update 2025-11-13: Layered in the sanitizer/parity workflow (multi-symbol parquet, `compute_symbol_gate_config.py`, `export_feature_slice.py`, `compare_feature_stats.py`) so custom datasets inherit the same symbol-aware gates the manifests + trading service now expect.
+> Update 2025-11-17: Added the time-series CV + random-search lane (`training/run_hparam_search.py`, `configs/cv_config.yaml`, `configs/hparam_spaces.yaml`) plus the promoted configs (`configs/best_model_configs.{yaml,json}`) so custom datasets can reuse/extend the shared sweeps. The sanitizer/parity workflow remains as before.
 
 This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your own instruments once you have equivalent market + RSS coverage.
 
@@ -40,6 +40,29 @@ This plan mirrors the refreshed Calmon stack. Adapt the paths/parameters to your
   ```
 - Validate the RSS audit and monthly diagnostics in `report.json`, then review deployable gates within the generated manifest.
 - When a matching gate file lives under `release/symbol_gates/` (same filename stem as your dataset), the CLI auto-loads it; passing the flag keeps deployable training/inference caps aligned when you deviate from the default dataset name.
+
+### Step 2b – Time-Series CV + Hyperparameter Search (optional)
+- Use the shared CV schema (`configs/cv_config.yaml`, expanding window; 15D validation, 1D gap) and search spaces (`configs/hparam_spaces.yaml`) to sweep your dataset:
+  ```bash
+  python -m training.run_hparam_search \
+    --model tcn \
+    --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
+    --cv-config configs/cv_config.yaml \
+    --hparam-space configs/hparam_spaces.yaml \
+    --n-trials 24 \
+    --output-dir experiments/hparam_search/tcn_<yoursuffix> \
+    --horizon 2 --seq-stride 10 --max-rows 800000 \
+    --cost-bps 5 --min-hold-bars 1
+  ```
+  Sequence models accept `seq_stride` to thin windows; TCN/Transformer early-stop on Sharpe computed with `cost_bps`/`min_hold_bars` when `val_returns` are supplied.
+- Promote best configs into a reusable YAML/JSON bundle with:
+  ```bash
+  python -m training.promote_best_configs \
+    --search-root experiments/hparam_search \
+    --min-sharpe 0.0 --top-n 1 \
+    --output configs/best_model_configs.yaml
+  ```
+  The repo ships with the latest promoted configs (`xgb_trial_010`, `tcn_trial_011`, `transformer_trial_023`) if you want a starting point.
 
 ## Step 3 – Temporal Model
 - Clone the TCN run with horizon tuned to your strategy (120 bars by default). Adjust `--window`, `--channels`, and `--stride` to match volatility profile while keeping turnover ≤200.

@@ -1,7 +1,9 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-11-16 05:43 UTC_
+_Last updated: 2025-11-17 14:38 UTC_
 
+> Update 2025-11-17: Added a time-series CV + random hyperparameter search lane (`training/time_series_cv.py`, `training/run_hparam_search.py`, `configs/cv_config.yaml`, `configs/hparam_spaces.yaml`), promoted the winning configs to `configs/best_model_configs.{yaml,json}`, and wired the sequence builders + TCN/Transformer trainers with stride-aware batching and P&L-aware early stopping so stride-1 experiments stay memory-safe while monitoring deployable Sharpe/coverage.
+>
 > Update 2025-11-16: Wired probability sampling into the scheduler/ingestion paths, added the distribution audit + recalibration workflow (`scripts/probability_distribution_audit.py`, refreshed `refresh_calibration.py`), capped enqueued decisions per job (`DECISION_PAYLOAD_ITEMS`/`max_decision_items`) with a queue-depth gauge, and added a restart grace (`TRADING_LAST_TS_GRACE_BARS`) so trading clears stale timestamps after downtime.
 
 End-to-end ingestion for **market**, **on-chain**, **social**, and **news** data with a Redis feature store, admin backfills/TTL sweeps, a scheduler, and monitoring (Prometheus + Grafana).
@@ -601,6 +603,31 @@ This merges market features with aggregated counts and mean sentiment for RSS/Re
 Notes
 - Scripts read from the data lake paths configured in env (local or S3/GCS). For S3/GCS, ensure credentials/env are set as described above.
 - The training matrix script expects that some RSS or Reddit Parquet exists; you can generate it via the `rss_to_parquet.py` script or schedule ingest jobs.
+
+## Time-Series CV & Hyperparameter Search
+
+- Random-search sweeps now use the time-based splits defined in `configs/cv_config.yaml` (expanding window; 15D validation, 1D gap). Example (TCN):
+  ```bash
+  python -m training.run_hparam_search \
+    --model tcn \
+    --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
+    --cv-config configs/cv_config.yaml \
+    --hparam-space configs/hparam_spaces.yaml \
+    --n-trials 32 \
+    --output-dir experiments/hparam_search/tcn \
+    --horizon 2 --seq-stride 10 --max-rows 800000 \
+    --cost-bps 5 --min-hold-bars 1
+  ```
+  Sequence models accept `--seq-stride` to thin windows so stride‑1 experiments stay memory-safe.
+- Every trial writes JSON + CSV under `experiments/hparam_search/<model>/`; promote the winners into reusable configs with:
+  ```bash
+  python -m training.promote_best_configs \
+    --search-root experiments/hparam_search \
+    --min-sharpe 0.0 --top-n 1 \
+    --output configs/best_model_configs.yaml
+  ```
+  The repo already includes the promoted configs (`xgb_trial_010`, `tcn_trial_011`, `transformer_trial_023`) mirrored in both YAML/JSON.
+- Sequence trainers (TCN/Transformer) now monitor deployable Sharpe during training when `val_returns` is provided, applying `cost_bps`, `long_only`, and `min_hold_bars` in early stopping/selection instead of pure loss.
 
 ## Modeling Snapshot (Nov 2025)
 

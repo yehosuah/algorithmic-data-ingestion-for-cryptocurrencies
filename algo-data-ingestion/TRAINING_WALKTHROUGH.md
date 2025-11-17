@@ -1,8 +1,8 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-11-13 04:43 UTC_
+_Last updated: 2025-11-17 14:38 UTC_
 
-> Update 2025-11-13: Added the multi-symbol sanitizer workflow, symbol-aware gate generator, and the new parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so every retrain shares the exact caps the scheduler/trading loop now enforces.
+> Update 2025-11-17: Layered in the time-series CV + random-search lane (`training/time_series_cv.py`, `training/run_hparam_search.py`) with shared search/cv configs (`configs/hparam_spaces.yaml`, `configs/cv_config.yaml`), promoted the current winners (`configs/best_model_configs.{yaml,json}`), and added stride-aware sequence builders plus P&L-aware early stopping for TCN/Transformer to keep stride-1 sweeps memory-safe while monitoring deployable Sharpe.
 
 This guide walks through the refreshed modeling stack: relaxed-gate retrains for the horizon-120 XGBoost baseline, the Calmon TCN suite, and the elastic-net blender that now clears 5 bps costs with RSS enrichment.
 
@@ -16,6 +16,29 @@ This guide walks through the refreshed modeling stack: relaxed-gate retrains for
 - Multi-symbol relaxed gate bundle (BTC/ETH/SOL) if you plan to retrain on the combined feed:
   - `datasets/market_multi_3symbol_1m.parquet` (≈1.19 M rows spanning 2024-01-01 ➜ 2025-11-04).
   - `release/symbol_gates/market_multi_3symbol_1m.json` stores per-symbol spread/vol caps; `scripts/train_base_gbdt.py` now auto-loads a gate config whose filename matches the dataset stem (e.g., `market_multi_3symbol_1m.parquet` → `release/symbol_gates/market_multi_3symbol_1m.json`).
+
+## 0b. Time-Series CV + Hyperparameter Search
+- Default splits live in `configs/cv_config.yaml` (expanding window, 15D validation, 1D gap). Run random-search sweeps with the shared search spaces in `configs/hparam_spaces.yaml`:
+  ```bash
+  python -m training.run_hparam_search \
+    --model tcn \
+    --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
+    --cv-config configs/cv_config.yaml \
+    --hparam-space configs/hparam_spaces.yaml \
+    --n-trials 32 \
+    --output-dir experiments/hparam_search/tcn \
+    --horizon 2 --seq-stride 10 --max-rows 800000 \
+    --cost-bps 5 --min-hold-bars 1
+  ```
+  Sequence builders now accept `seq_stride` so stride‑1 sweeps stay memory-safe; TCN/Transformer loops monitor Sharpe computed with `cost_bps`/`min_hold_bars` when `val_returns` are supplied, improving deployability alignment vs. loss-only early stopping.
+- Each sweep writes per-trial JSON + `results.csv`; collect leaders into configs with:
+  ```bash
+  python -m training.promote_best_configs \
+    --search-root experiments/hparam_search \
+    --min-sharpe 0.0 --top-n 1 \
+    --output configs/best_model_configs.yaml
+  ```
+  The current promoted configs are already checked in (`xgb_trial_010`, `tcn_trial_011`, `transformer_trial_023`), mirrored in YAML/JSON for scripting.
 
 ## 0. Prepare Multi-Symbol Feed & Gates
 - Sanitize fresh parquet pulls before training so duplicate (timestamp, symbol) rows and price outliers do not blow up `hl_spread`/`rvol`:
