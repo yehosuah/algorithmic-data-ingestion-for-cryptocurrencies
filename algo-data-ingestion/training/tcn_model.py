@@ -104,6 +104,8 @@ def train_tcn(
     y: np.ndarray,
     *,
     val: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    sample_weight: Optional[np.ndarray] = None,
+    val_sample_weight: Optional[np.ndarray] = None,
     val_returns: Optional[np.ndarray] = None,
     kernel_size: int = 3,
     channels: Tuple[int, int] = (32, 32),
@@ -121,7 +123,7 @@ def train_tcn(
         pos_weight = torch.tensor([float(config.class_weight)], device=device)
     loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
-    def _iter_batches(Xa, ya):
+    def _iter_batches(Xa, ya, swa=None):
         n = len(ya)
         bs = config.batch_size
         idx = np.arange(n)
@@ -129,7 +131,10 @@ def train_tcn(
             j = min(n, i + bs)
             xb = torch.tensor(Xa[i:j], dtype=torch.float32, device=device)
             yb = torch.tensor(ya[i:j], dtype=torch.float32, device=device)
-            yield xb, yb
+            swb = None
+            if swa is not None:
+                swb = torch.tensor(swa[i:j], dtype=torch.float32, device=device)
+            yield xb, yb, swb
 
     model.train()
     best_metric = -np.inf
@@ -138,11 +143,14 @@ def train_tcn(
     for epoch in range(config.epochs):
         perm = np.random.permutation(len(y))
         Xp, yp = X[perm], y[perm]
+        swp = sample_weight[perm] if sample_weight is not None else None
         total = 0.0
-        for xb, yb in _iter_batches(Xp, yp):
+        for xb, yb, swb in _iter_batches(Xp, yp, swp):
             opt.zero_grad()
             logits = model(xb).view(-1)
             loss = loss_fn(logits, yb)
+            if swb is not None:
+                loss = (loss * swb).mean()
             loss.backward()
             if config.max_grad_norm and config.max_grad_norm > 0:
                 nn.utils.clip_grad_norm_(model.parameters(), float(config.max_grad_norm))
@@ -294,6 +302,8 @@ class TCNModel(BaseModel):
             X_val_arr = self._ensure_ch_last_to_ch_first(np.asarray(X_val))
             y_val_arr = np.asarray(y_val).astype(np.float32)
             val_tuple = (X_val_arr, y_val_arr)
+        sample_weight = kwargs.get("sample_weight")
+        val_sample_weight = kwargs.get("val_sample_weight")
 
         tcfg = TrainConfig(
             epochs=int(self.config.get("epochs", 10)),
@@ -311,6 +321,8 @@ class TCNModel(BaseModel):
             X_arr,
             y_arr,
             val=val_tuple,
+            sample_weight=sample_weight,
+            val_sample_weight=val_sample_weight,
             val_returns=kwargs.get("val_returns"),
             kernel_size=int(self.config.get("kernel_size", 3)),
             channels=tuple(self.config.get("channels", (32, 32))),

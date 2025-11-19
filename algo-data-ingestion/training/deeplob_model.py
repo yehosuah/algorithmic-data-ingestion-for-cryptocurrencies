@@ -77,6 +77,8 @@ class DeepLOBModel(BaseModel):
         if X_arr.ndim != 3:
             raise ValueError(f"DeepLOBModel expects 3D input; got {X_arr.shape}")
         y_arr = np.asarray(y_train).astype(float)
+        sample_weight = kwargs.get("sample_weight")
+        val_sample_weight = kwargs.get("val_sample_weight")
         self.n_features = X_arr.shape[2]
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         val_returns = kwargs.get("val_returns")
@@ -105,13 +107,21 @@ class DeepLOBModel(BaseModel):
         for epoch in range(max_epochs):
             perm = np.random.permutation(len(y_arr))
             Xp, yp = X_arr[perm], y_arr[perm]
+            swp = sample_weight[perm] if sample_weight is not None else None
             total_loss = 0.0
+            offset = 0
             for xb, yb in self._iter_batches(Xp, yp):
                 xb_t = torch.tensor(xb, dtype=torch.float32, device=device)
                 yb_t = torch.tensor(yb, dtype=torch.float32, device=device)
+                swb = None
+                if swp is not None:
+                    swb = torch.tensor(swp[offset:offset + len(yb)], dtype=torch.float32, device=device)
+                offset += len(yb)
                 opt.zero_grad()
                 logits = self.model(xb_t)
                 loss = loss_fn(logits, yb_t)
+                if swb is not None:
+                    loss = (loss * swb).mean()
                 loss.backward()
                 max_norm = float(self.config.get("max_grad_norm", 1.0) or 0.0)
                 if max_norm > 0:

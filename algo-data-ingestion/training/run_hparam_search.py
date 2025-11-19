@@ -36,6 +36,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--long-only", action="store_true")
     ap.add_argument("--min-hold-bars", type=int, default=1)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--sampling-policy", default=None, help="Sampling policy name (uniform, vol_weighted, liquidity_weighted, regime_balanced)")
+    ap.add_argument("--sampling-config", default=None, help="Path to sampling config YAML.")
+    ap.add_argument("--weight-policy", default=None, help="Weight policy (none, cost_inverse, capacity_proportional, cost_capacity_combo).")
+    ap.add_argument("--weight-config", default=None, help="Path to weight config YAML.")
     args = ap.parse_args(argv)
 
     space = _load_yaml(args.hparam_space)
@@ -52,6 +56,8 @@ def main(argv: list[str] | None = None) -> int:
         "expanding": bool(cv_cfg_raw.get("expanding", cv_cfg_raw.get("train_window") is None)),
         "step": cv_cfg_raw.get("step"),
     }
+    sampling_cfg = _load_yaml(args.sampling_config) if args.sampling_config else {}
+    weight_cfg = _load_yaml(args.weight_config) if args.weight_config else {}
     random_search(
         args.model,
         search_space,
@@ -63,6 +69,10 @@ def main(argv: list[str] | None = None) -> int:
         horizon=args.horizon,
         seq_stride=args.seq_stride,
         max_rows=args.max_rows,
+        sampling_policy=args.sampling_policy,
+        sampling_config=sampling_cfg,
+        weight_policy=args.weight_policy,
+        weight_config=weight_cfg,
         cost_bps=args.cost_bps,
         long_only=bool(args.long_only),
         min_hold_bars=args.min_hold_bars,

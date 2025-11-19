@@ -1,0 +1,6 @@
+cost_capacity_combo:
+  alpha_capacity: 0.7
+  min_weight: 0.1
+  max_weight: 5.0
+  cost_col: cost_estimate_bps
+  liquidity_col: feat_rolling_volume_15m

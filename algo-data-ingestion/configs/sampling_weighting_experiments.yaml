@@ -1,0 +1,26 @@
+experiments:
+  - model_name: xgb
+    sampling_policy: uniform
+    sampling_config: configs/sampling_uniform.yaml
+    weight_policy: none
+  - model_name: xgb
+    sampling_policy: regime_balanced
+    sampling_config: configs/sampling_regime_balanced.yaml
+    weight_policy: none
+  - model_name: xgb
+    sampling_policy: uniform
+    sampling_config: configs/sampling_uniform.yaml
+    weight_policy: cost_capacity_combo
+    weight_config: configs/weights_cost_capacity.yaml
+  - model_name: tcn
+    sampling_policy: uniform
+    sampling_config: configs/sampling_uniform.yaml
+    weight_policy: none
+  - model_name: tcn
+    sampling_policy: vol_weighted
+    sampling_config:
+      vol_feature_col: feat_realized_vol_1h
+      target_fraction: 1.0
+      seed: 42
+    weight_policy: cost_capacity_combo
+    weight_config: configs/weights_cost_capacity.yaml

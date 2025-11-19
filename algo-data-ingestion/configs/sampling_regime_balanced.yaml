@@ -1,0 +1,4 @@
+regime_balanced:
+  min_samples_per_regime: 5000
+  max_samples_per_regime: 30000
+  seed: 42

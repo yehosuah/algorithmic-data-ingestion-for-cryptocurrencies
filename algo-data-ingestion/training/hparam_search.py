@@ -19,6 +19,8 @@ from . import deeplob_model  # noqa: F401
 from .data import load_canonical_contract, load_training_dataset
 from .model_registry import get_model_class
 from .sequence_builder import build_sequences
+from .sampling_policies import apply_sampling_policy
+from .sample_weights import compute_sample_weights
 from .thresholds import select_prob_threshold
 from .metrics import equity_curve, summary_stats
 from .time_series_cv import TimeSeriesSplitConfig, evaluate_by_regime, make_time_series_splits
@@ -135,6 +137,10 @@ def objective_single_model(
     horizon: int = 1,
     seq_stride: int = 1,
     max_rows: Optional[int] = None,
+    sampling_policy: Optional[str] = None,
+    sampling_config: Optional[Dict[str, Any]] = None,
+    weight_policy: Optional[str] = None,
+    weight_config: Optional[Dict[str, Any]] = None,
     cost_bps: float = 5.0,
     long_only: bool = False,
     min_hold_bars: int = 1,
@@ -155,7 +161,38 @@ def objective_single_model(
     df = df.sort_values(["timestamp", "symbol"] if "symbol" in df.columns else ["timestamp"]).reset_index(drop=True)
     feature_cols, label_col, regime_cols, ret_col = _resolve_columns(df, contract)
     df = df.dropna(subset=[label_col]).reset_index(drop=True)
+    sampled_mask = None
+    if sampling_policy:
+        regime_col = sampling_config.get("regime_col") if sampling_config else None
+        if regime_col is None and regime_cols:
+            regime_col = regime_cols[0]
+        sampled_mask = apply_sampling_policy(
+            df,
+            sampling_policy,
+            sampling_config or {},
+            regime_col=regime_col,
+            vol_feature_col=(sampling_config or {}).get("vol_feature_col"),
+            liquidity_feature_col=(sampling_config or {}).get("liquidity_feature_col"),
+        )
+        if sampled_mask is not None and sampled_mask.any():
+            df = df.loc[sampled_mask].reset_index(drop=True)
+            # re-derive metadata after filtering
+            feature_cols, label_col, regime_cols, ret_col = _resolve_columns(df, contract)
+        else:
+            sampled_mask = None
     splits = make_time_series_splits(df, "timestamp", cv_config)
+    if sampled_mask is not None:
+        for split in splits:
+            split["train_idx"] = split["train_idx"][sampled_mask[split["train_idx"]]]
+    weights = None
+    if weight_policy:
+        weights = compute_sample_weights(
+            df,
+            weight_policy,
+            weight_config or {},
+            cost_col=(weight_config or {}).get("cost_col"),
+            liquidity_col=(weight_config or {}).get("liquidity_col"),
+        )
     ModelCls = get_model_class(model_name)
     params_for_model = {k: v for k, v in hparams.items() if k not in {"seq_len", "horizon"}}
     fold_metrics: List[Dict[str, Any]] = []
@@ -173,6 +210,9 @@ def objective_single_model(
             stride=stride_use,
             return_index=True,
         )
+        idx_to_weight = None
+        if weights is not None:
+            idx_to_weight = {int(i): float(w) for i, w in zip(df.index, weights)}
         for split in splits:
             train_mask = np.isin(idx_seq, split["train_idx"])
             val_mask = np.isin(idx_seq, split["val_idx"])
@@ -180,9 +220,14 @@ def objective_single_model(
                 continue
             X_train, y_train = X_seq[train_mask], y_seq[train_mask]
             X_val, y_val = X_seq[val_mask], y_seq[val_mask]
+            w_train = None
+            w_val = None
+            if idx_to_weight is not None:
+                w_train = np.array([idx_to_weight.get(int(i), 1.0) for i in idx_seq[train_mask]], dtype=float)
+                w_val = np.array([idx_to_weight.get(int(i), 1.0) for i in idx_seq[val_mask]], dtype=float)
             mdl = ModelCls(params_for_model)
             val_returns = df.loc[idx_seq[val_mask], ret_col].to_numpy() if ret_col in df.columns else None
-            mdl.fit(X_train, y_train, val_data=(X_val, y_val), val_returns=val_returns)
+            mdl.fit(X_train, y_train, val_data=(X_val, y_val), val_returns=val_returns, sample_weight=w_train, val_sample_weight=w_val)
             preds = mdl.predict_proba(X_val)
             metrics = _evaluate_split(
                 df,
@@ -206,6 +251,9 @@ def objective_single_model(
             y_val = df.loc[val_idx, label_col].astype(int)
             mdl = ModelCls(params_for_model)
             fit_kwargs: Dict[str, Any] = {"val_data": (X_val, y_val)}
+            if weights is not None:
+                fit_kwargs["sample_weight"] = weights[train_idx] if len(weights) == len(df) else None
+                fit_kwargs["val_sample_weight"] = weights[val_idx] if len(weights) == len(df) else None
             if ret_col in df.columns:
                 fit_kwargs["val_returns"] = df.loc[val_idx, ret_col].to_numpy()
             mdl.fit(X_train, y_train, **fit_kwargs)
@@ -263,6 +311,10 @@ def random_search(
     horizon: int = 1,
     seq_stride: int = 1,
     max_rows: Optional[int] = None,
+    sampling_policy: Optional[str] = None,
+    sampling_config: Optional[Dict[str, Any]] = None,
+    weight_policy: Optional[str] = None,
+    weight_config: Optional[Dict[str, Any]] = None,
     cost_bps: float = 5.0,
     long_only: bool = False,
     min_hold_bars: int = 1,
@@ -305,6 +357,10 @@ def random_search(
             horizon=horizon,
             seq_stride=seq_stride_use,
             max_rows=max_rows,
+            sampling_policy=sampling_policy,
+            sampling_config=sampling_config,
+            weight_policy=weight_policy,
+            weight_config=weight_config,
             cost_bps=cost_bps_use,
             long_only=long_only_use,
             min_hold_bars=min_hold_use,
@@ -321,6 +377,8 @@ def random_search(
             "cost_bps": cost_bps_use,
             "long_only": long_only_use,
             "min_hold_bars": min_hold_use,
+            "sampling_policy": sampling_policy,
+            "weight_policy": weight_policy,
         }
         for k, v in sampled.items():
             record[f"param_{k}"] = v

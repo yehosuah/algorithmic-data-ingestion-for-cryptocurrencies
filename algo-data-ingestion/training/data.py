@@ -256,3 +256,40 @@ def load_training_dataset(contract: Dict[str, Any]) -> pd.DataFrame:
     df.attrs["regime_cols"] = regime_cols
     df.attrs["contract"] = contract
     return df
+
+
+def load_training_data_with_sampling(
+    contract_path: str,
+    *,
+    sampling_policy: str | None = None,
+    sampling_config: Optional[Dict[str, Any]] = None,
+) -> pd.DataFrame:
+    """
+    Load canonical dataset and optionally apply a sampling policy to the returned rows.
+
+    Sampling is intended for training portions; consumers should still respect time-series
+    splits and avoid leaking validation data. This helper pre-applies row filtering and
+    keeps metadata in df.attrs.
+    """
+    from .sampling_policies import apply_sampling_policy  # local import to avoid cycles
+
+    contract = load_canonical_contract(contract_path)
+    df = load_training_dataset(contract)
+    if not sampling_policy:
+        return df
+    regime_cols = df.attrs.get("regime_cols") or []
+    regime_col = sampling_config.get("regime_col") if sampling_config else None
+    if regime_col is None and regime_cols:
+        regime_col = regime_cols[0]
+    vol_col = sampling_config.get("vol_feature_col") if sampling_config else None
+    liq_col = sampling_config.get("liquidity_feature_col") if sampling_config else None
+    mask = apply_sampling_policy(
+        df,
+        sampling_policy,
+        sampling_config or {},
+        regime_col=regime_col,
+        vol_feature_col=vol_col,
+        liquidity_feature_col=liq_col,
+    )
+    df = df.loc[mask].reset_index(drop=True)
+    return df

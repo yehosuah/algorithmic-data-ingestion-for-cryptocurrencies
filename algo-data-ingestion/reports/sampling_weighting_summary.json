@@ -1,0 +1,55 @@
+{
+  "recommendations": "# Sampling & Weighting Summary\n\n## Top combinations\n- tcn | sampling=uniform | weight=none | sharpe=214.5489 | pnl=2.808387 | n=1\n- tcn | sampling=vol_weighted | weight=cost_capacity_combo | sharpe=214.0007 | pnl=2.806475 | n=1\n- xgb | sampling=regime_balanced | weight=none | sharpe=211.6658 | pnl=27.333700 | n=1\n- xgb | sampling=uniform | weight=cost_capacity_combo | sharpe=211.6658 | pnl=27.333700 | n=1\n- xgb | sampling=uniform | weight=none | sharpe=211.6658 | pnl=27.333700 | n=1\n\n## Recommendation for xgb\n- Recommend sampling=regime_balanced weight=none (sharpe=211.6658, pnl=27.333700)\n\n## Recommendation for tcn\n- Recommend sampling=uniform weight=none (sharpe=214.5489, pnl=2.808387)\n",
+  "top_rows": [
+    {
+      "model_name": "tcn",
+      "sampling_policy": "uniform",
+      "weight_policy": "none",
+      "config_hash": "7f091bf0",
+      "mean_pnl_net_cv": 2.8083873184119854,
+      "mean_sharpe_cv": 214.5488821379347,
+      "mean_hit_rate_cv": 0.6825168684164556,
+      "regime_pnl_variance_cv": 1.431385927367194
+    },
+    {
+      "model_name": "tcn",
+      "sampling_policy": "vol_weighted",
+      "weight_policy": "cost_capacity_combo",
+      "config_hash": "d257e76b",
+      "mean_pnl_net_cv": 2.8064747398794,
+      "mean_sharpe_cv": 214.0007274897947,
+      "mean_hit_rate_cv": 0.6825168684164556,
+      "regime_pnl_variance_cv": 1.4282335600006222
+    },
+    {
+      "model_name": "xgb",
+      "sampling_policy": "uniform",
+      "weight_policy": "none",
+      "config_hash": "879d4d22",
+      "mean_pnl_net_cv": 27.333699507598865,
+      "mean_sharpe_cv": 211.6658047931164,
+      "mean_hit_rate_cv": 0.6809670771575165,
+      "regime_pnl_variance_cv": 141.89877015489344
+    },
+    {
+      "model_name": "xgb",
+      "sampling_policy": "regime_balanced",
+      "weight_policy": "none",
+      "config_hash": "f3ba5223",
+      "mean_pnl_net_cv": 27.333699507598865,
+      "mean_sharpe_cv": 211.6658047931164,
+      "mean_hit_rate_cv": 0.6809670771575165,
+      "regime_pnl_variance_cv": 141.89877015489344
+    },
+    {
+      "model_name": "xgb",
+      "sampling_policy": "uniform",
+      "weight_policy": "cost_capacity_combo",
+      "config_hash": "60f7c8a6",
+      "mean_pnl_net_cv": 27.333699507598865,
+      "mean_sharpe_cv": 211.6658047931164,
+      "mean_hit_rate_cv": 0.6809670771575165,
+      "regime_pnl_variance_cv": 141.89877015489344
+    }
+  ]
+}
