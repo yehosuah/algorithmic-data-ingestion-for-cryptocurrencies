@@ -1,0 +1,8 @@
+{
+  "base_model_names": [
+    "xgb",
+    "tcn",
+    "transformer"
+  ],
+  "config": {}
+}

@@ -1,0 +1,72 @@
+scenarios:
+  - id: medium_xgb
+    description: XGB-only policies on a medium window.
+    max_rows: 150000
+    oos_fraction: 0.2
+    models: ["xgb"]
+    n_folds: 1
+    policy_search_config: configs/portfolio_policy_search_medium.yaml
+    model_weights_config: configs/portfolio_model_weights_xgb_only.yaml
+
+  - id: long_xgb
+    description: XGB-only policies on a long window.
+    max_rows: 300000
+    oos_fraction: 0.2
+    models: ["xgb"]
+    n_folds: 1
+    policy_search_config: configs/portfolio_policy_search_long.yaml
+    model_weights_config: configs/portfolio_model_weights_xgb_only.yaml
+
+  - id: medium_xgb_long_only
+    description: Long-only XGB aligned with diagnostics band.
+    max_rows: 150000
+    oos_fraction: 0.2
+    models: ["xgb"]
+    n_folds: 1
+    policy_search_config: configs/portfolio_policy_search_medium.yaml
+    model_weights_config: configs/portfolio_model_weights_xgb_only.yaml
+    long_only: true
+
+  - id: medium_xgb_low_cost
+    description: XGB medium window with low costs.
+    max_rows: 150000
+    oos_fraction: 0.2
+    models: ["xgb"]
+    n_folds: 1
+    policy_search_config: configs/portfolio_policy_search_medium.yaml
+    model_weights_config: configs/portfolio_model_weights_xgb_only.yaml
+    transaction_cost_bps: 0.25
+    long_only: true
+
+  - id: medium_xgb_realistic_cost
+    description: XGB medium window with realistic costs.
+    max_rows: 150000
+    oos_fraction: 0.2
+    models: ["xgb"]
+    n_folds: 1
+    policy_search_config: configs/portfolio_policy_search_medium.yaml
+    model_weights_config: configs/portfolio_model_weights_xgb_only.yaml
+    transaction_cost_bps: 0.6
+    long_only: true
+
+  - id: medium_xgb_high_cost
+    description: XGB medium window with higher costs stress.
+    max_rows: 150000
+    oos_fraction: 0.2
+    models: ["xgb"]
+    n_folds: 1
+    policy_search_config: configs/portfolio_policy_search_medium.yaml
+    model_weights_config: configs/portfolio_model_weights_xgb_only.yaml
+    transaction_cost_bps: 1.0
+    long_only: true
+
+  - id: long_xgb_realistic_cost
+    description: Long window XGB at realistic costs (long-only).
+    max_rows: 300000
+    oos_fraction: 0.2
+    models: ["xgb"]
+    n_folds: 1
+    policy_search_config: configs/portfolio_policy_search_long.yaml
+    model_weights_config: configs/portfolio_model_weights_xgb_only.yaml
+    transaction_cost_bps: 0.6
+    long_only: true

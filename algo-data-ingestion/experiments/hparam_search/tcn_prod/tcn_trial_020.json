@@ -1,0 +1,158 @@
+{
+  "model": "tcn",
+  "hparams": {
+    "kernel_size": 7,
+    "channels": "32,32",
+    "dropout": 0.0,
+    "lr": 0.003,
+    "weight_decay": 0.0001,
+    "batch_size": 128,
+    "epochs": 5,
+    "early_stopping_patience": 4,
+    "max_grad_norm": 2.0,
+    "seq_len": 32,
+    "seq_stride": 10,
+    "horizon": 1
+  },
+  "fold_metrics": [
+    {
+      "pnl_net": -0.0014250010593557108,
+      "sharpe": -13.965528762140295,
+      "hit_rate": 0.6897632311977716,
+      "threshold": 0.55,
+      "threshold_report": {
+        "mean_pnl": -4.961702852909857e-07,
+        "std_pnl": 2.140202586036678e-05,
+        "sharpe": -13.965528762140295,
+        "max_drawdown": 0.0014246437420991631,
+        "final_equity": 0.9985753562579008,
+        "avg_turnover": 0.0006963788300835655,
+        "total_turnover": 2.0,
+        "toggle_count": 2,
+        "selected_threshold": 0.55,
+        "criterion": "final_equity",
+        "cost_bps": 7.5,
+        "spread_scale": 0.0,
+        "slippage_bps": 0.0,
+        "long_only": true,
+        "min_hold_bars": 1,
+        "min_total_turnover": 0.0,
+        "max_total_turnover": null,
+        "kpi_schema_version": 1
+      },
+      "regime_pnl": {
+        "event_flag": {
+          "0": -0.0014250010593557108,
+          "1": 0.0
+        }
+      },
+      "regime_metrics": {
+        "event_flag": {
+          "0": {
+            "mean_pnl": -5.089289497698967e-07,
+            "std_pnl": 2.1675298408908943e-05,
+            "sharpe": -14.14404362152952,
+            "max_drawdown": 0.0014246437420991631,
+            "final_equity": 0.9985753562579008,
+            "avg_turnover": 0.0007142857142857143,
+            "total_turnover": 2.0,
+            "toggle_count": 2,
+            "pnl_net": -0.0014250010593557108,
+            "hit_rate": 0.6867857142857143,
+            "threshold": 0.55,
+            "count": 2800
+          },
+          "1": {
+            "mean_pnl": 0.0,
+            "std_pnl": 1e-12,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "final_equity": 1.0,
+            "avg_turnover": 0.0,
+            "total_turnover": 0.0,
+            "toggle_count": 0,
+            "pnl_net": 0.0,
+            "hit_rate": 0.8055555555555556,
+            "threshold": 0.55,
+            "count": 72
+          }
+        }
+      },
+      "final_equity": 0.9985753562579008,
+      "avg_turnover": 0.0006963788300835655,
+      "total_turnover": 2.0
+    },
+    {
+      "pnl_net": -0.0026059749948432083,
+      "sharpe": NaN,
+      "hit_rate": 0.6711089957163255,
+      "threshold": 0.55,
+      "threshold_report": {
+        "selected_threshold": 0.55,
+        "criterion": "final_equity",
+        "cost_bps": 7.5,
+        "spread_scale": 0.0,
+        "slippage_bps": 0.0,
+        "long_only": true,
+        "min_hold_bars": 1,
+        "min_total_turnover": 0.0,
+        "max_total_turnover": null,
+        "mean_pnl": 0.0,
+        "std_pnl": 0.0,
+        "sharpe": 0.0,
+        "max_drawdown": 0.0,
+        "final_equity": 1.0,
+        "avg_turnover": 0.0,
+        "total_turnover": 0.0,
+        "toggle_count": 0,
+        "kpi_schema_version": 1
+      },
+      "regime_pnl": {
+        "event_flag": {
+          "0": -0.0026059749948432083,
+          "1": 0.0
+        }
+      },
+      "regime_metrics": {
+        "event_flag": {
+          "0": {
+            "mean_pnl": NaN,
+            "std_pnl": NaN,
+            "sharpe": NaN,
+            "max_drawdown": NaN,
+            "final_equity": NaN,
+            "avg_turnover": 0.000975609756097561,
+            "total_turnover": 2.0,
+            "toggle_count": 2,
+            "pnl_net": -0.0026059749948432083,
+            "hit_rate": 0.6692682926829269,
+            "threshold": 0.55,
+            "count": 2050
+          },
+          "1": {
+            "mean_pnl": NaN,
+            "std_pnl": NaN,
+            "sharpe": NaN,
+            "max_drawdown": NaN,
+            "final_equity": NaN,
+            "avg_turnover": 0.0,
+            "total_turnover": 0.0,
+            "toggle_count": 0,
+            "pnl_net": 0.0,
+            "hit_rate": 0.7450980392156863,
+            "threshold": 0.55,
+            "count": 51
+          }
+        }
+      },
+      "final_equity": NaN,
+      "avg_turnover": 0.0009519276534983341,
+      "total_turnover": 2.0
+    }
+  ],
+  "mean_pnl_net_cv": -0.0020154880270994596,
+  "mean_sharpe_cv": NaN,
+  "mean_hit_rate_cv": 0.6804361134570486,
+  "regime_pnl_variance_cv": 1.1027167116141196e-06,
+  "trial_id": "tcn_trial_020"
+}

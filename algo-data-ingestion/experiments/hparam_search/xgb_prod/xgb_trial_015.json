@@ -1,0 +1,223 @@
+{
+  "model": "xgb",
+  "hparams": {
+    "max_depth": 7,
+    "learning_rate": 0.05,
+    "n_estimators": 10,
+    "subsample": 1.0,
+    "colsample_bytree": 0.8,
+    "min_child_weight": 1.0,
+    "gamma": 0.5,
+    "reg_lambda": 1.0,
+    "reg_alpha": 0.1,
+    "early_stopping_rounds": 50
+  },
+  "fold_metrics": [
+    {
+      "pnl_net": 0.0,
+      "sharpe": 0.0,
+      "hit_rate": 0.6514914748064035,
+      "threshold": 0.55,
+      "threshold_report": {
+        "mean_pnl": 0.0,
+        "std_pnl": 1e-12,
+        "sharpe": 0.0,
+        "max_drawdown": 0.0,
+        "final_equity": 1.0,
+        "avg_turnover": 0.0,
+        "total_turnover": 0.0,
+        "toggle_count": 0,
+        "selected_threshold": 0.55,
+        "criterion": "final_equity",
+        "cost_bps": 5.0,
+        "spread_scale": 0.0,
+        "slippage_bps": 0.0,
+        "long_only": true,
+        "min_hold_bars": 1,
+        "min_total_turnover": 0.0,
+        "max_total_turnover": null,
+        "kpi_schema_version": 1
+      },
+      "regime_pnl": {
+        "event_flag": {
+          "0": 0.0,
+          "1": 0.0
+        }
+      },
+      "regime_metrics": {
+        "event_flag": {
+          "0": {
+            "mean_pnl": 0.0,
+            "std_pnl": 1e-12,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "final_equity": 1.0,
+            "avg_turnover": 0.0,
+            "total_turnover": 0.0,
+            "toggle_count": 0,
+            "pnl_net": 0.0,
+            "hit_rate": 0.6491595148592099,
+            "threshold": 0.55,
+            "count": 28198
+          },
+          "1": {
+            "mean_pnl": 0.0,
+            "std_pnl": 1e-12,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "final_equity": 1.0,
+            "avg_turnover": 0.0,
+            "total_turnover": 0.0,
+            "toggle_count": 0,
+            "pnl_net": 0.0,
+            "hit_rate": 0.7612687813021702,
+            "threshold": 0.55,
+            "count": 599
+          }
+        }
+      },
+      "final_equity": 1.0,
+      "avg_turnover": 0.0,
+      "total_turnover": 0.0
+    },
+    {
+      "pnl_net": 0.017435645460786027,
+      "sharpe": 4.237660717545889,
+      "hit_rate": 0.6627765621201069,
+      "threshold": 0.55,
+      "threshold_report": {
+        "mean_pnl": 6.055936042786296e-07,
+        "std_pnl": 8.608680974086956e-05,
+        "sharpe": 4.237660717545889,
+        "max_drawdown": 0.013576535963105818,
+        "final_equity": 1.0174800387438467,
+        "avg_turnover": 0.002153450731131256,
+        "total_turnover": 62.0,
+        "toggle_count": 62,
+        "selected_threshold": 0.55,
+        "criterion": "final_equity",
+        "cost_bps": 5.0,
+        "spread_scale": 0.0,
+        "slippage_bps": 0.0,
+        "long_only": true,
+        "min_hold_bars": 1,
+        "min_total_turnover": 0.0,
+        "max_total_turnover": null,
+        "kpi_schema_version": 1
+      },
+      "regime_pnl": {
+        "event_flag": {
+          "0": 0.01743564546078603,
+          "1": 0.0
+        }
+      },
+      "regime_metrics": {
+        "event_flag": {
+          "0": {
+            "mean_pnl": 6.177814357363155e-07,
+            "std_pnl": 8.694871826327389e-05,
+            "sharpe": 4.280092803809424,
+            "max_drawdown": 0.013576535963105818,
+            "final_equity": 1.0174800387438467,
+            "avg_turnover": 0.0021967898522481663,
+            "total_turnover": 62.0,
+            "toggle_count": 62,
+            "pnl_net": 0.017435645460786034,
+            "hit_rate": 0.6597455975622719,
+            "threshold": 0.55,
+            "count": 28223
+          },
+          "1": {
+            "mean_pnl": 0.0,
+            "std_pnl": 1e-12,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "final_equity": 1.0,
+            "avg_turnover": 0.0,
+            "total_turnover": 0.0,
+            "toggle_count": 0,
+            "pnl_net": 0.0,
+            "hit_rate": 0.8133802816901409,
+            "threshold": 0.55,
+            "count": 568
+          }
+        }
+      },
+      "final_equity": 1.0174800387438467,
+      "avg_turnover": 0.002153450731131256,
+      "total_turnover": 62.0
+    },
+    {
+      "pnl_net": 0.0,
+      "sharpe": 0.0,
+      "hit_rate": 0.6725383920505872,
+      "threshold": 0.5750000000000001,
+      "threshold_report": {
+        "mean_pnl": 0.0,
+        "std_pnl": 1e-12,
+        "sharpe": 0.0,
+        "max_drawdown": 0.0,
+        "final_equity": 1.0,
+        "avg_turnover": 0.0,
+        "total_turnover": 0.0,
+        "toggle_count": 0,
+        "selected_threshold": 0.5750000000000001,
+        "criterion": "final_equity",
+        "cost_bps": 5.0,
+        "spread_scale": 0.0,
+        "slippage_bps": 0.0,
+        "long_only": true,
+        "min_hold_bars": 1,
+        "min_total_turnover": 0.0,
+        "max_total_turnover": null,
+        "kpi_schema_version": 1
+      },
+      "regime_pnl": {
+        "event_flag": {
+          "0": 0.0,
+          "1": 0.0
+        }
+      },
+      "regime_metrics": {
+        "event_flag": {
+          "0": {
+            "mean_pnl": 0.0,
+            "std_pnl": 1e-12,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "final_equity": 1.0,
+            "avg_turnover": 0.0,
+            "total_turnover": 0.0,
+            "toggle_count": 0,
+            "pnl_net": 0.0,
+            "hit_rate": 0.6710739722163458,
+            "threshold": 0.5750000000000001,
+            "count": 28362
+          },
+          "1": {
+            "mean_pnl": 0.0,
+            "std_pnl": 1e-12,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "final_equity": 1.0,
+            "avg_turnover": 0.0,
+            "total_turnover": 0.0,
+            "toggle_count": 0,
+            "pnl_net": 0.0,
+            "hit_rate": 0.7714285714285715,
+            "threshold": 0.55,
+            "count": 420
+          }
+        }
+      },
+      "final_equity": 1.0,
+      "avg_turnover": 0.0,
+      "total_turnover": 0.0
+    }
+  ],
+  "mean_pnl_net_cv": 0.005811881820262009,
+  "mean_sharpe_cv": 1.4125535725152965,
+  "mean_hit_rate_cv": 0.6622688096590326,
+  "regime_pnl_variance_cv": 2.533347771951904e-05,
+  "trial_id": "xgb_trial_015"
+}

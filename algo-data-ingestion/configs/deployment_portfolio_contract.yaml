@@ -1,0 +1,11 @@
+dataset_contract: configs/canonical_training_contract_market_multi_3symbol_1m.yaml
+best_model_configs: configs/best_model_configs.yaml
+portfolio_policies: configs/final_portfolio_policies.yaml
+risk_limits: configs/portfolio_risk_limits.yaml
+models:
+  xgb_primary: experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary
+dry_run_integration:
+  infer_manifest_path: configs/dry_run/infer_jobs_portfolio_policy.yaml
+  decision_logic_module: live/decision_logic.py
+  expected_input_schema: live/schema_input.yaml
+  policy_default: primary

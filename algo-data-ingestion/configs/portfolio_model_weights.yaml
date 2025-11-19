@@ -1,0 +1,14 @@
+models:
+  tcn: 0.4
+  xgb: 0.3
+  transformer: 0.3
+mode: weighted_sum
+by_regime:
+  vol_low:
+    tcn: 0.3
+    xgb: 0.4
+    transformer: 0.3
+  vol_high:
+    tcn: 0.5
+    xgb: 0.2
+    transformer: 0.3

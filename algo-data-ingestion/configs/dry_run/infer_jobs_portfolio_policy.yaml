@@ -1,0 +1,12 @@
+infer_jobs:
+  - job_id: portfolio_policy_primary
+    exchange: binance
+    symbol: ETH/USDT
+    timeframe: 1m
+    lookback_minutes: 180
+    history_minutes: 240
+    base_model: xgb_primary
+    blender_model: null
+    policy_id: primary
+    policy_contract: configs/deployment_portfolio_contract.yaml
+    max_decision_items: 3

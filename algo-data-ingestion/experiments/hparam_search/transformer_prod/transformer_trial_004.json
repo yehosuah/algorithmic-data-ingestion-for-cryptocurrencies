@@ -1,0 +1,22 @@
+{
+  "model": "transformer",
+  "hparams": {
+    "d_model": 256,
+    "nhead": 4,
+    "num_layers": 1,
+    "dim_feedforward": 128,
+    "dropout": 0.2,
+    "lr": 0.0003,
+    "weight_decay": 0.001,
+    "batch_size": 128,
+    "epochs": 20,
+    "early_stopping_patience": 2,
+    "max_grad_norm": 2.0,
+    "seq_len": 64,
+    "seq_stride": 1,
+    "horizon": 1
+  },
+  "mean_pnl_net_cv": -Infinity,
+  "mean_sharpe_cv": -Infinity,
+  "trial_id": "transformer_trial_004"
+}

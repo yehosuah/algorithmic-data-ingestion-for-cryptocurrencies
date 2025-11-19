@@ -1,0 +1,8 @@
+timestamp: datetime64[ns, UTC]
+symbol: string
+features:
+  description: Feature payload expected by decision logic.
+  example:
+    feat_log_return_1m: float
+    feat_realized_vol_1h: float
+    hl_spread: float

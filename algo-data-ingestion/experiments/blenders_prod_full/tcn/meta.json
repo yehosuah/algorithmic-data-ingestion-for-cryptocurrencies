@@ -1,0 +1,22 @@
+{
+  "config": {
+    "kernel_size": 3,
+    "channels": [
+      32,
+      32
+    ],
+    "dropout": 0.05,
+    "epochs": 10,
+    "batch_size": 256,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "class_weight": null,
+    "calibration_method": "isotonic",
+    "early_stopping_patience": 5,
+    "max_grad_norm": 1.0,
+    "cost_bps": 5.0,
+    "long_only": false,
+    "min_hold_bars": 1
+  },
+  "n_inputs": 18
+}

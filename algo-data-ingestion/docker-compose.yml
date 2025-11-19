@@ -113,9 +113,10 @@ services:
       - DECISION_QUEUE_KEY=trading:decisions
       - INFER_DEFAULT_STRIDE=2
       - INFER_JOBS=[
-          {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":1440,"history_minutes":2880,"base_model":"base_xgb_cost_spread","tcn_model":"tcn_h120_calmon_relaxed","blender_model":"blender_h120_v6","stride":2,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *"},
-          {"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":1440,"history_minutes":2880,"base_model":"base_xgb_cost_spread","tcn_model":"tcn_h120_calmon_relaxed","blender_model":"blender_h120_v6","stride":2,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *"},
-          {"exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":1440,"history_minutes":2880,"base_model":"base_xgb_cost_spread","tcn_model":"tcn_h120_calmon_relaxed","blender_model":"blender_h120_v6","stride":2,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *"}
+          {"job_id":"portfolio_policy_primary","exchange":"binance","symbol":"ETH/USDT","timeframe":"1m",
+           "lookback_minutes":180,"history_minutes":240,"base_model":"xgb_primary",
+           "base_path":"perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary",
+           "stride":2,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *"}
         ]
       - MARKET_JOBS=[
           {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":240,"cron":"*/5 * * * *"},
@@ -135,6 +136,7 @@ services:
       - "9002:9002"
     volumes:
       - market-data:/app/data_lake
+      - ./experiments/perf_sweeps:/opt/models/perf_sweeps
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9002/metrics >/dev/null"]
       interval: 30s
@@ -157,6 +159,7 @@ services:
       - DECISION_QUEUE_URL=redis://redis:6379/0
       - DECISION_QUEUE_KEY=trading:decisions
       - MODELS_ROOT=/opt/models
+      - TRADING_MODELS=[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":100.0}]
       - TRADING_METRICS_PORT=9010
       - TRADING_STATE_PATH=/app/trading_state/state.json
       - TRADING_STATE_REDIS_URL=redis://redis:6379/0
@@ -165,6 +168,7 @@ services:
       - market-data:/app/data_lake
       - trading-state:/app/trading_state
       - ./logs/trading:/app/logs
+      - ./experiments/perf_sweeps:/opt/models/perf_sweeps
     ports:
       - "9010:9010"
     healthcheck:

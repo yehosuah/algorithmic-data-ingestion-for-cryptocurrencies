@@ -1,0 +1,20 @@
+{
+  "model": "tcn",
+  "hparams": {
+    "kernel_size": 3,
+    "channels": "64,64",
+    "dropout": 0.2,
+    "lr": 0.001,
+    "weight_decay": 0.001,
+    "batch_size": 128,
+    "epochs": 30,
+    "early_stopping_patience": 3,
+    "max_grad_norm": 0.5,
+    "seq_len": 32,
+    "seq_stride": 5,
+    "horizon": 2
+  },
+  "mean_pnl_net_cv": -Infinity,
+  "mean_sharpe_cv": -Infinity,
+  "trial_id": "tcn_trial_005"
+}

@@ -1,0 +1,15 @@
+{
+  "models": [
+    "xgb",
+    "tcn",
+    "transformer"
+  ],
+  "lengths": {
+    "xgb": 19999,
+    "tcn": 19999,
+    "transformer": 19999
+  },
+  "sampling_policy": null,
+  "weight_policy": null,
+  "max_rows": 20000
+}

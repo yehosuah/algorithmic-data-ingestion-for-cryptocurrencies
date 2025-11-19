@@ -1,0 +1,14 @@
+models:
+  - xgb
+
+thresholds_grid:
+  entry_long:  [0.51, 0.53, 0.55, 0.57, 0.60, 0.65]
+  exit_long:   [0.49, 0.50, 0.51, 0.52, 0.55, 0.58]
+  entry_short: [0.43, 0.45, 0.47, 0.49]
+  exit_short:  [0.48, 0.50, 0.52, 0.55]
+
+weights_grid:
+  xgb:         [1.0]
+
+max_combinations: 16
+optimize_for: sharpe

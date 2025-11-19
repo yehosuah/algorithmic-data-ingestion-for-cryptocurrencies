@@ -1,0 +1,18 @@
+{
+  "model": "xgb",
+  "hparams": {
+    "max_depth": 7,
+    "learning_rate": 0.03,
+    "n_estimators": 200,
+    "subsample": 1.0,
+    "colsample_bytree": 0.8,
+    "min_child_weight": 1.0,
+    "gamma": 0.0,
+    "reg_lambda": 0.5,
+    "reg_alpha": 0.1,
+    "early_stopping_rounds": 100
+  },
+  "mean_pnl_net_cv": -Infinity,
+  "mean_sharpe_cv": -Infinity,
+  "trial_id": "xgb_trial_008"
+}
