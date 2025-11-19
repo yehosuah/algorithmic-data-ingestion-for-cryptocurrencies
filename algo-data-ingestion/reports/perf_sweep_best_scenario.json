@@ -1,0 +1,15 @@
+{
+  "scenario_id": "medium_xgb_low_cost",
+  "primary_policy_id": "primary",
+  "metrics": {
+    "pnl_net": 1021.5995,
+    "sharpe": 278.0551821839252,
+    "max_drawdown": 1.999999994950485e-05,
+    "turnover": 0.0007310475911981,
+    "trade_count": 100,
+    "fraction_time_in_position": 0.5149171639054635,
+    "avg_gross_exposure": 0.1129249214123839,
+    "transaction_cost_bps": 0.25
+  },
+  "long_only": true
+}

@@ -1,0 +1,26 @@
+{
+  "model_name": "xgb",
+  "label_key": "y_dir",
+  "train_fraction": 0.6,
+  "low_cost_bps": 0.25,
+  "global": {
+    "metrics_signal": {
+      "auc": 0.5826957650800236,
+      "brier": 0.26093942527585806,
+      "log_loss": 0.7203716342580947,
+      "ic": 0.004487039818580772,
+      "count": 477410
+    },
+    "metrics_pnl": {
+      "mean_pnl": 0.00010145077472721361,
+      "std_pnl": 0.029081348016207657,
+      "sharpe": 2.1014659167816006,
+      "max_drawdown": 3161.9925997745204,
+      "final_equity": 17432.903649958473,
+      "avg_turnover": 0.3343562137366205,
+      "total_turnover": 159625.0,
+      "toggle_count": 159625
+    }
+  },
+  "by_regime": {}
+}
