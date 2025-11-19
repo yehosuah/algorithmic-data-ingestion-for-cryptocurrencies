@@ -1,0 +1,4 @@
+data/*.parquet filter=lfs diff=lfs merge=lfs -text
+experiments/perf_sweeps/**/*.csv filter=lfs diff=lfs merge=lfs -text
+experiments/**/blender_metrics.json filter=lfs diff=lfs merge=lfs -text
+experiments/**/xgb_metrics.json filter=lfs diff=lfs merge=lfs -text
