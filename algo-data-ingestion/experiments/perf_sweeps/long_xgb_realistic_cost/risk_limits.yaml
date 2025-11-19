@@ -1,0 +1,31 @@
+capital: 1000000
+max_gross_leverage: 3.0
+max_net_exposure: 1.5
+max_symbol_weight: 0.2
+max_turnover_per_day: 1.0
+max_drawdown: 0.25
+transaction_cost_bps: 0.6
+slippage_bps: 0.0
+spread_scale: 0.0
+spread_column: hl_spread
+gate_mode: inference
+long_only: true
+model_weights: {}
+ensemble_mode: weighted_sum
+gate_config:
+  spread_column: hl_spread
+  prob_column: base_prob
+  training:
+    hl_spread_max: null
+    hl_spread_z_max: null
+    rvol20_max: null
+    prob_gate_min: 0.5
+    min_hold_bars: 1
+    long_only: false
+  inference:
+    hl_spread_max: null
+    hl_spread_z_max: null
+    rvol20_max: null
+    prob_gate_min: 0.5
+    min_hold_bars: 1
+    long_only: true

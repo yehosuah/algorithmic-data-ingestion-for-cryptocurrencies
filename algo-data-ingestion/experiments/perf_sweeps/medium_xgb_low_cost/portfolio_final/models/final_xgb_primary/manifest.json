@@ -1,0 +1,22 @@
+{
+  "model_path": "model.json",
+  "calibrator_path": "calibrator.joblib",
+  "feature_list_path": "feature_list.json",
+  "threshold": {
+    "value": 0.5,
+    "path": "threshold.json"
+  },
+  "report_path": "report.json",
+  "gates": {
+    "prob_column": "base_prob",
+    "inference": {
+      "prob_gate_min": 0.55,
+      "long_only": true,
+      "min_hold_bars": 1
+    }
+  },
+  "metadata": {
+    "model_type": "xgboost_classifier",
+    "calibrated": true
+  }
+}

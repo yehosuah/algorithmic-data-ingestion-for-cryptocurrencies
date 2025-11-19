@@ -1,0 +1,15 @@
+{
+  "model_path": "model.json",
+  "calibrator_path": "calibrator.joblib",
+  "feature_list_path": "feature_list.json",
+  "threshold": {
+    "value": 0.5,
+    "path": "threshold.json"
+  },
+  "report_path": "report.json",
+  "gates": {},
+  "metadata": {
+    "model_type": "xgboost_classifier",
+    "calibrated": true
+  }
+}

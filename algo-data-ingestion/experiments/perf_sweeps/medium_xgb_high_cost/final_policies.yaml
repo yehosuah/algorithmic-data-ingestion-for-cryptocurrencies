@@ -1,0 +1,36 @@
+primary:
+  id: policy_0010
+  weights:
+    xgb: 1.0
+  thresholds:
+    global:
+      entry_long: 0.51
+      exit_long: 0.5
+      entry_short: 0.49
+      exit_short: 0.5
+  models:
+  - xgb
+conservative:
+  id: policy_0008
+  weights:
+    xgb: 1.0
+  thresholds:
+    global:
+      entry_long: 0.53
+      exit_long: 0.51
+      entry_short: 0.43
+      exit_short: 0.5
+  models:
+  - xgb
+aggressive:
+  id: policy_0012
+  weights:
+    xgb: 1.0
+  thresholds:
+    global:
+      entry_long: 0.53
+      exit_long: 0.51
+      entry_short: 0.43
+      exit_short: 0.55
+  models:
+  - xgb
