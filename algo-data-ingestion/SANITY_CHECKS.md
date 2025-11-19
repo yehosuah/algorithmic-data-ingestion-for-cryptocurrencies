@@ -1,8 +1,8 @@
 # Sanity Checks and Optional Improvements
 
-_Last updated: 2025-11-16 05:43 UTC_
+_Last updated: 2025-11-19 03:48 UTC_
 
-> Update 2025-11-16: Added queue/backlog guardrails (`DECISION_PAYLOAD_ITEMS`, `trading_decision_queue_depth`, `TRADING_LAST_TS_GRACE_BARS`) to the dry-run checklist and appended a live distribution audit step using `scripts/probability_distribution_audit.py`.
+> Update 2025-11-19: Dry-run defaults now point to the promoted portfolio sweep bundle (`experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary`) via `configs/deployment_portfolio_contract.yaml` + `configs/dry_run/infer_jobs_portfolio_policy.yaml`; added checks to keep `TRADING_MODELS` and mounts aligned with the contract while watching queue/backlog guardrails.
 
 This document summarizes quick validation steps for a 2‑week backfill (market + RSS) and tracks optional improvements to reference during iteration.
 
@@ -78,7 +78,8 @@ Check the generated JSON into `release/symbol_gates/` so CI + manifests inherit 
 ## Trading Dry Run Validation
 
 With manifests refreshed and the Docker stack running, validate the scheduler → Redis → trading loop:
-1. Ensure `INFER_JOBS` is populated (see `.env.example`) and restart `scheduler` so it reloads manifests from `MODELS_ROOT`.
+1. Ensure `./experiments/perf_sweeps` is mounted (compose already does) and the promoted bundle exists at `experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary` (or whatever path your deployment contract references).
+2. Point `INFER_JOBS` to `configs/dry_run/infer_jobs_portfolio_policy.yaml` (or inline JSON) and restart `scheduler` so it reloads manifests from `MODELS_ROOT`; keep `TRADING_MODELS` aligned with the contract (`xgb_primary` on ETH/USDT, 1m by default).
 2. Watch scheduler metrics and logs:
    ```bash
    curl -s http://localhost:9002/metrics | grep scheduler_decision

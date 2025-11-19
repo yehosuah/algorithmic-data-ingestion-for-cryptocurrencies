@@ -1,7 +1,9 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-11-17 14:38 UTC_
+_Last updated: 2025-11-19 03:48 UTC_
 
+> Update 2025-11-19: Added sampling/weighting knobs to the time-series CV + random-search lane (`--sampling-policy/--weight-policy`, configs under `configs/sampling_*.yaml` + `configs/weights_cost_capacity.yaml`), threaded sample weights through DeepLOB/TCN/Transformer training, and shipped a portfolio performance-sweep harness (`portfolio/run_perf_sweeps.py`). The promoted sweep (`medium_xgb_low_cost`) is codified in `configs/deployment_portfolio_contract.yaml` plus `configs/dry_run/infer_jobs_portfolio_policy.yaml`, with Docker now mounting `experiments/perf_sweeps` so scheduler/trading can load the `xgb_primary` artifact during dry-runs.
+>
 > Update 2025-11-17: Added a time-series CV + random hyperparameter search lane (`training/time_series_cv.py`, `training/run_hparam_search.py`, `configs/cv_config.yaml`, `configs/hparam_spaces.yaml`), promoted the winning configs to `configs/best_model_configs.{yaml,json}`, and wired the sequence builders + TCN/Transformer trainers with stride-aware batching and P&L-aware early stopping so stride-1 experiments stay memory-safe while monitoring deployable Sharpe/coverage.
 >
 > Update 2025-11-16: Wired probability sampling into the scheduler/ingestion paths, added the distribution audit + recalibration workflow (`scripts/probability_distribution_audit.py`, refreshed `refresh_calibration.py`), capped enqueued decisions per job (`DECISION_PAYLOAD_ITEMS`/`max_decision_items`) with a queue-depth gauge, and added a restart grace (`TRADING_LAST_TS_GRACE_BARS`) so trading clears stale timestamps after downtime.
@@ -60,7 +62,7 @@ docker compose up -d --build
 - **scheduler** – Calls admin endpoints on cron (market backfill, TTL sweep); exposes `/metrics` on port 9002.
 - **prometheus** – Scrapes API, scheduler, redis-exporter.
 - **grafana** – Dashboards in `monitoring/grafana/dashboards`.
-- **trading** – Consumes `trading:decisions`, enforces manifest gates, emits Prometheus metrics, and persists state/audit trails.
+- **trading** – Consumes `trading:decisions`, enforces manifest/portfolio gates, emits Prometheus metrics, and persists state/audit trails.
 
 ---
 
@@ -80,10 +82,13 @@ Each payload carries manifest metadata, side, and probability, so the trading wo
 
 Trading also clears stale dedupe timestamps after restarts when downtime exceeds `TRADING_LAST_TS_GRACE_BARS` bars (default 3) so fresh decisions are not dropped due to old state; increase the grace if using long bar intervals.
 
+The default dry-run compose now loads `configs/dry_run/infer_jobs_portfolio_policy.yaml`, which routes an ETH/USDT inference job through the promoted portfolio sweep artifact (`experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary`) defined in `configs/deployment_portfolio_contract.yaml`. Keep `./experiments/perf_sweeps` mounted for scheduler/trading so the decision logic can load the artifact, and adjust `TRADING_MODELS` if you change the contract.
+
 > Tip: Let `scheduler` and `trading` run for at least an hour during rehearsals without restarting them—the extra runway keeps the `rvol_20` rolling window stable and gives `trading_trade_attempts_total` / `trading_gate_toggles_total` time to move off zero. Capture start/end counter values in your dry-run log.
 
 Useful helpers:
 - `python scripts/verify_trading_redis.py` inspects the Redis position hash and audit stream.
+- `python live/decision_logic.py --deployment-contract configs/deployment_portfolio_contract.yaml --dummy-features-path /tmp/live_slice.parquet --output-path /tmp/targets.json` smoke-tests the portfolio policy over a live-like slice without touching Redis.
 - Grafana dashboard `monitoring/grafana/dashboards/trading-overview.json` surfaces queue depth, gate coverage, and trade attempt metrics; alert rules now include stale decision queue detection.
 
 > **Recovery plan:** Whenever live coverage or PnL drifts from the training reports, follow the authoritative checklist in `docs/live_trading_recovery_plan.md`. Treat that document as the source of truth for remediation steps before adjusting manifests or redeploying.

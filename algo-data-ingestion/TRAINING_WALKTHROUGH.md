@@ -1,7 +1,9 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-11-17 14:38 UTC_
+_Last updated: 2025-11-19 03:48 UTC_
 
+> Update 2025-11-19: Added sampling/weighting controls to the CV + random-search lane (`--sampling-policy/--weight-policy`, `training/sampling_policies.py`, `training/sample_weights.py`, configs under `configs/sampling_*.yaml` + `configs/weights_cost_capacity.yaml`), piped sample weights through DeepLOB/TCN/Transformer training, and introduced a sampling/weighting comparison harness (`training/run_sampling_weighting_experiments.py`). Formalised the portfolio performance-sweep lane (`portfolio/run_perf_sweeps.py`, `configs/perf_sweep_scenarios.yaml`) with the promoted XGB-only policy codified in `configs/deployment_portfolio_contract.yaml` + `configs/dry_run/infer_jobs_portfolio_policy.yaml` for scheduler/trading dry-runs against `experiments/perf_sweeps/medium_xgb_low_cost/...`.
+>
 > Update 2025-11-17: Layered in the time-series CV + random-search lane (`training/time_series_cv.py`, `training/run_hparam_search.py`) with shared search/cv configs (`configs/hparam_spaces.yaml`, `configs/cv_config.yaml`), promoted the current winners (`configs/best_model_configs.{yaml,json}`), and added stride-aware sequence builders plus P&L-aware early stopping for TCN/Transformer to keep stride-1 sweeps memory-safe while monitoring deployable Sharpe.
 
 This guide walks through the refreshed modeling stack: relaxed-gate retrains for the horizon-120 XGBoost baseline, the Calmon TCN suite, and the elastic-net blender that now clears 5 bps costs with RSS enrichment.
@@ -39,6 +41,32 @@ This guide walks through the refreshed modeling stack: relaxed-gate retrains for
     --output configs/best_model_configs.yaml
   ```
   The current promoted configs are already checked in (`xgb_trial_010`, `tcn_trial_011`, `transformer_trial_023`), mirrored in YAML/JSON for scripting.
+
+## 0c. Sampling & Weighting Policies
+- Sampling policies live in `training/sampling_policies.py` + `configs/sampling_*.yaml` (`uniform`, `vol_weighted`, `liquidity_weighted`, `regime_balanced`); weighting lives in `training/sample_weights.py` + `configs/weights_cost_capacity.yaml` (`none`, `cost_inverse`, `capacity_proportional`, `cost_capacity_combo`). Sample weights are threaded through XGB, TCN, Transformer, and DeepLOB trainers.
+- Hyperparameter search now accepts `--sampling-policy/--sampling-config` and `--weight-policy/--weight-config` so CV scores reflect the chosen resampling scheme:
+  ```bash
+  python -m training.run_hparam_search \
+    --model xgb \
+    --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
+    --cv-config configs/cv_config.yaml \
+    --hparam-space configs/hparam_spaces.yaml \
+    --sampling-policy regime_balanced \
+    --sampling-config configs/sampling_regime_balanced.yaml \
+    --weight-policy cost_capacity_combo \
+    --weight-config configs/weights_cost_capacity.yaml \
+    --n-trials 16 --output-dir experiments/hparam_search/xgb
+  ```
+- To benchmark combinations against the promoted configs, run:
+  ```bash
+  python training/run_sampling_weighting_experiments.py \
+    --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
+    --best-configs configs/best_model_configs.yaml \
+    --experiment-config configs/sampling_weighting_experiments.yaml \
+    --cv-config configs/cv_config.yaml \
+    --output-file experiments/sampling_weighting_comparison.csv
+  ```
+  Summaries land in `reports/sampling_weighting_summary.{md,json}` (current recs: XGB `regime_balanced` with no weights; TCN `uniform` with no weights).
 
 ## 0. Prepare Multi-Symbol Feed & Gates
 - Sanitize fresh parquet pulls before training so duplicate (timestamp, symbol) rows and price outliers do not blow up `hl_spread`/`rvol`:
@@ -164,15 +192,30 @@ python scripts/report_shortlist.py \
 - Meta gating still lacks a stable decision surface; rerun `scripts/train_meta_label.py` only after extending the blender matrix to newer months and confirming the new deployable coverage plateaus via the guardrail.
 - Leverage the existing manifests for deployable gates in live inference until a calibrated meta filter clears the ≥1.2 equity hurdle without compromising the 5e-4 coverage floor.
 
-## 9. Wire Into Scheduler + Trading Dry Run
-- Copy refreshed manifests and reports to the models directory mounted by Docker (`MODELS_ROOT`). The scheduler reads them when parsing `INFER_JOBS`.
-- Configure `INFER_JOBS` (env JSON list) with exchange/symbol/timeframe, lookback/history windows, and manifest names. Example:
-  ```json
-  [{"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":1440,
-    "history_minutes":2880,"base_model":"base_xgb_h120_calmon_spread0",
-    "tcn_model":"tcn_h120_calmon_relaxed","stride":30,"queue_key":"trading:decisions",
-    "cron":"*/1 * * * *"}]
+## 9. Portfolio Performance Sweeps & Deployment Contract
+- Run portfolio sweeps across predefined scenarios (`configs/perf_sweep_scenarios.yaml`) to tune thresholds/weights against the promoted model configs:
+  ```bash
+  python -m portfolio.run_perf_sweeps \
+    --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
+    --best-model-configs configs/best_model_configs.yaml \
+    --risk-limits configs/portfolio_risk_limits.yaml \
+    --sweep-config configs/perf_sweep_scenarios.yaml \
+    --base-output-dir experiments/perf_sweeps
   ```
+  Use `python -c "from portfolio.run_perf_sweeps import run_production_xgb_sweeps; raise SystemExit(run_production_xgb_sweeps())"` for the XGB-only sweep we promote.
+- Each scenario writes policy search results under `experiments/perf_sweeps/<scenario>/portfolio_policy`, final policies to `<scenario>/final_policies.yaml`, and a deployment-friendly bundle under `<scenario>/portfolio_final` (metrics + `models/final_xgb_primary`).
+- The current winner (`medium_xgb_low_cost`: Sharpe 278, 100 trades, ≈51 % time-in-position across ETH/SOL) is mirrored to `configs/final_portfolio_policies.yaml` and `configs/deployment_portfolio_contract.yaml`. Dry-run inference uses `configs/dry_run/infer_jobs_portfolio_policy.yaml` with the `xgb_primary` artifact path pre-wired; keep Docker mounting `./experiments/perf_sweeps` so scheduler/trading can resolve it.
+
+## 10. Wire Into Scheduler + Trading Dry Run
+- Copy refreshed artifacts and reports to the models directory mounted by Docker (`MODELS_ROOT`); Docker already mounts `./experiments/perf_sweeps` so scheduler/trading can load the promoted portfolio artifact.
+- Configure `INFER_JOBS` (env JSON list or `configs/dry_run/infer_jobs_portfolio_policy.yaml`) with exchange/symbol/timeframe, lookback/history windows, and the policy contract. Example:
+  ```json
+  [{"job_id":"portfolio_policy_primary","exchange":"binance","symbol":"ETH/USDT",
+    "timeframe":"1m","lookback_minutes":180,"history_minutes":240,"base_model":"xgb_primary",
+    "policy_id":"primary","policy_contract":"configs/deployment_portfolio_contract.yaml",
+    "stride":2,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *"}]
+  ```
+- Keep `TRADING_MODELS` aligned with the contract (compose default: `[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":100.0}]`) so the trading service loads the same artifact and sizing used by the scheduler.
 - Bring up `docker compose up scheduler trading` (or the full stack). The scheduler publishes decisions to Redis, and the trading service consumes them, enforcing min-hold/coverage constraints before issuing dry-run orders via the CCXT adapter.
 - Observe metrics:
   ```bash
@@ -182,7 +225,7 @@ python scripts/report_shortlist.py \
   Grafana dashboards `ingestion-overview`, `scheduler-overview`, and `trading-overview` ship pre-wired panels for queue depth, gate coverage, and audit throughput.
 - Use `python scripts/verify_trading_redis.py` to inspect the Redis-backed trading state (`trading:positions`) and audit stream (`trading:audit`) during the dry run. Flip `TRADING_DRY_RUN=0` only after compliance/ops sign-off and update the runbook with observed gate coverage + P&L metrics.
 
-## 10. Feature Parity & Live Gate Drift
+## 11. Feature Parity & Live Gate Drift
 - Export the same scheduler slice you just dry-ran so you can diff it against the sanitized training parquet:
   ```bash
   python scripts/export_feature_slice.py \
