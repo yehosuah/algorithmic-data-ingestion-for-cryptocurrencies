@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
@@ -22,6 +23,7 @@ from app.monitoring.trading_metrics import (
 from app.trading.audit import TradingAuditLogger
 from app.trading.config import TradingConfig, TradingModelConfig
 from app.trading.executor import OrderDecision, OrderExecutor
+from app.trading.decision import TriggerConfig, DecisionOutcome, decide_bar
 from app.trading.state import PositionState, TradingStateStore
 from training.infer import load_manifest_artifacts
 
@@ -508,6 +510,19 @@ class TradingService:
         if take_profit_pct is not None and take_profit_pct <= 0.0:
             take_profit_pct = None
 
+        trigger_cfg = TriggerConfig(
+            entry_threshold=entry_threshold,
+            exit_threshold=exit_threshold,
+            exit_prob_drop=exit_prob_drop,
+            min_hold_bars=min_hold_bars,
+            bar_seconds=model_cfg.bar_seconds,
+            long_only=manifest.long_only,
+            max_hold_seconds=max_hold_seconds,
+            stop_loss_pct=stop_loss_pct,
+            take_profit_pct=take_profit_pct,
+            max_spread_bps=model_cfg.max_spread_bps,
+        )
+
         for ts, item in parsed:
             probability = float(item.get("probability") or 0.0)
             gate_pass = bool(item.get("gate_pass"))
@@ -546,73 +561,20 @@ class TradingService:
                     if entry_price <= 0.0:
                         entry_price = None
             current_price = _extract_price_from_item(item)
-            exit_due_to_stop_loss = False
-            exit_due_to_take_profit = False
-            if (
-                state.in_position
-                and entry_price is not None
-                and current_price is not None
-            ):
-                if stop_loss_pct is not None and current_price <= entry_price * (1.0 - stop_loss_pct):
-                    exit_due_to_stop_loss = True
-                elif take_profit_pct is not None and current_price >= entry_price * (1.0 + take_profit_pct):
-                    exit_due_to_take_profit = True
+            spread_bps = _extract_spread_from_item(item)
 
-            force_time_exit = False
-            if (
-                state.in_position
-                and max_hold_seconds is not None
-                and state.entry_ts is not None
-                and (ts - state.entry_ts).total_seconds() >= max_hold_seconds
-            ):
-                force_time_exit = True
-
-            ready_for_exit = state.ready_for_exit(ts)
-            if force_time_exit and not ready_for_exit:
-                ready_for_exit = True
-            if (exit_due_to_stop_loss or exit_due_to_take_profit) and not ready_for_exit:
-                ready_for_exit = True
-
-            should_enter = (
-                gate_pass
-                and probability >= entry_threshold
-                and manifest.long_only
-                and state.ready_for_entry(ts)
+            outcome = decide_bar(
+                ts=ts,
+                probability=probability,
+                gate_pass=gate_pass,
+                state=state,
+                cfg=trigger_cfg,
+                current_price=current_price,
+                entry_price=entry_price,
+                spread_bps=spread_bps,
             )
 
-            exit_due_to_prob_floor = probability < exit_threshold
-            exit_due_to_gate = (not gate_pass) or exit_due_to_prob_floor
-            exit_due_to_trailing = False
-            if state.in_position and stored_entry_prob is not None:
-                exit_due_to_trailing = (stored_entry_prob - probability) >= exit_prob_drop
-
-            exit_trigger: Optional[str] = None
-            if force_time_exit:
-                exit_trigger = "time_limit"
-            elif exit_due_to_stop_loss:
-                exit_trigger = "stop_loss"
-            elif exit_due_to_take_profit:
-                exit_trigger = "take_profit"
-            elif exit_due_to_prob_floor:
-                exit_trigger = "prob_floor"
-            elif not gate_pass:
-                exit_trigger = "gate_close"
-            elif exit_due_to_trailing:
-                exit_trigger = "prob_trailing"
-
-            should_exit = (
-                state.in_position
-                and ready_for_exit
-                and (
-                    exit_due_to_gate
-                    or exit_due_to_trailing
-                    or force_time_exit
-                    or exit_due_to_stop_loss
-                    or exit_due_to_take_profit
-                )
-            )
-
-            if should_enter:
+            if outcome.should_enter:
                 decision = await self.executor.submit(
                     exchange=model_cfg.exchange,
                     symbol=model_cfg.symbol,
@@ -654,6 +616,7 @@ class TradingService:
                     state.metadata.pop("last_exit_trigger", None)
                     set_position_active(model_cfg.model, model_cfg.symbol, True)
                     dirty = True
+                    market_price = current_price if current_price is not None else decision.price_used
                     self._log_trade_telemetry(
                         kind="entry",
                         model_cfg=model_cfg,
@@ -664,7 +627,8 @@ class TradingService:
                         decision=decision,
                         item=item,
                         entry_prob=probability,
-                        current_price=current_price,
+                        current_price=market_price,
+                        entry_price=decision.price_used,
                     )
                 else:
                     logger.info(
@@ -681,15 +645,15 @@ class TradingService:
                         f"{decision.spread_bps:.4f}" if decision.spread_bps is not None else ""
                     )
                     dirty = True
-            elif should_exit:
-                if exit_trigger == "time_limit":
+            elif outcome.should_exit:
+                if outcome.exit_trigger == "time_limit":
                     logger.info(
                         "Time-based exit triggered for %s %s after %.1f minutes in position",
                         model_cfg.model,
                         model_cfg.symbol,
                         ((ts - (state.entry_ts or ts)).total_seconds() / 60.0),
                     )
-                elif exit_trigger == "stop_loss":
+                elif outcome.exit_trigger == "stop_loss":
                     logger.info(
                         "Stop-loss exit triggered for %s %s at price %.6f (entry %.6f, threshold %.3f%%)",
                         model_cfg.model,
@@ -698,7 +662,7 @@ class TradingService:
                         (entry_price or 0.0),
                         (stop_loss_pct or 0.0) * 100.0,
                     )
-                elif exit_trigger == "take_profit":
+                elif outcome.exit_trigger == "take_profit":
                     logger.info(
                         "Take-profit exit triggered for %s %s at price %.6f (entry %.6f, threshold %.3f%%)",
                         model_cfg.model,
@@ -707,6 +671,14 @@ class TradingService:
                         (entry_price or 0.0),
                         (take_profit_pct or 0.0) * 100.0,
                     )
+                if outcome.skip_execution:
+                    state.metadata["last_exit_reason"] = outcome.skip_reason or ""
+                    state.metadata["last_exit_spread_bps"] = (
+                        f"{spread_bps:.4f}" if spread_bps is not None else ""
+                    )
+                    state.metadata["last_exit_trigger"] = outcome.exit_trigger or ""
+                    dirty = True
+                    continue
                 decision = await self.executor.submit(
                     exchange=model_cfg.exchange,
                     symbol=model_cfg.symbol,
@@ -730,7 +702,7 @@ class TradingService:
                     side="sell",
                     gate_pass=gate_pass,
                     probability=probability,
-                    threshold=exit_threshold if exit_trigger in {"prob_floor", "prob_trailing"} else entry_threshold,
+                    threshold=exit_threshold if outcome.exit_trigger in {"prob_floor", "prob_trailing"} else entry_threshold,
                     decision=decision,
                 )
                 if decision.executed:
@@ -756,10 +728,11 @@ class TradingService:
                     state.metadata["last_exit_spread_bps"] = (
                         f"{decision.spread_bps:.4f}" if decision.spread_bps is not None else ""
                     )
-                    state.metadata["last_exit_trigger"] = exit_trigger or ""
+                    state.metadata["last_exit_trigger"] = outcome.exit_trigger or ""
                     state.metadata.pop("open_entry_prob", None)
                     set_position_active(model_cfg.model, model_cfg.symbol, False)
                     dirty = True
+                    market_price = current_price if current_price is not None else decision.price_used
                     self._log_trade_telemetry(
                         kind="exit",
                         model_cfg=model_cfg,
@@ -769,10 +742,10 @@ class TradingService:
                         gate_pass=gate_pass,
                         decision=decision,
                         item=item,
-                        entry_prob=stored_entry_prob,
-                        current_price=current_price,
+                        entry_prob=state.metadata.get("open_entry_prob"),
+                        current_price=market_price,
                         entry_price=entry_price,
-                        exit_trigger=exit_trigger,
+                        exit_trigger=outcome.exit_trigger,
                     )
                 else:
                     logger.info(
@@ -780,14 +753,14 @@ class TradingService:
                         model_cfg.model,
                         model_cfg.symbol,
                         probability,
-                        exit_threshold if exit_trigger in {"prob_floor", "prob_trailing"} else entry_threshold,
+                        exit_threshold if outcome.exit_trigger in {"prob_floor", "prob_trailing"} else entry_threshold,
                         decision.reason or "unknown",
                     )
                     state.metadata["last_exit_reason"] = decision.reason or ""
                     state.metadata["last_exit_spread_bps"] = (
                         f"{decision.spread_bps:.4f}" if decision.spread_bps is not None else ""
                     )
-                    state.metadata["last_exit_trigger"] = exit_trigger or ""
+                    state.metadata["last_exit_trigger"] = outcome.exit_trigger or ""
                     dirty = True
 
         if dirty:
@@ -821,7 +794,15 @@ class TradingService:
         feature_spread = _extract_spread_from_item(item)
 
         def _fmt(value: Optional[float], precision: int = 4) -> str:
-            return f"{value:.{precision}f}" if value is not None else "na"
+            if value is None:
+                return "na"
+            try:
+                numeric = float(value)
+            except (TypeError, ValueError):
+                return "na"
+            if not math.isfinite(numeric):
+                return "na"
+            return f"{numeric:.{precision}f}"
 
         logger.info(
             "Trade telemetry [%s #%d] %s %s gate=%s prob=%s entry_thr=%.4f exit_thr=%.4f "

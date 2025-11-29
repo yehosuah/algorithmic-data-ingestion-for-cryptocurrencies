@@ -19,13 +19,13 @@ gate_config:
     hl_spread_max: null
     hl_spread_z_max: null
     rvol20_max: null
-    prob_gate_min: 0.5
+    prob_gate_min: 0.52
     min_hold_bars: 1
     long_only: false
   inference:
     hl_spread_max: null
     hl_spread_z_max: null
     rvol20_max: null
-    prob_gate_min: 0.5
+    prob_gate_min: 0.52
     min_hold_bars: 1
     long_only: true

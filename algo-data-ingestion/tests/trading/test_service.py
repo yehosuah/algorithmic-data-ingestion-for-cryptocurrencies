@@ -5,7 +5,7 @@ import pytest
 
 from app.trading.config import TradingConfig
 from app.trading.executor import OrderDecision
-from app.trading.service import TradingService
+from app.trading.service import TradingService, _extract_price_from_item
 from app.trading.state import PositionState
 
 
@@ -64,6 +64,11 @@ def _reset_state(service: TradingService, state_key: str) -> PositionState:
     state.bars_in_position = 0
     service.state_store.update(state_key, state)
     return state
+
+
+def test_extract_price_from_nested_features():
+    item = {"features": {"close": 123.45}}
+    assert _extract_price_from_item(item) == pytest.approx(123.45)
 
 
 @pytest.mark.asyncio

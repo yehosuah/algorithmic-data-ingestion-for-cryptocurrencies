@@ -1,0 +1,35 @@
+primary:
+  entry_threshold: 0.49
+  exit_threshold: 0.48
+  exit_prob_drop: 0.15
+  min_hold_bars: 1.0
+  stop_loss_pct: 0.004
+  take_profit_pct: 0.0075
+  max_spread_bps: 8.0
+  max_hold_minutes: 60.0
+conservative:
+  entry_threshold: 0.5
+  exit_threshold: 0.51
+  exit_prob_drop: 0.1
+  min_hold_bars: 3.0
+  stop_loss_pct: 0.004
+  take_profit_pct: null
+  max_spread_bps: 8.0
+  max_hold_minutes: null
+aggressive:
+  entry_threshold: 0.5
+  exit_threshold: 0.51
+  exit_prob_drop: 0.1
+  min_hold_bars: 1.0
+  stop_loss_pct: 0.004
+  take_profit_pct: 0.0075
+  max_spread_bps: 8.0
+  max_hold_minutes: null
+meta:
+  generated_from: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/experiments/trigger_sweeps/eth_quick/results.csv
+  symbol: ETH/USDT
+  timeframe: 1m
+  constraints:
+    min_trades: 100
+    fraction_time_in_position_min: 0.01
+  active_policy: primary
