@@ -1,7 +1,8 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-11-19 03:48 UTC_
+_Last updated: 2025-11-29 14:33 UTC_
 
+> Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 > Update 2025-11-19: Added sampling/weighting knobs to the time-series CV + random-search lane (`--sampling-policy/--weight-policy`, configs under `configs/sampling_*.yaml` + `configs/weights_cost_capacity.yaml`), threaded sample weights through DeepLOB/TCN/Transformer training, and shipped a portfolio performance-sweep harness (`portfolio/run_perf_sweeps.py`). The promoted sweep (`medium_xgb_low_cost`) is codified in `configs/deployment_portfolio_contract.yaml` plus `configs/dry_run/infer_jobs_portfolio_policy.yaml`, with Docker now mounting `experiments/perf_sweeps` so scheduler/trading can load the `xgb_primary` artifact during dry-runs.
 >
 > Update 2025-11-17: Added a time-series CV + random hyperparameter search lane (`training/time_series_cv.py`, `training/run_hparam_search.py`, `configs/cv_config.yaml`, `configs/hparam_spaces.yaml`), promoted the winning configs to `configs/best_model_configs.{yaml,json}`, and wired the sequence builders + TCN/Transformer trainers with stride-aware batching and P&L-aware early stopping so stride-1 experiments stay memory-safe while monitoring deployable Sharpe/coverage.
@@ -47,6 +48,29 @@ docker compose up -d --build
   curl -s http://localhost:9010/metrics | grep trading_trade_attempts_total
   ```
 
+### Trigger optimizer + preflight
+1. Run a sweep (quick example):
+   ```bash
+   python3 -m analysis.trigger_optimizer \
+     --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
+     --search-space configs/trigger_search_space_quick.yaml \
+     --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary \
+     --max-rows 20000 \
+     --output-dir experiments/trigger_sweeps/eth_quick \
+     --promote-best
+   ```
+   This writes ranked results to `experiments/trigger_sweeps/eth_quick/results.csv` and exports primary/conservative/aggressive to `configs/final_trigger_policy.yaml` (with `meta.active_policy`).
+2. Preflight coverage/trades before starting services:
+   ```bash
+   python3 scripts/trigger_preflight.py \
+     --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
+     --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary \
+     --max-rows 5000
+   ```
+   Exits non-zero if predicted coverage or trade-count proxy is near zero.
+3. Start services: `docker compose up -d`
+   - Model paths in the deployment contract now resolve relative to `MODELS_ROOT` (compose sets `/opt/models`); the mounted host bundle lives at `./experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary` → `/opt/models/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary` inside the containers.
+
 > Notes
 > - La imagen se construye “lean” por defecto (sin instalar `torch`/`transformers`) para acelerar el build. Si necesitas ML dentro del contenedor, puedes construir con `--build-arg INSTALL_ML=1`.
 > - Sin llaves API, social/news y on-chain pueden devolver `no_data` o errores 401 del proveedor. Con llaves, funcionará scraping real.
@@ -63,6 +87,8 @@ docker compose up -d --build
 - **prometheus** – Scrapes API, scheduler, redis-exporter.
 - **grafana** – Dashboards in `monitoring/grafana/dashboards`.
 - **trading** – Consumes `trading:decisions`, enforces manifest/portfolio gates, emits Prometheus metrics, and persists state/audit trails.
+
+Feature payloads are now enriched throughout the stack: `ingestion-api` builds augmented market features during ingest/backfill, writes them to Redis with `hl_spread_z`/`rvol_20`/liquidity ranks included, and the scheduler attaches `close`/`price` columns and backfills any missing manifest features before scoring so gates/trigger sweeps see real prices rather than zeros.
 
 ---
 
@@ -83,6 +109,8 @@ Each payload carries manifest metadata, side, and probability, so the trading wo
 Trading also clears stale dedupe timestamps after restarts when downtime exceeds `TRADING_LAST_TS_GRACE_BARS` bars (default 3) so fresh decisions are not dropped due to old state; increase the grace if using long bar intervals.
 
 The default dry-run compose now loads `configs/dry_run/infer_jobs_portfolio_policy.yaml`, which routes an ETH/USDT inference job through the promoted portfolio sweep artifact (`experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary`) defined in `configs/deployment_portfolio_contract.yaml`. Keep `./experiments/perf_sweeps` mounted for scheduler/trading so the decision logic can load the artifact, and adjust `TRADING_MODELS` if you change the contract.
+
+Trading trigger guards are centralized: `TRADING_MODELS` entries now accept `max_spread_bps`, `stop_loss_pct`, `take_profit_pct`, and `max_hold_minutes`, and the live loop shares `app/trading/decision.py::decide_bar` with the offline optimizer so spread/hold/SL/TP checks behave identically in sweeps and production.
 
 > Tip: Let `scheduler` and `trading` run for at least an hour during rehearsals without restarting them—the extra runway keeps the `rvol_20` rolling window stable and gives `trading_trade_attempts_total` / `trading_gate_toggles_total` time to move off zero. Capture start/end counter values in your dry-run log.
 

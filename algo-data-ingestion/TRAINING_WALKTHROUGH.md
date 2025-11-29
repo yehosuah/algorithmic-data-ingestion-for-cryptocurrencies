@@ -1,7 +1,8 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-11-19 03:48 UTC_
+_Last updated: 2025-11-29 14:33 UTC_
 
+> Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 > Update 2025-11-19: Added sampling/weighting controls to the CV + random-search lane (`--sampling-policy/--weight-policy`, `training/sampling_policies.py`, `training/sample_weights.py`, configs under `configs/sampling_*.yaml` + `configs/weights_cost_capacity.yaml`), piped sample weights through DeepLOB/TCN/Transformer training, and introduced a sampling/weighting comparison harness (`training/run_sampling_weighting_experiments.py`). Formalised the portfolio performance-sweep lane (`portfolio/run_perf_sweeps.py`, `configs/perf_sweep_scenarios.yaml`) with the promoted XGB-only policy codified in `configs/deployment_portfolio_contract.yaml` + `configs/dry_run/infer_jobs_portfolio_policy.yaml` for scheduler/trading dry-runs against `experiments/perf_sweeps/medium_xgb_low_cost/...`.
 >
 > Update 2025-11-17: Layered in the time-series CV + random-search lane (`training/time_series_cv.py`, `training/run_hparam_search.py`) with shared search/cv configs (`configs/hparam_spaces.yaml`, `configs/cv_config.yaml`), promoted the current winners (`configs/best_model_configs.{yaml,json}`), and added stride-aware sequence builders plus P&L-aware early stopping for TCN/Transformer to keep stride-1 sweeps memory-safe while monitoring deployable Sharpe.
@@ -67,6 +68,28 @@ This guide walks through the refreshed modeling stack: relaxed-gate retrains for
     --output-file experiments/sampling_weighting_comparison.csv
   ```
   Summaries land in `reports/sampling_weighting_summary.{md,json}` (current recs: XGB `regime_balanced` with no weights; TCN `uniform` with no weights).
+
+## 0d. Trigger sweep + preflight (trading thresholds)
+- Sweep entry/exit/hold/stop/take-profit/spread guardrails against the latest dataset to produce a deployable trigger policy:
+  ```bash
+  python3 -m analysis.trigger_optimizer \
+    --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
+    --search-space configs/trigger_search_space.yaml \
+    --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary \
+    --output-dir experiments/trigger_sweeps/eth_full \
+    --max-rows 50000 \
+    --promote-best
+  ```
+  This writes `results.csv` + `summary.json` under `experiments/trigger_sweeps/...` and promotes the winner to `configs/final_trigger_policy.yaml` (with `meta.active_policy`).
+- Before starting the Docker stack, fail fast if coverage/trade proxy falls below the guardrail:
+  ```bash
+  python3 scripts/trigger_preflight.py \
+    --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
+    --policy configs/final_trigger_policy.yaml \
+    --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary \
+    --max-rows 5000 --min-coverage 0.01 --min-trades 5
+  ```
+  Paths resolve against `MODELS_ROOT` when running in Docker (`/opt/models` via the compose mount); keep `configs/deployment_portfolio_contract.yaml` and `configs/dry_run/infer_jobs_portfolio_policy.yaml` in sync with the promoted bundle.
 
 ## 0. Prepare Multi-Symbol Feed & Gates
 - Sanitize fresh parquet pulls before training so duplicate (timestamp, symbol) rows and price outliers do not blow up `hl_spread`/`rvol`:

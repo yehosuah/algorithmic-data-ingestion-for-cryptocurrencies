@@ -1,12 +1,14 @@
 # Live Trading Recovery Plan
 
-_Last updated: 2025-11-16 05:43 UTC_
+_Last updated: 2025-11-29 14:33 UTC_
 
+> Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 > Update 2025-11-16: Added queue/backlog safeguards (`DECISION_PAYLOAD_ITEMS`, `trading_decision_queue_depth`, `TRADING_LAST_TS_GRACE_BARS`), folded in the probability sampler + distribution audit pipeline, and clarified calibrator refresh (re-score base booster before fitting) so recovery follows the latest live diagnostics.
 
 _Source of truth for reconciling training metrics with dry-run behaviour._
 
 ## 1. Verify Live Gating & Coverage
+- If coverage collapses or before restarting services after downtime, run `python scripts/trigger_preflight.py --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml --policy configs/final_trigger_policy.yaml --model-dir /opt/models/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary --max-rows 5000 --min-coverage 0.01 --min-trades 5` (adjust path if running outside Docker) to catch dead trigger configs early.
 - Ensure scheduler/trading containers have reloaded manifests (`docker compose exec scheduler cat /opt/models/<model>/manifest.json`).
 - Monitor `model_gate_coverage_ratio` for base + TCN via `curl -s localhost:9002/metrics | rg 'model_gate_coverage_ratio.*(base_xgb|tcn)_h120_calmon_relaxed'`.
 - Inspect recent Redis decision payloads/audit logs to confirm gate predicates embedded in the stream.

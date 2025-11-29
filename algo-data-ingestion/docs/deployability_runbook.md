@@ -1,7 +1,8 @@
 # Deployability Runbook (TCN Suite Refresh – Oct 2025)
 
-_Last updated: 2025-11-13 04:43 UTC_
+_Last updated: 2025-11-29 14:33 UTC_
 
+> Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 > Update 2025-11-13: Folded in the sanitizer + symbol-gate workflow and the feature parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so deployability steps reference the gates/metrics enforced by scheduler + trading.
 
 ## Immediate Follow-Ups
@@ -12,6 +13,7 @@ _Last updated: 2025-11-13 04:43 UTC_
 - **Documentation touch-up** – Update `docs/oct_2025_forward_replay.md` and `TRAINING_STATUS.md` with the new TCN gate thresholds/coverage before circulating status reports.
 - **Monitoring baseline update** – Append Oct 2025 figures to `live_gate_coverage.csv` so alert thresholds reflect the relaxed yet deployable gates.
 - **Trading rehearsal plan** – Populate `INFER_JOBS`/`TRADING_MODELS`, review `docs/weeklong_dry_run_checklist.md`, and schedule a 7-day paper-trading run logging queue depth, trade attempts, and faux P&L.
+- **Trigger guard check** – Run `python scripts/trigger_preflight.py --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml --policy configs/final_trigger_policy.yaml --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary --max-rows 5000` ahead of each rehearsal to fail fast when coverage/trade-count proxy drops.
 - **Feature parity proof** – At the end of each dry run, export a scheduler slice (`scripts/export_feature_slice.py`) and store the diff vs sanitized training data via `scripts/compare_feature_stats.py --train datasets/market_multi_3symbol_1m.parquet --live /tmp/features_debug.parquet --out release/calibration/latest/tcn_parity.json`; attach the JSON to deployment notes before widening gates.
 
 ## Connecting to Live Trading

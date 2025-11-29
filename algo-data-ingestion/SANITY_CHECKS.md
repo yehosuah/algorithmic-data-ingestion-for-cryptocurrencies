@@ -1,7 +1,8 @@
 # Sanity Checks and Optional Improvements
 
-_Last updated: 2025-11-19 03:48 UTC_
+_Last updated: 2025-11-29 14:33 UTC_
 
+> Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 > Update 2025-11-19: Dry-run defaults now point to the promoted portfolio sweep bundle (`experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary`) via `configs/deployment_portfolio_contract.yaml` + `configs/dry_run/infer_jobs_portfolio_policy.yaml`; added checks to keep `TRADING_MODELS` and mounts aligned with the contract while watching queue/backlog guardrails.
 
 This document summarizes quick validation steps for a 2‑week backfill (market + RSS) and tracks optional improvements to reference during iteration.
@@ -78,35 +79,37 @@ Check the generated JSON into `release/symbol_gates/` so CI + manifests inherit 
 ## Trading Dry Run Validation
 
 With manifests refreshed and the Docker stack running, validate the scheduler → Redis → trading loop:
+1. Run a quick trigger preflight before booting containers so dry-runs do not start with zero coverage: `python scripts/trigger_preflight.py --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml --policy configs/final_trigger_policy.yaml --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary --max-rows 5000`.
 1. Ensure `./experiments/perf_sweeps` is mounted (compose already does) and the promoted bundle exists at `experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary` (or whatever path your deployment contract references).
-2. Point `INFER_JOBS` to `configs/dry_run/infer_jobs_portfolio_policy.yaml` (or inline JSON) and restart `scheduler` so it reloads manifests from `MODELS_ROOT`; keep `TRADING_MODELS` aligned with the contract (`xgb_primary` on ETH/USDT, 1m by default).
-2. Watch scheduler metrics and logs:
+1. Point `INFER_JOBS` to `configs/dry_run/infer_jobs_portfolio_policy.yaml` (or inline JSON) and restart `scheduler` so it reloads manifests from `MODELS_ROOT`; keep `TRADING_MODELS` aligned with the contract (`xgb_primary` on ETH/USDT, 1m by default, guard fields for spread/SL/TP/max hold).
+1. Watch scheduler metrics and logs:
    ```bash
    curl -s http://localhost:9002/metrics | grep scheduler_decision
    docker compose logs -f scheduler | grep decision
    ```
-3. Confirm Redis queue health:
+1. Confirm Redis queue health:
    ```bash
    redis-cli -u redis://localhost:6379/0 llen trading:decisions
    ```
    The value should oscillate around 0 as the trading service drains decisions.
-4. Watch backlog safety:
+1. Spot-check Redis feature payloads to ensure augmented fields are present (`hl_spread_z`, `rvol_20`, `sym_spread_ratio`, `sym_rvol_ratio`, `sym_liquidity_rank`) and that `close`/`price` columns are populated on the slices feeding inference; if missing, rerun ingest/backfill before trusting the run.
+1. Watch backlog safety:
    ```bash
    curl -s http://localhost:9010/metrics | grep trading_decision_queue_depth
    ```
    Keep depth near 0; if it creeps, tune `DECISION_PAYLOAD_ITEMS` (or per-job `max_decision_items`) and `TRADING_QUEUE_POLL_TIMEOUT`. After long downtime, ensure `TRADING_LAST_TS_GRACE_BARS` cleared stale last-processed timestamps (trading startup logs will note any reset).
-5. Inspect trading metrics:
+1. Inspect trading metrics:
    ```bash
    curl -s http://localhost:9010/metrics | egrep 'trading_trade_attempts_total|trading_position_active'
    ```
    Run for a few minutes and ensure counters advance while positions toggle as expected.
-6. Audit persisted state:
+1. Audit persisted state:
    ```bash
    python scripts/verify_trading_redis.py
    ```
    Review the `trading:positions` hash and `trading:audit` stream for gate/trade entries.
-7. Grafana dashboards `scheduler-overview` and `trading-overview` visualise queue depth, coverage, trade attempts, and dry-run P&L; keep Prometheus alert rules green throughout the exercise.
-8. Export a parity slice and compare it with the sanitized training parquet before loosening gates:
+1. Grafana dashboards `scheduler-overview` and `trading-overview` visualise queue depth, coverage, trade attempts, and dry-run P&L; keep Prometheus alert rules green throughout the exercise.
+1. Export a parity slice and compare it with the sanitized training parquet before loosening gates:
    ```bash
    python scripts/export_feature_slice.py \
      --data-lake-root data_lake/market \

@@ -1,7 +1,8 @@
 # Sampling & Weighting Summary
 
-_Last updated: 2025-11-19 03:48 UTC_
+_Last updated: 2025-11-29 14:33 UTC_
 
+> Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 Generated via `python training/run_sampling_weighting_experiments.py --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml --best-configs configs/best_model_configs.yaml --experiment-config configs/sampling_weighting_experiments.yaml --cv-config configs/cv_config.yaml --output-file experiments/sampling_weighting_comparison.csv`. Full CSV lives at `experiments/sampling_weighting_comparison.csv`.
 
 ## Top combinations
