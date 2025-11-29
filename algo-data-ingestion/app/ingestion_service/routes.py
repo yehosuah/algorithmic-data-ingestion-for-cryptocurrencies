@@ -49,6 +49,7 @@ from app.features.ingestion.onchain_client import OnchainClient
 from app.features.ingestion.social_client import SocialClient
 from app.features.store.redis_store import get_store, RedisFeatureStore
 from app.features.factory.market_factory import build_market_features
+from training.feature_eng import augment_market_features
 import inspect
 from fastapi import HTTPException
 from app.ingestion_service.metrics import ingest_span, record_rows_written
@@ -225,8 +226,9 @@ async def ingest_market(exchange: str, body: MarketIngestRequest):
                     detail=f"{exchange} does not have market symbol {body.symbol}",
                 ) from e
 
-            # ---- Normalize + write parquet (unchanged logic) ----
+            # ---- Normalize + write parquet (with feature enrichment) ----
             try:
+                features = pd.DataFrame()
                 if not df.empty:
                     df["symbol"] = body.symbol
                     df["exchange"] = exchange
@@ -242,6 +244,23 @@ async def ingest_market(exchange: str, body: MarketIngestRequest):
                             df["timestamp"] = s.dt.tz_localize("UTC")
                     else:
                         df["timestamp"] = pd.to_datetime(s, utc=True)
+
+                    try:
+                        features = build_market_features(df)
+                        features = augment_market_features(features, inplace=False)
+                    except Exception as feat_exc:
+                        logger.warning("Feature build during ingest failed; proceeding with raw OHLCV: %s", feat_exc)
+                        features = pd.DataFrame()
+
+                    if not features.empty:
+                        enriched = features.drop(columns=["dt"], errors="ignore")
+                        df = df.merge(
+                            enriched,
+                            on=["timestamp", "symbol", "exchange", "timeframe"],
+                            how="left",
+                        )
+                        # ensure dt exists for downstream parquet partitioning even if early rows lack features
+                        add_dt_partition(df, ts_col="timestamp")
 
                 base = settings.MARKET_PATH
                 partitions = {
@@ -265,7 +284,7 @@ async def ingest_market(exchange: str, body: MarketIngestRequest):
             features_written = 0
             if not df.empty:
                 try:
-                    features_written = await _write_market_features_to_store(df)
+                    features_written = await _write_market_features_to_store(df, feats=features)
                 except Exception as e:
                     logger.warning("Feature write failed", exc_info=e)
                     features_written = 0
@@ -908,7 +927,11 @@ async def get_news_features_range(
 # Internal: build & write features
 # ---------------------------
 
-async def _write_market_features_to_store(df: pd.DataFrame) -> int:
+async def _write_market_features_to_store(
+    df: pd.DataFrame,
+    *,
+    feats: Optional[pd.DataFrame] = None,
+) -> int:
     """
     Build features from normalized OHLCV and write them to Redis.
     Returns number of feature rows written.
@@ -916,16 +939,37 @@ async def _write_market_features_to_store(df: pd.DataFrame) -> int:
     if df.empty:
         return 0
 
-    feats = build_market_features(df)
+    feats = feats if feats is not None else build_market_features(df)
+    feats = augment_market_features(feats, inplace=False)
     if feats.empty:
         return 0
 
     # choose compact payload set; extend as needed
-    payload_cols = [c for c in ["ret1", "rsi_14", "hl_spread", "oi_obv"] if c in feats.columns]
+    payload_cols = [
+        c
+        for c in [
+            "ret_1",
+            "rsi_14",
+            "hl_spread",
+            "hl_spread_z",
+            "rvol_20",
+            "sym_spread_ratio",
+            "sym_rvol_ratio",
+            "sym_liquidity_rank",
+            "oi_obv",
+        ]
+        if c in feats.columns
+    ]
 
     items = []
     for _, r in feats.iterrows():
-        payload = {c: r[c] for c in payload_cols if pd.notna(r[c])}
+        payload: Dict[str, Any] = {}
+        for c in payload_cols:
+            val = r.get(c)
+            if pd.isna(val):
+                payload[c] = None
+            else:
+                payload[c] = val.item() if hasattr(val, "item") else val
         if not payload:
             continue
         items.append({

@@ -157,6 +157,7 @@ class ManifestArtifacts:
     report: Dict[str, Any]
     model_label: str
     prob_column: str
+    apply_calibration: bool
     rss_indicator_column: Optional[str]
     rss_minute_share_threshold: Optional[float]
     prob_sigma_threshold: Optional[float]
@@ -164,29 +165,52 @@ class ManifestArtifacts:
     gate_reference_tolerance: Optional[float]
 
 
-def _read_text_retry(path: Path, attempts: int = 5, delay: float = 0.1) -> str:
+def _read_text_retry(path: Path, attempts: int = 12, delay: float = 0.1) -> str:
+    """
+    Read text from disk while tolerating transient filesystem lock errors that can surface
+    on bind-mounted model artefacts (e.g. macOS host -> linux container).
+    """
+    transient_errnos = {errno.EDEADLK, errno.EAGAIN, errno.EBUSY}
     last_exc: Optional[OSError] = None
     for idx in range(max(1, attempts)):
         try:
             return path.read_text()
         except OSError as exc:
-            if getattr(exc, "errno", None) == errno.EDEADLK and idx + 1 < attempts:
+            last_exc = exc
+            if getattr(exc, "errno", None) in transient_errnos:
                 time.sleep(delay * (idx + 1))
                 continue
-            last_exc = exc
             break
-    if last_exc is not None and getattr(last_exc, "errno", None) == errno.EDEADLK:
-        # Fallback: copy to a temp file on the container filesystem before reading.
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            tmp_path = Path(tmp.name)
+
+    if last_exc is not None and getattr(last_exc, "errno", None) in transient_errnos:
+        # Fallback 1: unbuffered binary read to avoid text codec re-open attempts.
         try:
-            shutil.copyfile(path, tmp_path)
-            return tmp_path.read_text()
-        finally:
+            with path.open("rb", buffering=0) as fh:
+                chunks: List[bytes] = []
+                while True:
+                    chunk = fh.read(8192)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+            return b"".join(chunks).decode("utf-8", errors="ignore")
+        except Exception:
+            pass
+
+        # Fallback 2: copy to a temp file to dodge host lock state.
+        try:
+            with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                tmp_path = Path(tmp.name)
             try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
+                shutil.copyfile(path, tmp_path)
+                return tmp_path.read_text(encoding="utf-8", errors="ignore")
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
     if last_exc is not None:
         raise last_exc
     # Should not reach here, but keep mypy happy.
@@ -260,6 +284,15 @@ def load_manifest_artifacts(base_dir: Path, *, model_label: Optional[str] = None
     rss_threshold = rss_audit.get("min_minute_spike_share")
     if rss_threshold is None:
         rss_threshold = rss_audit.get("minute_spike_share")
+    apply_calibration = True
+    for flag in (
+        manifest.get("apply_calibration"),
+        metadata.get("apply_calibration"),
+        metadata.get("calibrated"),
+    ):
+        if flag is not None:
+            apply_calibration = bool(flag)
+            break
     prob_guardrail = report.get("prob_sigma_guardrail") or metadata.get("prob_sigma_guardrail") or {}
     prob_sigma_threshold = prob_guardrail.get("threshold")
     gate_reference = metadata.get("gate_reference_coverage")
@@ -282,6 +315,7 @@ def load_manifest_artifacts(base_dir: Path, *, model_label: Optional[str] = None
         report=report,
         model_label=str(label),
         prob_column=prob_column,
+        apply_calibration=apply_calibration,
         rss_indicator_column=rss_indicator_column,
         rss_minute_share_threshold=rss_threshold,
         prob_sigma_threshold=prob_sigma_threshold,
@@ -359,10 +393,15 @@ def load_base_predictor(
     feat_cols = json.loads(_read_text_retry(base_dir / "feature_list.json"))
     calib_path = base_dir / "calibrator.joblib"
     use_calibrator = apply_calibration and calib_path.exists()
+    calib = None
     if use_calibrator:
-        calib = joblib.load(calib_path)
-    else:
-        # Load raw booster model if calibrator absent
+        try:
+            calib = joblib.load(calib_path)
+        except Exception as exc:
+            logger.warning("Failed to load calibrator at %s; falling back to raw booster: %s", calib_path, exc)
+            use_calibrator = False
+    if not use_calibrator:
+        # Load raw booster model if calibrator absent or disabled
         import xgboost as xgb
         booster = xgb.Booster()
         booster.load_model(str(base_dir / "model.json"))
@@ -591,7 +630,11 @@ def score_base_with_manifest(
     """
     artifacts = load_manifest_artifacts(model_dir, model_label=model_label)
     prob_col = artifacts.prob_column or "base_prob"
-    calib, feat_cols = load_base_predictor(model_dir, prob_column=prob_col)
+    calib, feat_cols = load_base_predictor(
+        model_dir,
+        prob_column=prob_col,
+        apply_calibration=getattr(artifacts, "apply_calibration", True),
+    )
     prob_series = predict_base(df, calib, feat_cols)
     scored = df.copy()
     scored[prob_col] = prob_series

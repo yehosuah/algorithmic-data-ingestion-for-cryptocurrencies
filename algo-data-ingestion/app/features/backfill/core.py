@@ -5,6 +5,7 @@ import os, glob
 import pandas as pd
 from app.ingestion_service.config import settings
 from app.features.factory.market_factory import build_market_features
+from training.feature_eng import augment_market_features
 from app.features.store.redis_store import get_store
 
 def _safe_symbol_part(s: str) -> str:
@@ -57,17 +58,33 @@ async def backfill_market(
                 df[col] = val
 
         feats = build_market_features(df)
+        feats = augment_market_features(feats, inplace=False)
         rows_in += len(df)
         if feats.empty:
             files_scanned += 1
             continue
 
-        payload_cols = [c for c in ("ret_1", "rsi_14", "hl_spread", "oi_obv") if c in feats.columns]
+        payload_cols = [
+            c
+            for c in (
+                "ret_1",
+                "rsi_14",
+                "hl_spread",
+                "hl_spread_z",
+                "rvol_20",
+                "sym_spread_ratio",
+                "sym_rvol_ratio",
+                "sym_liquidity_rank",
+                "oi_obv",
+            )
+            if c in feats.columns
+        ]
         items: List[dict] = []
         for _, r in feats.iterrows():
-            payload = {c: float(r[c]) for c in payload_cols if pd.notna(r[c])}
-            if not payload:
-                continue
+            payload = {}
+            for c in payload_cols:
+                val = r.get(c)
+                payload[c] = None if pd.isna(val) else float(val)
             items.append({
                 "domain": "market",
                 "symbol": str(r["symbol"]),

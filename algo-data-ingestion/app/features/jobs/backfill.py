@@ -10,6 +10,7 @@ import pandas as pd
 
 from app.features.store.redis_store import get_store, RedisFeatureStore
 from app.features.factory.market_factory import build_market_features
+from training.feature_eng import augment_market_features
 from app.features.ingestion.ccxt_client import CCXTClient
 from app.features.backfill.core import backfill_market as core_backfill_market
 
@@ -85,15 +86,31 @@ async def build_and_write_market_features(
         return 0
 
     feats = build_market_features(df)
+    feats = augment_market_features(feats, inplace=False)
     if feats is None or feats.empty:
         return 0
 
-    payload_cols = [c for c in ["ret_1", "rsi_14", "hl_spread", "oi_obv"] if c in feats.columns]
+    payload_cols = [
+        c
+        for c in [
+            "ret_1",
+            "rsi_14",
+            "hl_spread",
+            "hl_spread_z",
+            "rvol_20",
+            "sym_spread_ratio",
+            "sym_rvol_ratio",
+            "sym_liquidity_rank",
+            "oi_obv",
+        ]
+        if c in feats.columns
+    ]
     items: List[Dict[str, Any]] = []
     for _, r in feats.iterrows():
-        payload = {c: r[c] for c in payload_cols if pd.notna(r[c])}
-        if not payload:
-            continue
+        payload: Dict[str, Any] = {}
+        for c in payload_cols:
+            val = r.get(c)
+            payload[c] = None if pd.isna(val) else (val.item() if hasattr(val, "item") else val)
         items.append(
             {
                 "domain": "market",

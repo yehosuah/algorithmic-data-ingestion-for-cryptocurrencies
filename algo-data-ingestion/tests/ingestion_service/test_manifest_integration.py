@@ -21,9 +21,13 @@ def _make_test_frame() -> pd.DataFrame:
                 ["2025-10-01T00:00:00Z", "2025-10-01T00:01:00Z"],
                 utc=True,
             ),
+            "symbol": ["BTC/USDT", "BTC/USDT"],
             "hl_spread": [5e-4, 5e-4],
             "hl_spread_z": [-0.5, 0.0],
             "rvol_20": [5e-5, 5e-5],
+            "sym_spread_ratio": [0.5, 0.5],
+            "sym_rvol_ratio": [0.5, 0.5],
+            "sym_liquidity_rank": [1.0, 1.0],
             "base_prob": [0.9, 0.1],
         }
     )
@@ -77,3 +81,18 @@ def test_prepare_decision_payload_pipeline(loaded_registry: ManifestRegistry):
     assert payload["prob_column"] == "base_prob"
     gate_vector = [item["gate_pass"] for item in payload["items"]]
     assert gate_vector == [True, False]
+
+
+def test_build_decision_payload_includes_price_fields(loaded_registry: ManifestRegistry):
+    df = _make_test_frame()
+    df["close"] = [101.0, 102.0]
+    annotated = loaded_registry.annotate_with_gate_pass(
+        "base_xgb_h120_calmon_spread0",
+        df,
+        inplace=False,
+        update_metrics=False,
+    )
+    payload = loaded_registry.build_decision_payload("base_xgb_h120_calmon_spread0", annotated)
+    first = payload["items"][0]
+    assert first["close"] == pytest.approx(101.0)
+    assert first.get("price", first["close"]) == pytest.approx(101.0)

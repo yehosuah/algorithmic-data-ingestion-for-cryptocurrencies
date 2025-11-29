@@ -296,7 +296,11 @@ class ModelScoringService:
                 )
 
         prob_col = artifacts.prob_column or "base_prob"
-        calibrator, feature_columns = load_base_predictor(model_dir, prob_column=prob_col)
+        calibrator, feature_columns = load_base_predictor(
+            model_dir,
+            prob_column=prob_col,
+            apply_calibration=getattr(artifacts, "apply_calibration", True),
+        )
         logger.info("Initialised base XGB scorer for '%s' (features=%d)", label, len(feature_columns))
 
         return BaseXGBRunner(

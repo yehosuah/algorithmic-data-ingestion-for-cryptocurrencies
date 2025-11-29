@@ -10,7 +10,14 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from training.infer import compute_gate_mask, load_base_predictor, predict_base, load_tcn_predictor, predict_tcn
+from training.infer import (
+    compute_gate_mask,
+    load_base_predictor,
+    load_manifest_artifacts,
+    predict_base,
+    load_tcn_predictor,
+    predict_tcn,
+)
 from training.transformer_model import TransformerModel
 
 from portfolio.gating import apply_thresholds_to_probs
@@ -50,14 +57,41 @@ def _load_probabilities(
     if prob_col in features.columns:
         return features[prob_col].to_numpy()
 
-    model_dir = Path(model_path_map.get(model_name, artifacts_root / model_name)).expanduser()
+    raw_dir = Path(model_path_map.get(model_name, artifacts_root / model_name)).expanduser()
+    candidates = []
+    if raw_dir.is_absolute():
+        candidates.append(raw_dir)
+    else:
+        candidates.append((artifacts_root / raw_dir).expanduser())
+        candidates.append(raw_dir)
+        candidates.append((artifacts_root / model_name).expanduser())
+    model_dir = None
+    for cand in candidates:
+        if cand.exists():
+            model_dir = cand
+            break
+    if model_dir is None:
+        model_dir = candidates[0]
+    model_dir = model_dir.expanduser().resolve()
+
+    try:
+        manifest = load_manifest_artifacts(model_dir, model_label=model_name)
+    except Exception:
+        manifest = None
+    prob_col = getattr(manifest, "prob_column", prob_col)
+    apply_calibration = getattr(manifest, "apply_calibration", True)
+
     if (model_dir / "model.json").exists():
-        calibrator, feat_cols = load_base_predictor(model_dir)
+        calibrator, feat_cols = load_base_predictor(
+            model_dir,
+            prob_column=prob_col,
+            apply_calibration=apply_calibration,
+        )
         return predict_base(features, calibrator, feat_cols).to_numpy()
     if (model_dir / "tcn.pt").exists():
         model, calib, series_cols, scaler, window = load_tcn_predictor(model_dir)
         prob_df = predict_tcn(features, model, calib, series_cols, scaler, window)
-        col = getattr(calib, "prob_column", "tcn_prob")
+        col = getattr(calib, "prob_column", getattr(manifest, "prob_column", "tcn_prob"))
         return prob_df[col].to_numpy()
     if (model_dir / "transformer.pt").exists():
         transformer = TransformerModel.load(str(model_dir))
@@ -86,7 +120,7 @@ def decide_trades(
     if risk_limits_path and Path(risk_limits_path).exists():
         risk_cfg = _load_yaml(risk_limits_path)
     gate_cfg = _load_gate_config(risk_cfg) if risk_cfg else {}
-    artifacts_root = Path(contract.get("models_root", contract.get("models_dir", "models"))).expanduser()
+    artifacts_root = Path(contract.get("models_root", contract.get("models_dir", "models"))).expanduser().resolve()
     model_path_map: Dict[str, str] = contract.get("models", {})
     models = policy.get("models") or list((contract.get("models") or {}).keys())
     weights = policy.get("weights") or {}

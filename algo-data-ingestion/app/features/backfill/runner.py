@@ -12,6 +12,7 @@ import pandas as pd
 
 from app.features.ingestion.ccxt_client import CCXTClient
 from app.features.factory.market_factory import build_market_features
+from training.feature_eng import augment_market_features
 from app.features.store.redis_store import get_store
 from app.common.time_norm import to_utc_dt
 
@@ -28,7 +29,17 @@ TF_SECONDS = {
     "1d": 86400,
 }
 
-PAYLOAD_COLS = ["ret1", "rsi_14", "hl_spread", "oi_obv"]  # keep payload compact
+PAYLOAD_COLS = [
+    "ret_1",
+    "rsi_14",
+    "hl_spread",
+    "hl_spread_z",
+    "rvol_20",
+    "sym_spread_ratio",
+    "sym_rvol_ratio",
+    "sym_liquidity_rank",
+    "oi_obv",
+]  # keep payload compact but gate-ready
 
 
 def _parse_time(s: str) -> int:
@@ -99,7 +110,7 @@ def _mk_items_for_store(feats: pd.DataFrame) -> List[dict]:
     if feats.empty:
         return []
 
-    # keep only numeric payloads and drop NaN/Inf
+    # keep only numeric payloads and drop NaN/Inf (store None when missing)
     rows = []
     for _, r in feats.iterrows():
         payload = {}
@@ -108,8 +119,8 @@ def _mk_items_for_store(feats: pd.DataFrame) -> List[dict]:
                 v = r[c]
                 if isinstance(v, (int, float)) and not (isinstance(v, float) and (math.isnan(v) or math.isinf(v))):
                     payload[c] = float(v)
-        if not payload:
-            continue
+                else:
+                    payload[c] = None
 
         rows.append({
             "domain": "market",
@@ -126,6 +137,7 @@ async def _write_features(df: pd.DataFrame) -> int:
         return 0
 
     feats = build_market_features(df)
+    feats = augment_market_features(feats, inplace=False)
     if feats.empty:
         return 0
 

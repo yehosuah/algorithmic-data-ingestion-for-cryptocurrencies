@@ -94,9 +94,10 @@ async def test_ingest_then_retrieve_features(async_client, fake_store, monkeypat
     out = response2.json()
     assert out["rows"] in (1, 2)
     assert isinstance(out["data"], list)
+    expected_keys = {"ret_1", "hl_spread", "hl_spread_z", "rvol_20"}
     for row in out["data"]:
         assert "timestamp" in row
-        assert any(k in row for k in ("ret1", "rsi_14", "hl_spread", "oi_obv"))
+        assert expected_keys.issubset(row.keys())
 
 
 async def test_cache_miss_returns_empty(async_client, fake_store):

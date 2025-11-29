@@ -44,6 +44,7 @@ from training.calibration_utils import apply_posthoc_calibration
 from app.monitoring.model_metrics import observe_gate_coverage, record_gate_coverage_sample
 from app.monitoring.probability_sampler import record_probability_samples
 from collections import defaultdict
+from features.feature_engineering import FEATURE_REGISTRY
 
 _MODEL_SYMBOL_COVERAGE: Dict[str, Dict[str, float]] = defaultdict(dict)
 
@@ -686,8 +687,59 @@ def _build_feature_frame(job: InferenceJob, ohlcv: pd.DataFrame) -> pd.DataFrame
         return pd.DataFrame()
     features = build_market_features(ohlcv)
     features = augment_market_features(features, inplace=False)
+    if (
+        not features.empty
+        and "timestamp" in features.columns
+        and "timestamp" in ohlcv.columns
+        and "close" in ohlcv.columns
+    ):
+        try:
+            close_frame = ohlcv.copy()
+            close_frame["timestamp"] = pd.to_datetime(close_frame["timestamp"], utc=True)
+            # Deduplicate on timestamp to avoid pandas reindex errors when mapping.
+            dedup = close_frame.drop_duplicates(subset=["timestamp"], keep="last")
+            close_series = dedup.set_index("timestamp")["close"].astype(float)
+            ts = pd.to_datetime(features["timestamp"], utc=True)
+            features["close"] = ts.map(close_series)
+            features["price"] = features["close"]
+        except Exception:
+            log.debug("Failed to attach close price to feature frame for job %s", job.job_id, exc_info=True)
     features = features.sort_values("timestamp").reset_index(drop=True)
     return features
+
+
+def _ensure_required_features(frame: pd.DataFrame, required: List[str], *, job_id: str) -> pd.DataFrame:
+    """
+    Ensure all manifest-declared features exist before scoring.
+
+    - Compute any missing FEATURE_REGISTRY entries on the fly.
+    - Backfill any remaining missing columns with 0.0 to avoid silent model drift.
+    """
+    if not required:
+        return frame
+    out = frame
+    missing_registry = [col for col in required if col in FEATURE_REGISTRY and col not in out.columns]
+    if missing_registry:
+        out = out.copy()
+        for col in missing_registry:
+            fn = FEATURE_REGISTRY.get(col)
+            try:
+                out[col] = fn(out)
+            except Exception as exc:
+                log.warning("Failed to compute feature %s; filling with 0.0 (job %s): %s", col, job_id, exc)
+                out[col] = 0.0
+    missing_any = [col for col in required if col not in out.columns]
+    if missing_any:
+        out = out.copy()
+        for col in missing_any:
+            out[col] = 0.0
+        log.warning(
+            "Backfilled %d missing manifest features with 0.0 (job %s): %s",
+            len(missing_any),
+            job_id,
+            missing_any[:10],
+        )
+    return out
 
 
 def _get_base_context(label: str) -> Tuple[Any, object, List[str]]:
@@ -699,7 +751,11 @@ def _get_base_context(label: str) -> Tuple[Any, object, List[str]]:
     _register_metric_thresholds(artifacts)
     model_dir = _ensure_local_model_dir(label, registry.get_path(label))
     prob_col = artifacts.prob_column or "base_prob"
-    calibrator, feature_columns = load_base_predictor(model_dir, prob_column=prob_col)
+    calibrator, feature_columns = load_base_predictor(
+        model_dir,
+        prob_column=prob_col,
+        apply_calibration=getattr(artifacts, "apply_calibration", True),
+    )
     ctx = (artifacts, calibrator, list(feature_columns))
     _BASE_MODEL_CACHE[label] = ctx
     return ctx
@@ -797,6 +853,7 @@ def _run_inference_sync(job: InferenceJob, now: datetime) -> List[Dict[str, Any]
 
     if base_ctx is not None:
         artifacts, calibrator, feature_cols = base_ctx
+        working = _ensure_required_features(working, feature_cols, job_id=job.job_id)
         prob_series = predict_base(working, calibrator, feature_cols)
         prob_col = artifacts.prob_column or "base_prob"
         working = working.copy()

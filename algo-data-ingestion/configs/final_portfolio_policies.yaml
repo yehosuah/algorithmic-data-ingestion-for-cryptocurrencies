@@ -4,8 +4,9 @@ primary:
     xgb: 1.0
   thresholds:
     global:
-      entry_long: 0.51
-      exit_long: 0.49
+      entry_long: 0.50
+      exit_long: 0.48
+      min_hold_bars: 2
       entry_short: 0.47
       exit_short: 0.5
   models:

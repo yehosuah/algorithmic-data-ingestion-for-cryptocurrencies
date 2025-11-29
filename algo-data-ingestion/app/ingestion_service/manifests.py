@@ -245,6 +245,11 @@ class ManifestRegistry:
                 "probability": row.get(prob_col),
                 "gate_pass": bool(row.get(gate_column)),
             }
+            for key in ("price", "close", "mid_price", "last_price", "bid", "ask"):
+                value = row.get(key)
+                if value is None or pd.isna(value):
+                    continue
+                item[key] = value
             if include_features:
                 item["features"] = row
             items.append(item)
