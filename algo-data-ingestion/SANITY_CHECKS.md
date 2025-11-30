@@ -1,13 +1,14 @@
 # Sanity Checks and Optional Improvements
 
-_Last updated: 2025-11-30 18:55 UTC_
+_Last updated: 2025-11-30 22:29 UTC_
 
+> Update 2025-11-30 22:29 UTC: Trimmed the checked-in parquet snapshots (regenerate via the scripts below), dropped `TRADING_SHADOW_SYMBOLS` so dry-runs exercise BTC/ETH/SOL as true primary entries (300 USDT notional, 10 bps spread guard), and lowered the runtime risk cooldowns to 1 minute after exits/5 minutes after losses in the stage-0 overrides.
 > Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
 > Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 > Update 2025-11-19: Dry-run defaults now point to the promoted portfolio sweep bundle (`experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary`) via `configs/deployment_portfolio_contract.yaml` + `configs/dry_run/infer_jobs_portfolio_policy.yaml`; added checks to keep `TRADING_MODELS` and mounts aligned with the contract while watching queue/backlog guardrails.
 
-This document summarizes quick validation steps for a 2‑week backfill (market + RSS) and tracks optional improvements to reference during iteration.
+This document summarizes quick validation steps for a 2‑week backfill (market + RSS) and tracks optional improvements to reference during iteration. The bulky parquet snapshots were pruned from git, so always rerun the orchestrator/backfill steps here before audits instead of relying on checked-in datasets.
 
 ## 2‑Week Backfill (Market + RSS)
 
@@ -81,9 +82,10 @@ Check the generated JSON into `release/symbol_gates/` so CI + manifests inherit 
 ## Trading Dry Run Validation
 
 With manifests refreshed and the Docker stack running, validate the scheduler → Redis → trading loop:
+1. Before booting containers, confirm `TRADING_MODELS` matches the stage-0 ladder (BTC/ETH/SOL, `order_notional=300`, `max_spread_bps=10`, `shadow_mode=false`) and keep `TRADING_SHADOW_SYMBOLS=[]` so rehearsals exercise the real policy mix. Re-run `analysis.apply_launch_stage` if env files drifted, and verify `configs/runtime_overrides/risk_limits_stage_0.yaml` shows `cooldown_minutes_after_exit: 1` / `cooldown_minutes_after_loss: 5` so the tighter runtime risk cadence is active.
 1. Run a quick trigger preflight before booting containers so dry-runs do not start with zero coverage: `python scripts/trigger_preflight.py --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml --policy configs/final_trigger_policy.yaml --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary --max-rows 5000`.
 1. Ensure `./experiments/perf_sweeps` is mounted (compose already does) and the promoted bundle exists at `experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary` (or whatever path your deployment contract references).
-1. Point `INFER_JOBS` to `configs/dry_run/infer_jobs_portfolio_policy.yaml` (or inline JSON) and restart `scheduler` so it reloads manifests from `MODELS_ROOT`; keep `TRADING_MODELS` aligned with the contract (`xgb_primary` on ETH/USDT, 1m by default, guard fields for spread/SL/TP/max hold).
+1. Point `INFER_JOBS` to `configs/dry_run/infer_jobs_portfolio_policy.yaml` (or inline JSON) and restart `scheduler` so it reloads manifests from `MODELS_ROOT`; keep `TRADING_MODELS` aligned with the contract (`xgb_primary` on BTC/USDT, ETH/USDT, SOL/USDT; 1m; guard fields for spread/SL/TP/max hold).
 1. Watch scheduler metrics and logs:
    ```bash
    curl -s http://localhost:9002/metrics | grep scheduler_decision
