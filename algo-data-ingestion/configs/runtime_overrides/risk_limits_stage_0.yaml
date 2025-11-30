@@ -12,8 +12,8 @@ max_daily_turnover: 0.5
 daily_loss_limit_pct: 0.03
 max_drawdown_pct: 0.15
 max_drawdown: 0.15
-cooldown_minutes_after_exit: 5
-cooldown_minutes_after_loss: 30
+cooldown_minutes_after_exit: 1
+cooldown_minutes_after_loss: 5
 halt_on_safe_mode: true
 allow_exits_during_halt: true
 halt_if_spread_bps_gt: 35.0
