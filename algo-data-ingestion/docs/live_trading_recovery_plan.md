@@ -1,6 +1,8 @@
 # Live Trading Recovery Plan
 
-_Last updated: 2025-11-29 14:33 UTC_
+_Last updated: 2025-11-30 18:55 UTC_
+
+> Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
 > Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 > Update 2025-11-16: Added queue/backlog safeguards (`DECISION_PAYLOAD_ITEMS`, `trading_decision_queue_depth`, `TRADING_LAST_TS_GRACE_BARS`), folded in the probability sampler + distribution audit pipeline, and clarified calibrator refresh (re-score base booster before fitting) so recovery follows the latest live diagnostics.
@@ -14,6 +16,7 @@ _Source of truth for reconciling training metrics with dry-run behaviour._
 - Inspect recent Redis decision payloads/audit logs to confirm gate predicates embedded in the stream.
 - Watch queue health while gates are enforced: `curl -s localhost:9010/metrics | rg trading_decision_queue_depth` should stay near 0. The scheduler trims decision batches to `DECISION_PAYLOAD_ITEMS` (or job-level `max_decision_items`) so stale entries do not accumulate.
 - After restarts, confirm the trading service cleared stale dedupe offsets when downtime exceeded `TRADING_LAST_TS_GRACE_BARS` (logged on startup) so fresh decisions are not skipped.
+- Assert kill/safe switches while diagnosing: set `TRADING_KILL_SWITCH=1`/`TRADING_SAFE_MODE=1`, verify `trading_safe_mode_latched` flips to 1 and only unlatches after reconciliation success. Check `deadlock_action_taken_total` and audit `deadlock_status` payloads if coverage craters for a symbol.
 
 ## 2. Align Manifests With Training Reports
 - Diff each `manifest.json` against its paired `report.json`, reconciling `prob_gate_min`, `hl_spread_z_max`, and `rvol20_max`.
@@ -76,3 +79,9 @@ _Source of truth for reconciling training metrics with dry-run behaviour._
 - After alignment, rebuild `scheduler` and `trading`, verify coverage > 0 for both models, and watch Prom + audit telemetry.
 - Add CI checks that fail when manifest gate coverage or feature parity drifts from the `report.json` expectations.
 - Document future gate adjustments in this file before rollout; treat it as the authoritative checklist for regression recovery.
+
+## 7. Runtime Controls & Launch Ladder
+- **Intent ledger health** – `trading_intent_ledger_state_total` should reflect state transitions (`pending_submit`, `submitted`, `filled`, etc.). If dedupe blocks legitimate orders, flush the Redis ledger keys (`${TRADING_INTENT_LEDGER_PREFIX}:*`) after ensuring no open intents remain, then restart trading with `TRADING_KILL_SWITCH=1` to resume exits only.
+- **Runtime risk limits** – Inspect audit `risk_block_reason`/`risk_clip_reasons` and Prometheus `trading_risk_blocked_total`/`trading_risk_clipped_total`. If limits are tripping unexpectedly, diff `configs/runtime_overrides/risk_limits_stage_*.yaml` against `configs/portfolio_risk_limits.yaml` and re-run `analysis.apply_launch_stage` to restore overrides.
+- **Deadlock policy** – Use `analysis.shadow_readiness` to produce a coverage/deadlock report, review `trading_deadlock_*` gauges, and confirm `deadlock_policy.enabled`/`adjust_prob_gate_min` entries match the deployment contract. If policy actions misfire, run `analysis.evaluate_launch_stage` to regenerate overrides and audit logs.
+- **Launch ladder rollback** – To revert a problematic stage, set kill/safe env vars, run `python -m analysis.rollback_to_stage --stage stage_0 --ladder configs/live_launch_ladder.yaml --contract configs/deployment_portfolio_contract.yaml`, redeploy env bundle (`configs/runtime_overrides/stage_0.yaml`), and wait for reconciliation success before re-opening entries.

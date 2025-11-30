@@ -1,6 +1,8 @@
 # Sanity Checks and Optional Improvements
 
-_Last updated: 2025-11-29 14:33 UTC_
+_Last updated: 2025-11-30 18:55 UTC_
+
+> Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
 > Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 > Update 2025-11-19: Dry-run defaults now point to the promoted portfolio sweep bundle (`experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary`) via `configs/deployment_portfolio_contract.yaml` + `configs/dry_run/infer_jobs_portfolio_policy.yaml`; added checks to keep `TRADING_MODELS` and mounts aligned with the contract while watching queue/backlog guardrails.
@@ -103,6 +105,16 @@ With manifests refreshed and the Docker stack running, validate the scheduler â†
    curl -s http://localhost:9010/metrics | egrep 'trading_trade_attempts_total|trading_position_active'
    ```
    Run for a few minutes and ensure counters advance while positions toggle as expected.
+1. Validate the new invariants:
+   ```bash
+   curl -s http://localhost:9010/metrics | egrep 'trading_safe_mode_latched|trading_intent_ledger_state_total|trading_risk_blocked_total|deadlock_action_taken_total|trading_reconcile_runs_total'
+   ```
+   Safe mode should read 0 during healthy dry-runs, intent ledger counts should increase for each order lifecycle, reconciliation successes should increment every interval, and deadlock action counters should remain flat unless you simulate a coverage stall.
+1. Confirm audit provenance:
+   ```bash
+   python scripts/verify_trading_redis.py --show-audit --limit 3
+   ```
+   Each entry should include `audit_source`, `audit_run_id`, `audit_seq`, and the HMAC digest; record the run_id in dry-run notes.
 1. Audit persisted state:
    ```bash
    python scripts/verify_trading_redis.py

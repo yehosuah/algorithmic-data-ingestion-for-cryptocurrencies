@@ -1,6 +1,8 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-11-29 14:33 UTC_
+_Last updated: 2025-11-30 18:55 UTC_
+
+> Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
 > Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 > Update 2025-11-19: Added sampling/weighting knobs to the time-series CV + random-search lane (`--sampling-policy/--weight-policy`, configs under `configs/sampling_*.yaml` + `configs/weights_cost_capacity.yaml`), threaded sample weights through DeepLOB/TCN/Transformer training, and shipped a portfolio performance-sweep harness (`portfolio/run_perf_sweeps.py`). The promoted sweep (`medium_xgb_low_cost`) is codified in `configs/deployment_portfolio_contract.yaml` plus `configs/dry_run/infer_jobs_portfolio_policy.yaml`, with Docker now mounting `experiments/perf_sweeps` so scheduler/trading can load the `xgb_primary` artifact during dry-runs.
@@ -123,6 +125,26 @@ Useful helpers:
 
 ---
 
+## Live Deployment Hardening
+
+- **Multi-symbol rollout bundle** – `configs/deployment_portfolio_contract.yaml` and `configs/dry_run/infer_jobs_portfolio_policy.yaml` now encode the BTC/ETH/SOL ladder, per-symbol `policy_id` overrides, `shadow_mode` flags, and `model_key` routing so scheduler/trading stay in lockstep. Compose wires the overrides via `TRADING_MODELS`, `TRADING_SHADOW_SYMBOLS`, `TRADING_RISK_LIMITS_PATH`, and `TRADING_DEADLOCK_POLICY_PATH`; the stage ladder (`configs/live_launch_ladder.yaml`) emits env bundles under `configs/runtime_overrides/stage_*.yaml`.
+- **Signed audit & provenance** – Trading now requires `TRADING_AUDIT_HMAC_KEY` (plus optional `TRADING_AUDIT_RUN_ID`/`TRADING_AUDIT_HOST_ID`) and writes `audit_source`/`audit_run_id`/`audit_seq` metadata inside every event so `analysis.validate_deployment_contract` can assert observability requirements before go-live. Redis/Postgres/file backends all compute the HMAC digest.
+- **Intent ledger + reconciliation** – `TRADING_INTENT_LEDGER_BACKEND=redis`, `TRADING_INTENT_LEDGER_REDIS_URL`, and the new `IntentLedger` class dedupe order intents, track lifecycle status (`pending_submit`→`filled`/`canceled`/`error`), and feed metrics (`trading_intent_ledger_state_total`). A periodic reconcile loop compares internal state vs exchange truth and latches safe-mode until a healthy streak succeeds; emissions land in the audit stream under `reconciliation`.
+- **Runtime risk engine** – `app/trading/risk.py::assess_and_adjust_order` consumes `configs/portfolio_risk_limits.yaml` (or the stage overrides) to block/clip orders based on turnover, exposure, drawdown, order cadence, cooldowns, and per-symbol spread/notional/qty rules. Audit payloads include `risk_block_reason`/`risk_clip_reasons`, and Prometheus gets `trading_risk_blocked_total`/`trading_risk_clipped_total`.
+- **Deadlock policy automation** – `app/trading/deadlock.py`, the new `analysis.*launch_stage*` CLIs, and the Prometheus suite (`trading_deadlock_*`, `deadlock_action_taken_total`) monitor per-symbol coverage windows, execute staged mitigations (prob gate adjustments, policy switches, safe-mode), and log actions/audits with policy hashes.
+- **Observability & controls** – Kill-/safe-mode env vars (`TRADING_KILL_SWITCH`, `TRADING_SAFE_MODE`) are enforced inside `app/trading/decision.py`; trading only enters when both are clear or we’re exiting safely. Metrics now include decision coverage, skip/dedup/risk block counters, orders-per-hour, turnover/drawdown gauges, safe-mode latch state, and reconciliation health. Grafana’s `trading-overview.json` dashboard plots the additional telemetry, and alert rules reference the same invariants listed in the deployment contract.
+
+Guardrail CLIs:
+- `python -m analysis.validate_deployment_contract --contract configs/deployment_portfolio_contract.yaml` now verifies symbol/policy/model mapping, `TRADING_MODELS` parity, kill/safe env wiring, audit fields/counters, and the presence of live risk limits.
+- `python -m analysis.apply_launch_stage --stage stage_N --ladder configs/live_launch_ladder.yaml --contract configs/deployment_portfolio_contract.yaml` emits runtime overrides (risk limits, deadlock policy, env bundle) for the requested stage, while `analysis.evaluate_launch_stage` and `analysis.rollback_to_stage` publish readiness/rollback artifacts under `reports/`.
+
+Promotion checklist:
+1. Export the current stage bundle (`configs/runtime_overrides/stage_N.yaml`) and set `TRADING_AUDIT_HMAC_KEY`, `TRADING_INTENT_LEDGER_*`, `TRADING_KILL_SWITCH`, and `TRADING_SAFE_MODE` before starting trading.
+2. Run `analysis.preflight_coverage`, `analysis.shadow_readiness`, and the deployment contract validator; review the Markdown/JSON reports (coverage, deadlock health, symbol readiness) under `reports/`.
+3. Start trading with the exported env, leave kill/safe-mode asserted until reconciliation succeeds, and monitor Prometheus counters (`deadlock_action_taken_total`, `trading_deadlock_coverage_ratio`, `trading_safe_mode_latched`, `trading_risk_blocked_total`, `trading_reconcile_runs_total`) plus audit logs for provenance.
+
+---
+
 ## Feature Parity & Gate Calibration
 
 - `datasets/market_multi_3symbol_1m.parquet` (≈1.19 M rows across BTC/ETH/SOL) now powers the relaxed gate. Run `training/data.sanitize_market_dataset` before retraining so duplicates/outliers are removed and symbol-level liquidity columns stay stable.
@@ -199,6 +221,19 @@ TTL_SWEEP_TTL=3600
 GLASSNODE_API_KEY=
 TWITTER_BEARER_TOKEN=
 NEWS_API_KEY=
+# Trading service
+TRADING_DRY_RUN=1
+TRADING_MODELS=[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":80.0,"max_spread_bps":25.0,"stop_loss_pct":0.004,"take_profit_pct":0.0075,"max_hold_minutes":null,"shadow_mode":false,"policy_id":"primary"},{"model":"xgb_primary","symbol":"BTC/USDT","exchange":"binance","timeframe":"1m","order_notional":50.0,"max_spread_bps":25.0,"stop_loss_pct":0.004,"take_profit_pct":0.0075,"max_hold_minutes":null,"shadow_mode":true,"policy_id":"conservative"},{"model":"xgb_primary","symbol":"SOL/USDT","exchange":"binance","timeframe":"1m","order_notional":40.0,"max_spread_bps":28.0,"stop_loss_pct":0.004,"take_profit_pct":0.0075,"max_hold_minutes":null,"shadow_mode":true,"policy_id":"conservative"}]
+TRADING_SHADOW_SYMBOLS=["BTC/USDT","SOL/USDT"]
+TRADING_AUDIT_HMAC_KEY=changeme_in_prod
+TRADING_INTENT_LEDGER_BACKEND=redis
+TRADING_INTENT_LEDGER_REDIS_URL=redis://redis:6379/0
+TRADING_DEPLOYMENT_CONTRACT=configs/deployment_portfolio_contract.yaml
+TRADING_RISK_LIMITS_PATH=configs/runtime_overrides/risk_limits_stage_0.yaml
+TRADING_DEADLOCK_POLICY_PATH=configs/runtime_overrides/deadlock_policy_stage_0.yaml
+TRADING_KILL_SWITCH=1
+TRADING_SAFE_MODE=1
+TRADING_SAFE_MODE_ALLOW_EXITS=1
 ```
 
 ---

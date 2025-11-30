@@ -1,6 +1,8 @@
 # Launch Roadmap – Calmon Stack
 
-_Last updated: 2025-11-29 14:33 UTC_
+_Last updated: 2025-11-30 18:55 UTC_
+
+> Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
 > Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 > Update 2025-11-13: Roadmap items now call out the sanitizer + symbol-gate workflow, parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`), and the Redis-backed trading defaults baked into `.env` so launch criteria reference the exact gates and metrics in git.
@@ -16,6 +18,7 @@ _Last updated: 2025-11-29 14:33 UTC_
 - **Inference parity** – Mirror the manifest-driven gates inside the FastAPI ingestion/inference path via `training/infer.py::score_base_with_manifest`, exercising the new stride-aware batching in `predict_tcn`, and keep regression tests that replay historical batches tied to the new Prometheus gauges.
 - **Fallback definition** – Document and implement the fallback hierarchy (no-RSS blender, base-only mode) that activates when gating coverage or RSS audits breach thresholds.
 - **Trading dry-run coverage** – Validate the scheduler `INFER_JOBS` → Redis → trading service loop, ensuring queue depth stays bounded, audit streams populate, and metrics (`trading_trade_attempts_total`, `trading_position_active`, `trading_realized_pnl_total`) remain healthy before considering live order routing.
+- **Live invariants & launch ladder** – Keep `analysis.validate_deployment_contract`, `analysis.shadow_readiness`, and the stage ladder (`analysis.apply_launch_stage`/`evaluate_launch_stage`/`rollback_to_stage`) green; fix any kill/safe wiring, audit field, risk limit, or deadlock regressions before promoting a stage.
 
 ## High-Priority Tasks (1–2 Weeks)
 - Recompute forward replay as TCN manifests evolve; update manifests, `live_gate_coverage.csv`, and `models/oos_replay_summary_latest.json` (keeping the archived `...oct_nov_2025.json` for regression) with each threshold change.
@@ -34,6 +37,7 @@ _Last updated: 2025-11-29 14:33 UTC_
 - Publish Grafana panels overlaying deployable vs relaxed coverage, RSS audits, and model equity curves for the Oct 2025 forward window onward.
 - Ensure `.github/workflows/ci.yml` remains green and add a nightly job (cron or scheduled workflow) that reruns `pytest tests/regression` plus the new inference replay test over the latest manifests.
 - Add trading-specific alerts: stale Redis decision queue, zero `trading_trade_attempts_total` for >15 min, `trading_position_active` stuck > max hold window, and missing audit events; wire them to the new dashboard and include runbook links.
+- Track the new invariants: alert on `trading_safe_mode_latched` stuck at 1, `trading_reconcile_runs_total{status="failure"}` spikes, elevated `trading_risk_blocked_total`, `deadlock_action_taken_total` increments, and abnormal intent-ledger state ratios; publish dedicated Grafana panels for these signals.
 
 ## Documentation & Comms
 - Update `docs/final_stretch_v1.md`, `TRAINING_STATUS.md`, `TRAINING_WALKTHROUGH.md`, and README excerpts once gate tuning completes.

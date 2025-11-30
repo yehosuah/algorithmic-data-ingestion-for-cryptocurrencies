@@ -1,6 +1,8 @@
 # Deployability Runbook (TCN Suite Refresh – Oct 2025)
 
-_Last updated: 2025-11-29 14:33 UTC_
+_Last updated: 2025-11-30 18:55 UTC_
+
+> Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
 > Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 > Update 2025-11-13: Folded in the sanitizer + symbol-gate workflow and the feature parity helpers (`export_feature_slice.py`, `compare_feature_stats.py`) so deployability steps reference the gates/metrics enforced by scheduler + trading.
@@ -15,6 +17,7 @@ _Last updated: 2025-11-29 14:33 UTC_
 - **Trading rehearsal plan** – Populate `INFER_JOBS`/`TRADING_MODELS`, review `docs/weeklong_dry_run_checklist.md`, and schedule a 7-day paper-trading run logging queue depth, trade attempts, and faux P&L.
 - **Trigger guard check** – Run `python scripts/trigger_preflight.py --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml --policy configs/final_trigger_policy.yaml --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary --max-rows 5000` ahead of each rehearsal to fail fast when coverage/trade-count proxy drops.
 - **Feature parity proof** – At the end of each dry run, export a scheduler slice (`scripts/export_feature_slice.py`) and store the diff vs sanitized training data via `scripts/compare_feature_stats.py --train datasets/market_multi_3symbol_1m.parquet --live /tmp/features_debug.parquet --out release/calibration/latest/tcn_parity.json`; attach the JSON to deployment notes before widening gates.
+- **Live invariants check** – After applying a ladder stage, run `python -m analysis.validate_deployment_contract --contract configs/deployment_portfolio_contract.yaml` plus `analysis.shadow_readiness` to confirm kill/safe env wiring, audit fields/counters, risk limit coverage, symbol/policy/model parity, and deadlock readiness match the deployment contract. Archive `reports/launch_stage_eval_stage_N_*` alongside dry-run summaries.
 
 ## Connecting to Live Trading
 - **Manifest enforcement in inference**  
@@ -28,10 +31,15 @@ _Last updated: 2025-11-29 14:33 UTC_
   - Mount `TRADING_STATE_PATH` on a persistent volume (Docker Compose maps `trading-state:/app/trading_state/state.json`) so `last_timestamp` survives container restarts and stale payloads are ignored by the `register_bar` guard.  
   - Mirror the scheduler’s Redis endpoint for the trading worker, track per-model decision timestamps in `TRADING_LAST_TS_HASH` (default `trading:last_processed_ts`), and let `_handle_payload` drop anything older; before restarting the worker, run `redis-cli -u $DECISION_QUEUE_URL DEL trading:decisions` (or `LTRIM` up to the persisted timestamp) to avoid replay storms.  
   - Redis outages that close `BLPOP` sockets now trigger reconnection with exponential backoff—keep Prometheus alerts/ Grafana panels pointed at the shared Redis instance so scheduler + trading failures surface together.
+- **Runtime safeguards**  
+  - Set `TRADING_AUDIT_HMAC_KEY`, `TRADING_KILL_SWITCH`, `TRADING_SAFE_MODE`, `TRADING_INTENT_LEDGER_BACKEND=redis`, and `TRADING_INTENT_LEDGER_REDIS_URL` before enabling live entries; trading now blocks entries if kill/safe switches are asserted, dedupes intents via Redis locks, and latches safe mode until reconciliation succeeds.
+  - Configure `TRADING_RISK_LIMITS_PATH`/`TRADING_DEADLOCK_POLICY_PATH` (or use the ladder overrides) so `app/trading/risk.py` can clip/block orders based on turnover/exposure/cooldowns and `app/trading/deadlock.py` can track coverage windows, emit metrics, and execute staged mitigations.
+  - Audit payloads now include `audit_source`/`audit_run_id`/`audit_seq` plus HMAC digests; wire downstream consumers to verify signatures and fail deployments when provenance metadata is missing.
+- **Monitoring & alerting**  
 - **Monitoring & alerting**  
   - Export `model_gate_coverage_ratio`, `model_probability_sigma`, `model_rss_minute_spike_share`, plus trading counters/gauges (`trading_trade_attempts_total`, `trading_gate_toggles_total`, `trading_trade_notional_total`, `trading_position_active`, `trading_realized_pnl_total`).  
-  - Update `monitoring/alert.rules.yml` to watch the new coverage floor (~5 e‑4), probability σ guardrails, stale decision queues, and missing trading audit events.  
-  - Publish Grafana panels for gate coverage, queue depth, turnover, faux P&L, and order execution latency (see `monitoring/grafana/dashboards/trading-overview.json`).
+  - Update `monitoring/alert.rules.yml` to watch the new coverage floor (~5 e‑4), probability σ guardrails, stale decision queues, missing trading audit events, deadlock action counts, reconciliation health, safe-mode latch duration, risk block spikes, and intent-ledger anomalies.  
+  - Publish Grafana panels for gate coverage, queue depth, turnover, faux P&L, safe-mode/kill-switch latches, reconciliation streaks, and order execution latency (see `monitoring/grafana/dashboards/trading-overview.json`).
 - **Dry-run then cutover**  
   - Execute a full paper-trading rehearsal with `TRADING_DRY_RUN=1`, capturing queue depth, trading metrics, audit stream entries, and latency.  
   - Once validated, set `TRADING_DRY_RUN=0`, rotate in live credentials, keep heightened alerting for the first week, and prepare rollback scripts (base-only mode, disable trading service) if coverage collapses.

@@ -1,6 +1,8 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-11-29 14:33 UTC_
+_Last updated: 2025-11-30 18:55 UTC_
+
+> Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
 > Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
 > Update 2025-11-19: Added sampling/weighting controls to the CV + random-search lane (`--sampling-policy/--weight-policy`, `training/sampling_policies.py`, `training/sample_weights.py`, configs under `configs/sampling_*.yaml` + `configs/weights_cost_capacity.yaml`), piped sample weights through DeepLOB/TCN/Transformer training, and introduced a sampling/weighting comparison harness (`training/run_sampling_weighting_experiments.py`). Formalised the portfolio performance-sweep lane (`portfolio/run_perf_sweeps.py`, `configs/perf_sweep_scenarios.yaml`) with the promoted XGB-only policy codified in `configs/deployment_portfolio_contract.yaml` + `configs/dry_run/infer_jobs_portfolio_policy.yaml` for scheduler/trading dry-runs against `experiments/perf_sweeps/medium_xgb_low_cost/...`.
