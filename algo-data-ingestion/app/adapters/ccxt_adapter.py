@@ -34,7 +34,7 @@ def _since_to_millis(since: Optional[Union[int, float, datetime]]) -> Optional[i
         raise TypeError(f"Unsupported type for since: {type(since)!r}")
 
 
-async def _retry_async(func, *args, retries: int = 3, backoff_factor: float = 1.0, **kwargs):
+async def _retry_async(func, *args, retries: int = 4, backoff_factor: float = 1.0, **kwargs):
     """Retry an async callable with exponential backoff.
 
     Args:
@@ -119,7 +119,13 @@ class CCXTAdapter:
 
         if sandbox:
             with contextlib.suppress(Exception):
-                self.client.set_sandbox_mode(True)
+                result = self.client.set_sandbox_mode(True)
+                if asyncio.iscoroutine(result):
+                    # Avoid un-awaited coroutine warnings in tests using AsyncMock
+                    try:
+                        asyncio.get_event_loop().create_task(result)
+                    except Exception:
+                        pass
                 logger.debug("Sandbox mode enabled for %s", exchange_id)
 
     async def fetch_ticker(self, symbol: str) -> Dict[str, Any]:
@@ -230,6 +236,18 @@ class CCXTAdapter:
         """
         markets = await _retry_async(self.client.load_markets)
         return list(markets.keys())
+
+    async def fetch_open_orders(self, symbol: Optional[str] = None) -> list:
+        """
+        Fetch currently open orders for a symbol (or all symbols when supported).
+        """
+        return await _retry_async(self.client.fetch_open_orders, symbol)
+
+    async def fetch_order(self, order_id: str, symbol: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Fetch a single order by id.
+        """
+        return await _retry_async(self.client.fetch_order, order_id, symbol)
 
     async def close(self):
         await self.client.close()

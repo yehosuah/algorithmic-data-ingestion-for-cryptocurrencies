@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "analysis/shadow_readiness.py", line 409, in <module>
+    raise SystemExit(main())
+  File "analysis/shadow_readiness.py", line 343, in main
+    events, provenance = _load_audit_events(
+  File "analysis/shadow_readiness.py", line 104, in _load_audit_events
+    raise ValueError(f"Non-monotonic audit_seq for run {run_id}: {seq_int} <= {state[run_id]}")
+ValueError: Non-monotonic audit_seq for run 9e3c03e7-5704-43aa-a2de-567c5239f340: 1 <= 1

@@ -1,0 +1,13 @@
+{
+  "results_path": "experiments/trigger_sweeps/eth_rerun/results.csv",
+  "best": {
+    "entry_threshold": 0.52,
+    "exit_threshold": 0.51,
+    "exit_prob_drop": 0.1,
+    "min_hold_bars": 3,
+    "max_hold_seconds": null,
+    "stop_loss_pct": 0.004,
+    "take_profit_pct": null,
+    "max_spread_bps": 8
+  }
+}

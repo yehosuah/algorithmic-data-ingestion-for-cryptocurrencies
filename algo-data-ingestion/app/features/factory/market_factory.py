@@ -192,9 +192,6 @@ def build_market_features(
     out = coerce_schema(out, FEATURE_SCHEMA)
 
     # Backward-compat aliases for manifests that still reference camel-case columns.
-    out["rvol5"] = out["rvol_5"]
-    out["rvol20"] = out["rvol_20"]
-
     if dropna_final:
         # Drop rows that are all-NaN on features but keep rows where at least one feature exists
         feature_cols = [c for c in out.columns if c not in ("timestamp", "dt", "symbol", "exchange", "timeframe", "feature_version")]

@@ -1,0 +1,193 @@
+base_risk_limits_path: portfolio_risk_limits.yaml
+
+launch_ladder:
+  stage_0:
+    name: "Dry-run baseline (ETH live, BTC/SOL shadow)"
+    description: "Minimal sizing with aggressive safety rails while validating pipeline end-to-end."
+    mode: "dry_run"
+    live_symbols: ["ETH/USDT"]
+    shadow_symbols: ["BTC/USDT", "SOL/USDT"]
+    per_symbol:
+      "ETH/USDT": { order_notional: 80, policy_id: "primary" }
+      "BTC/USDT": { order_notional: 50, policy_id: "conservative" }
+      "SOL/USDT": { order_notional: 40, policy_id: "conservative" }
+    risk_overrides:
+      max_orders_per_hour: 20
+      max_total_notional: 120000
+      max_notional_per_symbol: 120000
+      symbols:
+        "ETH/USDT": { max_symbol_notional: 20000, max_spread_bps: 25 }
+        "BTC/USDT": { max_symbol_notional: 15000, max_spread_bps: 25 }
+        "SOL/USDT": { max_symbol_notional: 8000, max_spread_bps: 28 }
+    deadlock_policy:
+      enabled: true
+      window_minutes: 30
+      min_trades_window: 1
+      min_coverage_ratio_window: 0.02
+      cooldown_minutes: 45
+      max_actions_per_day: 2
+      audit_every_action: true
+      adjust_prob_gate_min: { step: 0.02, floor: 0.5 }
+      actions:
+        - adjust_prob_gate_min: { step: 0.02, floor: 0.5 }
+        - enter_safe_mode: true
+    promotion:
+      min_runtime_minutes: 180
+      gates:
+        min_trade_count: 5
+        min_coverage_ratio: 0.01
+        max_spread_block_rate: 0.35
+        max_risk_block_rate: 0.35
+        max_safe_mode_events: 0
+        max_reconcile_mismatches: 0
+        max_deadlock_actions: 1
+        max_drawdown_pct: 0.02
+    rollback:
+      triggers:
+        drawdown_pct: 0.03
+        safe_mode_events: 1
+        reconcile_mismatches: 1
+
+  stage_1:
+    name: "ETH live soak, BTC shadow"
+    description: "Slightly larger sizing while keeping BTC/SOL shadowed."
+    mode: "dry_run"
+    live_symbols: ["ETH/USDT"]
+    shadow_symbols: ["BTC/USDT", "SOL/USDT"]
+    per_symbol:
+      "ETH/USDT": { order_notional: 120, policy_id: "primary" }
+      "BTC/USDT": { order_notional: 60, policy_id: "conservative" }
+      "SOL/USDT": { order_notional: 50, policy_id: "conservative" }
+    risk_overrides:
+      max_orders_per_hour: 30
+      max_total_notional: 180000
+      max_notional_per_symbol: 180000
+      symbols:
+        "ETH/USDT": { max_symbol_notional: 30000, max_spread_bps: 25 }
+        "BTC/USDT": { max_symbol_notional: 20000, max_spread_bps: 25 }
+        "SOL/USDT": { max_symbol_notional: 12000, max_spread_bps: 28 }
+    deadlock_policy:
+      enabled: true
+      window_minutes: 45
+      min_trades_window: 2
+      min_coverage_ratio_window: 0.02
+      cooldown_minutes: 45
+      max_actions_per_day: 2
+      audit_every_action: true
+      adjust_prob_gate_min: { step: 0.02, floor: 0.5 }
+      actions:
+        - adjust_prob_gate_min: { step: 0.02, floor: 0.5 }
+        - switch_policy_id: { from: "primary", to: "conservative" }
+        - enter_safe_mode: true
+    promotion:
+      min_runtime_minutes: 240
+      gates:
+        min_trade_count: 8
+        min_coverage_ratio: 0.015
+        max_spread_block_rate: 0.3
+        max_risk_block_rate: 0.3
+        max_safe_mode_events: 0
+        max_reconcile_mismatches: 0
+        max_deadlock_actions: 1
+        max_drawdown_pct: 0.02
+    rollback:
+      triggers:
+        drawdown_pct: 0.025
+        safe_mode_events: 1
+        reconcile_mismatches: 1
+
+  stage_2:
+    name: "ETH + BTC live, SOL shadow"
+    description: "First BTC live exposure with SOL shadow, revert policies if block rates spike."
+    mode: "live"
+    live_symbols: ["ETH/USDT", "BTC/USDT"]
+    shadow_symbols: ["SOL/USDT"]
+    per_symbol:
+      "ETH/USDT": { order_notional: 150, policy_id: "primary" }
+      "BTC/USDT": { order_notional: 80, policy_id: "conservative" }
+      "SOL/USDT": { order_notional: 60, policy_id: "conservative" }
+    risk_overrides:
+      max_orders_per_hour: 45
+      max_total_notional: 260000
+      max_notional_per_symbol: 260000
+      symbols:
+        "ETH/USDT": { max_symbol_notional: 50000, max_spread_bps: 28 }
+        "BTC/USDT": { max_symbol_notional: 40000, max_spread_bps: 28 }
+        "SOL/USDT": { max_symbol_notional: 20000, max_spread_bps: 30 }
+    deadlock_policy:
+      enabled: true
+      window_minutes: 60
+      min_trades_window: 2
+      min_coverage_ratio_window: 0.02
+      cooldown_minutes: 30
+      max_actions_per_day: 3
+      audit_every_action: true
+      adjust_prob_gate_min: { step: 0.02, floor: 0.48 }
+      actions:
+        - adjust_prob_gate_min: { step: 0.02, floor: 0.48 }
+        - switch_policy_id: { from: "primary", to: "conservative" }
+        - enter_safe_mode: true
+    promotion:
+      min_runtime_minutes: 360
+      gates:
+        min_trade_count: 10
+        min_coverage_ratio: 0.02
+        max_spread_block_rate: 0.25
+        max_risk_block_rate: 0.25
+        max_safe_mode_events: 0
+        max_reconcile_mismatches: 0
+        max_deadlock_actions: 1
+        max_drawdown_pct: 0.03
+    rollback:
+      triggers:
+        drawdown_pct: 0.03
+        safe_mode_events: 1
+        reconcile_mismatches: 1
+
+  stage_3:
+    name: "ETH + BTC + SOL live"
+    description: "Full portfolio live sizing with normal risk limits."
+    mode: "live"
+    live_symbols: ["ETH/USDT", "BTC/USDT", "SOL/USDT"]
+    shadow_symbols: []
+    per_symbol:
+      "ETH/USDT": { order_notional: 200, policy_id: "primary" }
+      "BTC/USDT": { order_notional: 100, policy_id: "primary" }
+      "SOL/USDT": { order_notional: 70, policy_id: "conservative" }
+    risk_overrides:
+      max_orders_per_hour: 60
+      max_total_notional: 400000
+      max_notional_per_symbol: 400000
+      symbols:
+        "ETH/USDT": { max_symbol_notional: 80000, max_spread_bps: 30 }
+        "BTC/USDT": { max_symbol_notional: 120000, max_spread_bps: 30 }
+        "SOL/USDT": { max_symbol_notional: 40000, max_spread_bps: 32 }
+    deadlock_policy:
+      enabled: true
+      window_minutes: 60
+      min_trades_window: 2
+      min_coverage_ratio_window: 0.02
+      cooldown_minutes: 30
+      max_actions_per_day: 3
+      audit_every_action: true
+      adjust_prob_gate_min: { step: 0.02, floor: 0.48 }
+      actions:
+        - adjust_prob_gate_min: { step: 0.02, floor: 0.48 }
+        - switch_policy_id: { from: "primary", to: "conservative" }
+        - enter_safe_mode: true
+    promotion:
+      min_runtime_minutes: 480
+      gates:
+        min_trade_count: 12
+        min_coverage_ratio: 0.025
+        max_spread_block_rate: 0.25
+        max_risk_block_rate: 0.25
+        max_safe_mode_events: 0
+        max_reconcile_mismatches: 0
+        max_deadlock_actions: 1
+        max_drawdown_pct: 0.04
+    rollback:
+      triggers:
+        drawdown_pct: 0.05
+        safe_mode_events: 1
+        reconcile_mismatches: 1

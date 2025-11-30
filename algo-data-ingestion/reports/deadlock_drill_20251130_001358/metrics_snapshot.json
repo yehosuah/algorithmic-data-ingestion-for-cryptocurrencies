@@ -1,0 +1,7 @@
+{
+  "deadlock_actions": {
+    "enter_safe_mode": 0.0,
+    "adjust_prob_gate_min": 1.0
+  },
+  "portfolio_trades": 5.0
+}

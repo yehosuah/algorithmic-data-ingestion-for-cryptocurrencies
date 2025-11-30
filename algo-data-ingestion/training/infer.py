@@ -71,80 +71,26 @@ DEFAULT_GATE_CONFIG: Dict[str, Any] = {
     "spread_column": "hl_spread",
     "prob_column": "base_prob",
     "training": {
-        "hl_spread_max": {
-            "BTC/USDT": 0.00259762,
-            "ETH/USDT": 0.00324014,
-            "SOL/USDT": 0.00392244,
-            "default": 0.00392244,
-        },
+        "hl_spread_max": 0.0007,
         "hl_spread_z_max": 0.25,
-        "rvol20_max": {
-            "BTC/USDT": 0.001625910819,
-            "ETH/USDT": 0.001933756009,
-            "SOL/USDT": 0.00345556233,
-            "default": 0.00345556233,
-        },
+        "rvol20_max": 0.0002,
         "prob_gate_min": None,
         "min_hold_bars": 10,
         "long_only": True,
-        "sym_spread_ratio_max": {
-            "BTC/USDT": 1.8206031,
-            "ETH/USDT": 1.74718181,
-            "SOL/USDT": 1.77276998,
-            "default": 1.8206031,
-        },
-        "sym_rvol_ratio_max": {
-            "BTC/USDT": 1.62934166,
-            "ETH/USDT": 1.54273458,
-            "SOL/USDT": 1.77045051,
-            "default": 1.77045051,
-        },
-        "liquidity_rank_max": {
-            "BTC/USDT": 1.0,
-            "ETH/USDT": 2.0,
-            "SOL/USDT": 3.0,
-            "default": 3.0,
-        },
+        "sym_spread_ratio_max": None,
+        "sym_rvol_ratio_max": None,
+        "liquidity_rank_max": None,
     },
     "inference": {
-        "hl_spread_max": {
-            "BTC/USDT": 0.00200922,
-            "ETH/USDT": 0.00254495,
-            "SOL/USDT": 0.00297092,
-            "default": 0.00297092,
-        },
+        "hl_spread_max": 0.0007,
         "hl_spread_z_max": 0.3,
-        "rvol20_max": {
-            "BTC/USDT": 0.001323804714,
-            "ETH/USDT": 0.001623748022,
-            "SOL/USDT": 0.002458999182,
-            "default": 0.002458999182,
-        },
-        "prob_gate_min": {
-            "default": 0.6,
-            "ETH/USDT": 0.55,
-            "SOL/USDT": 0.52,
-        },
+        "rvol20_max": 8e-05,
+        "prob_gate_min": 0.6,
         "min_hold_bars": 10,
         "long_only": True,
-        "sym_spread_ratio_max": {
-            "BTC/USDT": 1.40820917,
-            "ETH/USDT": 1.37231633,
-            "SOL/USDT": 1.34272553,
-            "default": 1.40820917,
-        },
-        "sym_rvol_ratio_max": {
-            "BTC/USDT": 1.3266056,
-            "ETH/USDT": 1.29543339,
-            "SOL/USDT": 1.25986126,
-            "default": 1.3266056,
-        },
-        "liquidity_rank_max": {
-            "BTC/USDT": 1.0,
-            "ETH/USDT": 2.0,
-            "SOL/USDT": 3.0,
-            "default": 3.0,
-        },
+        "sym_spread_ratio_max": None,
+        "sym_rvol_ratio_max": None,
+        "liquidity_rank_max": None,
     },
 }
 
@@ -475,7 +421,7 @@ def _apply_numeric_gate(
     if gate_value is None:
         return mask
     if column not in df.columns:
-        return mask & False
+        return mask
     threshold = _resolve_gate_value(gate_value, df)
     if threshold is None:
         return mask

@@ -1,0 +1,57 @@
+{
+  "audit_log": "reports/deadlock_drill_20251130_001628/runtime_audit.log",
+  "capital": 1000000.0,
+  "generated_at": "2025-11-30T00:17:49.549584+00:00",
+  "provenance": {
+    "audit_source": "runtime",
+    "hmac_validated": true,
+    "last_seq": {
+      "9e3c03e7-5704-43aa-a2de-567c5239f340": 2
+    },
+    "run_ids": [
+      "9e3c03e7-5704-43aa-a2de-567c5239f340"
+    ],
+    "time_max": null,
+    "time_min": null
+  },
+  "risk_limits": "configs/portfolio_risk_limits.yaml",
+  "symbols": {
+    "ETH/USDT": {
+      "avg_spread_bps": null,
+      "fraction_time_in_position": 0.0,
+      "implied_trades": 0,
+      "promotion_ready": false,
+      "promotion_reasons": [
+        "would_enter<3",
+        "no_implied_trades"
+      ],
+      "risk_block_breakdown": {},
+      "risk_block_rate": 0.0,
+      "samples": 0,
+      "spread_block_rate": 0.0,
+      "symbol": "ETH/USDT",
+      "thresholds_used": {
+        "max_risk_block_rate": 0.2,
+        "max_spread_block_rate": 0.2,
+        "min_would_enter": 3
+      },
+      "turnover_fraction": 0.0,
+      "turnover_notional": 0.0,
+      "would_enter": 0,
+      "would_exit": 0
+    }
+  },
+  "thresholds": {
+    "max_risk_block_rate": 0.2,
+    "max_spread_block_rate": 0.2,
+    "min_would_enter": 3
+  },
+  "thresholds_by_symbol": {
+    "ETH/USDT": {
+      "max_risk_block_rate": 0.2,
+      "max_spread_block_rate": 0.2,
+      "min_would_enter": 3
+    }
+  },
+  "window_hours": 48
+}

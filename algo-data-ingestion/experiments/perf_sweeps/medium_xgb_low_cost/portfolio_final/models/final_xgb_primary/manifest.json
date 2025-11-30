@@ -4,14 +4,14 @@
   "feature_list_path": "feature_list.json",
   "apply_calibration": true,
   "threshold": {
-    "value": 0.48,
+    "value": 0.51,
     "path": "threshold.json"
   },
   "report_path": "report.json",
   "gates": {
     "prob_column": "base_prob",
     "inference": {
-      "prob_gate_min": 0.49,
+      "prob_gate_min": 0.5,
       "long_only": true,
       "min_hold_bars": 1
     }

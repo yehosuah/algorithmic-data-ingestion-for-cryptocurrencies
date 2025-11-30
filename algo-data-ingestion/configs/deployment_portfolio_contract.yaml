@@ -1,12 +1,100 @@
 dataset_contract: configs/canonical_training_contract_market_multi_3symbol_1m.yaml
 best_model_configs: configs/best_model_configs.yaml
 portfolio_policies: configs/final_portfolio_policies.yaml
-risk_limits: configs/portfolio_risk_limits.yaml
+risk_limits: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides/risk_limits_stage_0.yaml
 models_root: /opt/models
 models:
-  xgb_primary: perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary
+  xgb_primary: experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary
+live_symbols:
+- ETH/USDT
+- BTC/USDT
+- SOL/USDT
+symbol_model_key:
+  ETH/USDT: xgb_primary
+  BTC/USDT: xgb_primary
+  SOL/USDT: xgb_primary
+symbol_policy_map:
+  ETH/USDT: primary
+  BTC/USDT: conservative
+  SOL/USDT: conservative
+symbol_shadow_mode:
+  ETH/USDT: false
+  BTC/USDT: true
+  SOL/USDT: true
+deadlock_policy:
+  enabled: true
+  window_minutes: 30
+  min_trades_window: 1
+  min_coverage_ratio_window: 0.02
+  cooldown_minutes: 45
+  max_actions_per_day: 2
+  audit_every_action: true
+  adjust_prob_gate_min:
+    step: 0.02
+    floor: 0.5
+  actions:
+  - adjust_prob_gate_min:
+      step: 0.02
+      floor: 0.5
+  - enter_safe_mode: true
 dry_run_integration:
   infer_manifest_path: configs/dry_run/infer_jobs_portfolio_policy.yaml
   decision_logic_module: live/decision_logic.py
   expected_input_schema: live/schema_input.yaml
   policy_default: primary
+live_invariants:
+  mode: dry_run
+  kill_switch:
+    env_var: TRADING_KILL_SWITCH
+    behavior: no_new_entries
+  safe_mode:
+    env_var: TRADING_SAFE_MODE
+  time_integrity:
+    require_monotonic_timestamps: true
+    max_clock_skew_seconds: 5
+  risk_limits:
+    path: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides/risk_limits_stage_0.yaml
+    require:
+    - capital
+    - max_gross_leverage
+    - max_net_exposure
+    - max_turnover_per_day
+    - max_orders_per_hour
+    - max_concurrent_positions
+    - daily_loss_limit_pct
+    - max_drawdown_pct
+    - cooldown_minutes_after_exit
+    - cooldown_minutes_after_loss
+    - halt_on_safe_mode
+    - halt_if_spread_bps_gt
+    - halt_if_vol_zscore_gt
+    - halt_if_missing_price_bars
+    - halt_if_data_stale_seconds
+    - symbols
+  idempotency:
+    require_order_intent_id: true
+  reconciliation:
+    require_live_reconcile_on_startup: true
+  observability:
+    required_counters:
+    - trade_count
+    - coverage
+    - skips_by_reason
+    - deadlock_action_taken_total
+    required_fields_in_audit_log:
+    - symbol
+    - timeframe
+    - ts
+    - policy_id
+    - gate_pass
+    - prob
+    - decision
+    - skip_reason
+    - audit_source
+    - audit_run_id
+    - audit_seq
+symbol_order_notional:
+  ETH/USDT: 80.0
+  BTC/USDT: 50.0
+  SOL/USDT: 40.0
+intent_ledger_backend: redis

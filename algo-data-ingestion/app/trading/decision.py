@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Dict, Any
 
 from app.trading.state import PositionState
+
+KILL_SWITCH_ENV = "TRADING_KILL_SWITCH"
+SAFE_MODE_ENV = "TRADING_SAFE_MODE"
+_FLAG_TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
 @dataclass(frozen=True)
@@ -29,6 +34,7 @@ class DecisionOutcome:
     exit_trigger: Optional[str] = None
     skip_execution: bool = False
     skip_reason: Optional[str] = None
+    entry_block_reason: Optional[str] = None
 
 
 def _is_finite(val: Optional[float]) -> bool:
@@ -48,6 +54,7 @@ def decide_bar(
     current_price: Optional[float] = None,
     entry_price: Optional[float] = None,
     spread_bps: Optional[float] = None,
+    safe_mode_active: bool = False,
 ) -> DecisionOutcome:
     """
     Pure decision function mirrored from the live trading loop.
@@ -69,6 +76,7 @@ def decide_bar(
     exit_trigger: Optional[str] = None
     skip_execution = False
     skip_reason: Optional[str] = None
+    entry_block_reason: Optional[str] = None
 
     # Execution guard (spread) – informational for offline; live executor enforces too.
     if _is_finite(spread_bps) and cfg.max_spread_bps is not None:
@@ -79,6 +87,13 @@ def decide_bar(
         except Exception:
             pass
 
+    if not state.in_position:
+        safe_mode_flag = safe_mode_active or os.getenv(SAFE_MODE_ENV, "").strip().lower() in _FLAG_TRUE_VALUES
+        if os.getenv(KILL_SWITCH_ENV, "").strip().lower() in _FLAG_TRUE_VALUES:
+            entry_block_reason = "kill_switch"
+        elif safe_mode_flag:
+            entry_block_reason = "safe_mode"
+
     min_hold_seconds = max(1, int(cfg.min_hold_bars)) * max(1, int(cfg.bar_seconds))
     max_hold_seconds = cfg.max_hold_seconds if cfg.max_hold_seconds and cfg.max_hold_seconds > 0 else None
 
@@ -88,6 +103,7 @@ def decide_bar(
         and probability >= cfg.entry_threshold
         and cfg.long_only
         and state.ready_for_entry(ts)
+        and entry_block_reason is None
     ):
         should_enter = True
 
@@ -158,4 +174,5 @@ def decide_bar(
         exit_trigger=exit_trigger,
         skip_execution=skip_execution,
         skip_reason=skip_reason,
+        entry_block_reason=entry_block_reason,
     )

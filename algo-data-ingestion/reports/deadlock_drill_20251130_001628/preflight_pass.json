@@ -1,0 +1,57 @@
+{
+  "contract": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/deployment_portfolio_contract.yaml",
+  "epsilon": 0.0001,
+  "feature_path": "data/features_labels_regimes_market_multi_3symbol_1m.parquet",
+  "gate_mode": "inference",
+  "generated_at": "2025-11-30T00:13:11.942408+00:00",
+  "hard_fail": false,
+  "max_rows": 500,
+  "no_go_reasons": [],
+  "symbols": {
+    "BTC/USDT": {
+      "coverage_ratio": 0.36363636363636365,
+      "entry_threshold": null,
+      "exit_threshold": null,
+      "fraction_above_prob_gate_min": 0.36363636363636365,
+      "fraction_between_entry_exit": 0.0,
+      "implied_trade_proxy": 24,
+      "model": "xgb_primary",
+      "p50": 0.5002435445785522,
+      "p90": 0.6844155788421631,
+      "p95": 0.6844155788421631,
+      "p99": 0.6844155788421631,
+      "prob_gate_min": 0.52,
+      "samples": 176
+    },
+    "ETH/USDT": {
+      "coverage_ratio": 0.5102040816326531,
+      "entry_threshold": null,
+      "exit_threshold": null,
+      "fraction_above_prob_gate_min": 0.5102040816326531,
+      "fraction_between_entry_exit": 0.0,
+      "implied_trade_proxy": 32,
+      "model": "xgb_primary",
+      "p50": 0.565682053565979,
+      "p90": 0.6844155788421631,
+      "p95": 0.6844155788421631,
+      "p99": 0.6844155788421631,
+      "prob_gate_min": 0.52,
+      "samples": 147
+    },
+    "SOL/USDT": {
+      "coverage_ratio": 0.4971751412429379,
+      "entry_threshold": null,
+      "exit_threshold": null,
+      "fraction_above_prob_gate_min": 0.4971751412429379,
+      "fraction_between_entry_exit": 0.0,
+      "implied_trade_proxy": 20,
+      "model": "xgb_primary",
+      "p50": 0.5002435445785522,
+      "p90": 0.6844155788421631,
+      "p95": 0.6844155788421631,
+      "p99": 0.7068225097656259,
+      "prob_gate_min": 0.52,
+      "samples": 177
+    }
+  }
+}

@@ -71,12 +71,16 @@ class PositionState:
     def ready_for_entry(self, ts: datetime) -> bool:
         if self.in_position:
             return False
+        if self.metadata.get("pending_entry_intent_id"):
+            return False
         if self.hold_until is None:
             return True
         return ts >= self.hold_until
 
     def ready_for_exit(self, ts: datetime) -> bool:
         if not self.in_position:
+            return False
+        if self.metadata.get("pending_exit_intent_id"):
             return False
         if self.hold_until is None:
             return True

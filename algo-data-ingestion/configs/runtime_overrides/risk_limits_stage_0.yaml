@@ -1,0 +1,76 @@
+capital: 1000000
+max_gross_leverage: 3.0
+max_net_exposure: 1.5
+max_turnover_per_day: 1.0
+max_orders_per_hour: 20
+max_concurrent_positions: 5
+max_symbol_weight: 0.2
+max_symbol_notional: 100000
+max_notional_per_symbol: 120000
+max_total_notional: 120000
+max_daily_turnover: 0.5
+daily_loss_limit_pct: 0.03
+max_drawdown_pct: 0.15
+max_drawdown: 0.15
+cooldown_minutes_after_exit: 5
+cooldown_minutes_after_loss: 30
+halt_on_safe_mode: true
+allow_exits_during_halt: true
+halt_if_spread_bps_gt: 35.0
+halt_if_vol_zscore_gt: 5.0
+halt_if_missing_price_bars: false
+halt_if_data_stale_seconds: 180
+min_trade_notional: 0.0001
+transaction_cost_bps: 1.0
+slippage_bps: 0.0
+spread_scale: 0.0
+spread_column: hl_spread
+gate_mode: inference
+long_only: false
+model_weights: {}
+ensemble_mode: weighted_sum
+gate_config:
+  spread_column: hl_spread
+  prob_column: base_prob
+  training:
+    hl_spread_max: null
+    hl_spread_z_max: null
+    rvol20_max: null
+    prob_gate_min: 0.52
+    min_hold_bars: 1
+    long_only: false
+  inference:
+    hl_spread_max: null
+    hl_spread_z_max: null
+    rvol20_max: null
+    prob_gate_min: 0.52
+    min_hold_bars: 1
+    long_only: true
+symbols:
+  BTC/USDT:
+    max_symbol_notional: 15000
+    max_symbol_weight: 0.2
+    max_spread_bps: 25
+    min_trade_notional: 0.0001
+    qty_step: 0.0001
+    price_tick: 0.01
+    max_entry_slippage_bps: 25
+    max_position_age_minutes: 1440
+  ETH/USDT:
+    max_symbol_notional: 20000
+    max_symbol_weight: 0.2
+    max_spread_bps: 25
+    min_trade_notional: 0.0001
+    qty_step: 0.001
+    price_tick: 0.01
+    max_entry_slippage_bps: 25
+    max_position_age_minutes: 1440
+  SOL/USDT:
+    max_symbol_notional: 8000
+    max_symbol_weight: 0.15
+    max_spread_bps: 28
+    min_trade_notional: 0.0001
+    qty_step: 0.01
+    price_tick: 0.001
+    max_entry_slippage_bps: 30
+    max_position_age_minutes: 1440

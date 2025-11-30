@@ -1,0 +1,72 @@
+{
+  "audit_log": "data_lake/trading/audit.log",
+  "capital": 1000000.0,
+  "generated_at": "2025-11-29T21:25:34.018082+00:00",
+  "risk_limits": "configs/portfolio_risk_limits.yaml",
+  "symbols": {
+    "BTC/USDT": {
+      "avg_spread_bps": 5.0,
+      "fraction_time_in_position": 0.016017806984953704,
+      "implied_trades": 15,
+      "promotion_ready": false,
+      "promotion_reasons": [
+        "would_enter<10"
+      ],
+      "risk_block_breakdown": {},
+      "risk_block_rate": 0.0,
+      "samples": 15,
+      "spread_block_rate": 0.0,
+      "symbol": "BTC/USDT",
+      "thresholds_used": {
+        "max_risk_block_rate": 0.5,
+        "max_spread_block_rate": 0.5,
+        "min_would_enter": 10
+      },
+      "turnover_fraction": 0.001605,
+      "turnover_notional": 1605.0,
+      "would_enter": 8,
+      "would_exit": 7
+    },
+    "SOL/USDT": {
+      "avg_spread_bps": 5.0,
+      "fraction_time_in_position": 0.016017806984953704,
+      "implied_trades": 15,
+      "promotion_ready": false,
+      "promotion_reasons": [
+        "would_enter<10"
+      ],
+      "risk_block_breakdown": {},
+      "risk_block_rate": 0.0,
+      "samples": 15,
+      "spread_block_rate": 0.0,
+      "symbol": "SOL/USDT",
+      "thresholds_used": {
+        "max_risk_block_rate": 0.5,
+        "max_spread_block_rate": 0.5,
+        "min_would_enter": 10
+      },
+      "turnover_fraction": 0.001605,
+      "turnover_notional": 1605.0,
+      "would_enter": 8,
+      "would_exit": 7
+    }
+  },
+  "thresholds": {
+    "max_risk_block_rate": 0.5,
+    "max_spread_block_rate": 0.5,
+    "min_would_enter": 3
+  },
+  "thresholds_by_symbol": {
+    "BTC/USDT": {
+      "max_risk_block_rate": 0.5,
+      "max_spread_block_rate": 0.5,
+      "min_would_enter": 10
+    },
+    "SOL/USDT": {
+      "max_risk_block_rate": 0.5,
+      "max_spread_block_rate": 0.5,
+      "min_would_enter": 10
+    }
+  },
+  "window_hours": 48
+}

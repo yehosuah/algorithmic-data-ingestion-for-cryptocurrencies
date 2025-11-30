@@ -159,7 +159,14 @@ services:
       - DECISION_QUEUE_URL=redis://redis:6379/0
       - DECISION_QUEUE_KEY=trading:decisions
       - MODELS_ROOT=/opt/models
-      - TRADING_MODELS=[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":100.0,"max_spread_bps":8.0,"stop_loss_pct":0.004,"take_profit_pct":0.0075,"max_hold_minutes":60}]
+      - TRADING_MODELS=[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":80.0,"max_spread_bps":25.0,"stop_loss_pct":0.004,"take_profit_pct":0.0075,"max_hold_minutes":null,"shadow_mode":false,"policy_id":"primary"},{"model":"xgb_primary","symbol":"BTC/USDT","exchange":"binance","timeframe":"1m","order_notional":50.0,"max_spread_bps":25.0,"stop_loss_pct":0.004,"take_profit_pct":0.0075,"max_hold_minutes":null,"shadow_mode":true,"policy_id":"conservative"},{"model":"xgb_primary","symbol":"SOL/USDT","exchange":"binance","timeframe":"1m","order_notional":40.0,"max_spread_bps":28.0,"stop_loss_pct":0.004,"take_profit_pct":0.0075,"max_hold_minutes":null,"shadow_mode":true,"policy_id":"conservative"}]
+      - TRADING_SHADOW_SYMBOLS=["BTC/USDT","SOL/USDT"]
+      - TRADING_DRY_RUN=true
+      - TRADING_RISK_LIMITS_PATH=configs/runtime_overrides/risk_limits_stage_0.yaml
+      - TRADING_DEADLOCK_POLICY_PATH=configs/runtime_overrides/deadlock_policy_stage_0.yaml
+      - TRADING_INTENT_LEDGER_BACKEND=redis
+      - TRADING_INTENT_LEDGER_REDIS_URL=redis://redis:6379/0
+      - TRADING_AUDIT_HMAC_KEY=${TRADING_AUDIT_HMAC_KEY}
       - TRADING_METRICS_PORT=9010
       - TRADING_STATE_PATH=/app/trading_state/state.json
       - TRADING_STATE_REDIS_URL=redis://redis:6379/0
@@ -169,6 +176,7 @@ services:
       - trading-state:/app/trading_state
       - ./logs/trading:/app/logs
       - ./experiments/perf_sweeps:/opt/models/perf_sweeps
+      - ./configs/runtime_overrides:/app/configs/runtime_overrides
     ports:
       - "9010:9010"
     healthcheck:

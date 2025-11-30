@@ -1,0 +1,64 @@
+{
+  "failures": [
+    "contract_validation:risk_limits path (/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides/risk_limits_stage_0.yaml) must match live_invariants.risk_limits.path (/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/portfolio_risk_limits.yaml)",
+    "coverage_preflight_error:risk_limits path (/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides/risk_limits_stage_0.yaml) must match live_invariants.risk_limits.path (/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/portfolio_risk_limits.yaml)",
+    "audit_read:Unexpected audit_source None in /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/data_lake/trading/audit.log (expected runtime)",
+    "ETH/USDT: trade_count<5",
+    "ETH/USDT: coverage<0.01",
+    "runtime_minutes<180"
+  ],
+  "gates": {
+    "max_deadlock_actions": 1,
+    "max_drawdown_pct": 0.02,
+    "max_reconcile_mismatches": 0,
+    "max_risk_block_rate": 0.35,
+    "max_safe_mode_events": 0,
+    "max_spread_block_rate": 0.35,
+    "min_coverage_ratio": 0.01,
+    "min_runtime_minutes": 180,
+    "min_trade_count": 5
+  },
+  "generated_at": "2025-11-30T01:30:29.046742+00:00",
+  "live_symbols": [
+    "ETH/USDT"
+  ],
+  "metrics": {
+    "per_symbol": {
+      "ETH/USDT": {
+        "coverage_ratio": 0.0,
+        "drawdown_pct": 0.0,
+        "executed_count": 0,
+        "gate_pass": 0,
+        "gate_samples": 0,
+        "risk_block_rate": 0.0,
+        "risk_blocks": 0,
+        "spread_block_rate": 0.0,
+        "spread_blocks": 0,
+        "trade_count": 0
+      }
+    },
+    "summary": {
+      "deadlock_actions": 0,
+      "drawdown_pct_max": 0.0,
+      "reconcile_mismatches": 0,
+      "runtime_minutes": 0.0,
+      "safe_mode_events": 0
+    }
+  },
+  "mode": "dry_run",
+  "provenance": {
+    "audit_log": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/data_lake/trading/audit.log",
+    "error": "Unexpected audit_source None in /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/data_lake/trading/audit.log (expected runtime)",
+    "hmac_validated": false,
+    "run_ids": []
+  },
+  "reports_dir": "reports",
+  "shadow_symbols": [
+    "BTC/USDT",
+    "SOL/USDT"
+  ],
+  "stage": "stage_0",
+  "status": "NO_GO",
+  "window_end": "2025-11-30T01:30:29.046742+00:00",
+  "window_start": "2025-11-28T01:30:29.046742+00:00"
+}

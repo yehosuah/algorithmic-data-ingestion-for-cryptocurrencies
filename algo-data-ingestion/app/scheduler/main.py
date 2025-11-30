@@ -224,6 +224,14 @@ def _safe_symbol_path(symbol: str) -> str:
     return sym.replace(" ", "").replace("/", "-").replace(":", "-").upper()
 
 
+def _decision_namespace(symbol: str, timeframe: str, policy_id: str, model_label: str) -> str:
+    sym = _safe_symbol_path(symbol) or symbol
+    tf = (timeframe or "").strip().lower()
+    policy = (policy_id or "").strip() or "primary"
+    model = (model_label or "").strip()
+    return f"{sym}:{tf}:{policy}:{model}"
+
+
 @dataclass
 class InferenceJob:
     job_id: str
@@ -239,6 +247,10 @@ class InferenceJob:
     tcn_path: Optional[str]
     blender_model: Optional[str]
     blender_path: Optional[str]
+    model_key: Optional[str]
+    policy_id: str
+    policy_contract: Optional[str]
+    shadow_mode: bool
     stride: int
     include_features: bool
     max_decision_items: int
@@ -295,18 +307,22 @@ def _parse_inference_jobs(raw: str) -> List[InferenceJob]:
                 )
                 max_decision_items = DEFAULT_DECISION_PAYLOAD_ITEMS
 
+        policy_id = str(entry.get("policy_id") or "primary").strip() or "primary"
+        policy_contract = str(entry.get("policy_contract") or entry.get("policy_path") or "").strip() or None
         base_model = str(entry.get("base_model") or "").strip() or None
         base_path = str(entry.get("base_path") or "").strip() or (base_model or None)
         tcn_model = str(entry.get("tcn_model") or "").strip() or None
         tcn_path = str(entry.get("tcn_path") or "").strip() or (tcn_model or None)
         blender_model = str(entry.get("blender_model") or "").strip() or None
         blender_path = str(entry.get("blender_path") or "").strip() or (blender_model or None)
+        model_key = str(entry.get("model_key") or base_model or tcn_model or blender_model or "").strip() or None
         if not base_model and not tcn_model and not blender_model:
             log.warning(
                 "INFER_JOBS[%d] requires at least one of base_model, tcn_model, or blender_model; skipping.",
                 idx,
             )
             continue
+        shadow_mode = _coerce_bool(entry.get("shadow_mode", False))
 
         queue_url = str(entry.get("queue_url") or DECISION_QUEUE_URL).strip()
         queue_key = str(entry.get("queue_key") or DECISION_QUEUE_KEY).strip() or DECISION_QUEUE_KEY
@@ -334,6 +350,10 @@ def _parse_inference_jobs(raw: str) -> List[InferenceJob]:
                 tcn_path=tcn_path,
                 blender_model=blender_model,
                 blender_path=blender_path,
+                model_key=model_key,
+                policy_id=policy_id,
+                policy_contract=policy_contract,
+                shadow_mode=shadow_mode,
                 stride=stride,
                 include_features=include_features,
                 max_decision_items=max_decision_items,
@@ -352,7 +372,7 @@ _QUEUE_CLIENTS: Dict[str, aioredis.Redis] = {}
 _BASE_MODEL_CACHE: Dict[str, Tuple[Any, object, List[str]]] = {}
 _TCN_MODEL_CACHE: Dict[str, Tuple[Any, object, object, List[str], object, int]] = {}
 _BLENDER_MODEL_CACHE: Dict[str, Tuple[Any, object, List[str], Optional[LoadedCalibrator]]] = {}
-_LAST_EMITTED: Dict[Tuple[str, str], pd.Timestamp] = {}
+_LAST_EMITTED: Dict[Tuple[str, str, str], pd.Timestamp] = {}
 _LOCAL_MODEL_ROOT = Path("/tmp/scheduler-models")
 _LOCAL_MODEL_ROOT.mkdir(parents=True, exist_ok=True)
 _MODEL_COPY_LOCKS: Dict[str, threading.Lock] = {}
@@ -512,13 +532,14 @@ def _get_queue_client(url: str) -> aioredis.Redis:
 def _filter_new_payload_items(
     job_id: str,
     model_label: str,
+    policy_id: str,
     items: List[Dict[str, Any]],
     *,
     min_ts: Optional[pd.Timestamp] = None,
 ) -> List[Dict[str, Any]]:
     if not items:
         return []
-    key = (job_id, model_label)
+    key = (job_id, model_label, policy_id)
     last_ts = _LAST_EMITTED.get(key)
     fresh: List[Tuple[pd.Timestamp, Dict[str, Any]]] = []
     for item in items:
@@ -563,7 +584,7 @@ async def _enqueue_payload(job: InferenceJob, payload: Dict[str, Any], now: date
             min_ts = min_ts.tz_localize("UTC")
         else:
             min_ts = min_ts.tz_convert("UTC")
-    new_items = _filter_new_payload_items(job.job_id, model_label, items, min_ts=min_ts)
+    new_items = _filter_new_payload_items(job.job_id, model_label, job.policy_id, items, min_ts=min_ts)
     new_count = len(new_items)
     min_ts_str = min_ts.isoformat() if isinstance(min_ts, pd.Timestamp) else "<none>"
     log.info(
@@ -595,21 +616,30 @@ async def _enqueue_payload(job: InferenceJob, payload: Dict[str, Any], now: date
     prob_column = payload.get("prob_column")
     gate_column = payload.get("gate_column")
     artifact_dir = payload.get("artifact_dir")
+    policy_id = job.policy_id or "primary"
+    policy_contract = job.policy_contract
+    model_key_value = job.model_key or model_label
+    shadow_mode = bool(job.shadow_mode)
 
     messages: List[str] = []
     for item in selected_items:
         ts = pd.to_datetime(item.get("timestamp"), utc=True, errors="coerce")
         if ts is pd.NaT:
             continue
+        namespace = _decision_namespace(job.symbol, job.timeframe, policy_id, model_label)
         message: Dict[str, Any] = {
             "job_id": job.job_id,
             "model": model_label,
             "exchange": job.exchange,
             "symbol": job.symbol,
             "timeframe": job.timeframe,
+            "policy_id": policy_id,
+            "model_key": model_key_value,
             "timestamp": ts.isoformat(),
             "probability": float(item.get("probability", 0.0) or 0.0),
             "gate_pass": bool(item.get("gate_pass")),
+            "shadow_mode": shadow_mode,
+            "decision_namespace": namespace,
         }
         if prob_column:
             message["prob_column"] = prob_column
@@ -617,6 +647,8 @@ async def _enqueue_payload(job: InferenceJob, payload: Dict[str, Any], now: date
             message["gate_column"] = gate_column
         if artifact_dir:
             message["artifact_dir"] = artifact_dir
+        if policy_contract:
+            message["policy_contract"] = policy_contract
         if job.include_features and "features" in item:
             message["features"] = item["features"]
         messages.append(json.dumps(message, default=str))

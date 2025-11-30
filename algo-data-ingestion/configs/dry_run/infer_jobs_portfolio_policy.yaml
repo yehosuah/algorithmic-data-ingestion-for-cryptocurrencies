@@ -3,6 +3,7 @@ infer_jobs:
     exchange: binance
     symbol: ETH/USDT
     timeframe: 1m
+    model_key: xgb_primary
     lookback_minutes: 180
     history_minutes: 240
     base_model: xgb_primary
@@ -10,4 +11,33 @@ infer_jobs:
     blender_model: null
     policy_id: primary
     policy_contract: configs/deployment_portfolio_contract.yaml
+    shadow_mode: false
+    max_decision_items: 3
+  - job_id: portfolio_policy_primary_btc
+    exchange: binance
+    symbol: BTC/USDT
+    timeframe: 1m
+    model_key: xgb_primary
+    lookback_minutes: 180
+    history_minutes: 240
+    base_model: xgb_primary
+    base_path: perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary
+    blender_model: null
+    policy_id: primary
+    policy_contract: configs/deployment_portfolio_contract.yaml
+    shadow_mode: true
+    max_decision_items: 3
+  - job_id: portfolio_policy_primary_sol
+    exchange: binance
+    symbol: SOL/USDT
+    timeframe: 1m
+    model_key: xgb_primary
+    lookback_minutes: 180
+    history_minutes: 240
+    base_model: xgb_primary
+    base_path: perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary
+    blender_model: null
+    policy_id: primary
+    policy_contract: configs/deployment_portfolio_contract.yaml
+    shadow_mode: true
     max_decision_items: 3
