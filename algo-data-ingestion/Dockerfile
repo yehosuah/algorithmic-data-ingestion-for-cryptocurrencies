@@ -43,6 +43,7 @@ RUN pip install --no-cache-dir \
     prometheus-client \
     ccxt \
     redis \
+    scikit-learn==1.3.2 \
     numpy \
     numba \
     feedparser \

@@ -34,7 +34,7 @@ services:
       - HF_HOME=/app/.cache/huggingface
       - SOCIAL_SENTIMENT_ENRICH=0
     volumes:
-      - market-data:/app/data_lake
+      - ./data_lake:/app/data_lake
       - hf-cache:/app/.cache/huggingface
       # - ./secrets:/secrets:ro  # mount GCP SA JSON here and set GOOGLE_APPLICATION_CREDENTIALS
     ports:
@@ -111,12 +111,13 @@ services:
       - DATA_LAKE_ROOT=/app/data_lake/market
       - DECISION_QUEUE_URL=redis://redis:6379/0
       - DECISION_QUEUE_KEY=trading:decisions
-      - INFER_DEFAULT_STRIDE=2
+      - INFER_DEFAULT_STRIDE=1
+      - INFER_HISTORY_MARGIN_MIN=30
+      - INFER_APPLY_CALIBRATION=1
       - INFER_JOBS=[
-          {"job_id":"portfolio_policy_primary","exchange":"binance","symbol":"ETH/USDT","timeframe":"1m",
-           "lookback_minutes":180,"history_minutes":240,"base_model":"xgb_primary",
-           "base_path":"perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary",
-           "stride":2,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *"}
+          {"job_id":"portfolio_policy_primary","exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":60,"history_minutes":120,"base_model":"xgb_primary","base_path":"perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary","stride":1,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *","policy_id":"primary","shadow_mode":false,"max_decision_items":1},
+          {"job_id":"portfolio_policy_primary_btc","exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":60,"history_minutes":120,"base_model":"xgb_primary","base_path":"perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary","stride":1,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *","policy_id":"conservative","shadow_mode":false,"max_decision_items":1},
+          {"job_id":"portfolio_policy_primary_sol","exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":60,"history_minutes":120,"base_model":"xgb_primary","base_path":"perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary","stride":1,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *","policy_id":"conservative","shadow_mode":false,"max_decision_items":1}
         ]
       - MARKET_JOBS=[
           {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":240,"cron":"*/5 * * * *"},
@@ -125,9 +126,9 @@ services:
           {"exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":240,"cron":"*/5 * * * *"}
         ]
       - MARKET_INGEST_JOBS=[
-          {"exchange":"binance","symbol":"BTC/USDT","granularity":"1m","limit":360,"cron":"*/10 * * * *"},
-          {"exchange":"binance","symbol":"ETH/USDT","granularity":"1m","limit":360,"cron":"*/10 * * * *"},
-          {"exchange":"binance","symbol":"SOL/USDT","granularity":"1m","limit":360,"cron":"*/10 * * * *"}
+          {"exchange":"binance","symbol":"BTC/USDT","granularity":"1m","limit":360,"cron":"*/1 * * * *"},
+          {"exchange":"binance","symbol":"ETH/USDT","granularity":"1m","limit":360,"cron":"*/1 * * * *"},
+          {"exchange":"binance","symbol":"SOL/USDT","granularity":"1m","limit":360,"cron":"*/1 * * * *"}
         ]
       - TTL_SWEEP_CRON=*/15 * * * *
       - TTL_SWEEP_PATTERN=features:market:*
@@ -135,7 +136,7 @@ services:
     ports:
       - "9002:9002"
     volumes:
-      - market-data:/app/data_lake
+      - ./data_lake:/app/data_lake
       - ./experiments/perf_sweeps:/opt/models/perf_sweeps
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9002/metrics >/dev/null"]
@@ -159,7 +160,7 @@ services:
       - DECISION_QUEUE_URL=redis://redis:6379/0
       - DECISION_QUEUE_KEY=trading:decisions
       - MODELS_ROOT=/opt/models
-      - TRADING_MODELS=[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":300.0,"max_spread_bps":10.0,"stop_loss_pct":0.004,"take_profit_pct":0.0075,"max_hold_minutes":null,"shadow_mode":false,"policy_id":"primary"},{"model":"xgb_primary","symbol":"BTC/USDT","exchange":"binance","timeframe":"1m","order_notional":300.0,"max_spread_bps":10.0,"stop_loss_pct":0.004,"take_profit_pct":0.0075,"max_hold_minutes":null,"shadow_mode":false,"policy_id":"primary"},{"model":"xgb_primary","symbol":"SOL/USDT","exchange":"binance","timeframe":"1m","order_notional":300.0,"max_spread_bps":10.0,"stop_loss_pct":0.004,"take_profit_pct":0.0075,"max_hold_minutes":null,"shadow_mode":false,"policy_id":"primary"}]
+      - TRADING_MODELS=[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":80.0,"max_spread_bps":15,"stop_loss_pct":0.0,"take_profit_pct":0.0003,"max_hold_minutes":60,"shadow_mode":false,"policy_id":"primary","min_hold_bars_override":3},{"model":"xgb_primary","symbol":"BTC/USDT","exchange":"binance","timeframe":"1m","order_notional":50.0,"max_spread_bps":20,"stop_loss_pct":0.0,"take_profit_pct":0.0003,"max_hold_minutes":60,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":3},{"model":"xgb_primary","symbol":"SOL/USDT","exchange":"binance","timeframe":"1m","order_notional":40.0,"max_spread_bps":22,"stop_loss_pct":0.0,"take_profit_pct":0.0003,"max_hold_minutes":60,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":3}]
       - TRADING_SHADOW_SYMBOLS=[]
       - TRADING_DRY_RUN=true
       - TRADING_RISK_LIMITS_PATH=configs/runtime_overrides/risk_limits_stage_0.yaml
@@ -169,10 +170,16 @@ services:
       - TRADING_AUDIT_HMAC_KEY=${TRADING_AUDIT_HMAC_KEY}
       - TRADING_METRICS_PORT=9010
       - TRADING_STATE_PATH=/app/trading_state/state.json
+      - TRADING_STATE_BACKEND=file
       - TRADING_STATE_REDIS_URL=redis://redis:6379/0
+      - TRADING_AUDIT_BACKEND=file
+      - TRADING_AUDIT_LOG_PATH=/app/data_lake/trading/audit.log
       - TRADING_AUDIT_REDIS_URL=redis://redis:6379/0
+      - TRADING_LAST_TS_GRACE_BARS=10
+      - TRADING_DECISION_MAX_AGE_SECONDS=240
+      - TRADING_LOG_LEVEL=DEBUG
     volumes:
-      - market-data:/app/data_lake
+      - ./data_lake:/app/data_lake
       - trading-state:/app/trading_state
       - ./logs/trading:/app/logs
       - ./experiments/perf_sweeps:/opt/models/perf_sweeps

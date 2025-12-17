@@ -19,8 +19,8 @@ symbol_policy_map:
   SOL/USDT: conservative
 symbol_shadow_mode:
   ETH/USDT: false
-  BTC/USDT: true
-  SOL/USDT: true
+  BTC/USDT: false
+  SOL/USDT: false
 deadlock_policy:
   enabled: true
   window_minutes: 30

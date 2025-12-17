@@ -1,10 +1,15 @@
 stage: stage_0
 env:
   TRADING_DRY_RUN: 'true'
-  TRADING_SHADOW_SYMBOLS: BTC/USDT,SOL/USDT
-  TRADING_MODELS: '[{"exchange":"binance","max_hold_minutes":null,"max_spread_bps":25,"model":"xgb_primary","order_notional":80.0,"policy_id":"primary","shadow_mode":false,"stop_loss_pct":0.004,"symbol":"ETH/USDT","take_profit_pct":0.0075,"timeframe":"1m"},{"exchange":"binance","max_hold_minutes":null,"max_spread_bps":25,"model":"xgb_primary","order_notional":50.0,"policy_id":"conservative","shadow_mode":true,"stop_loss_pct":0.004,"symbol":"BTC/USDT","take_profit_pct":0.0075,"timeframe":"1m"},{"exchange":"binance","max_hold_minutes":null,"max_spread_bps":28,"model":"xgb_primary","order_notional":40.0,"policy_id":"conservative","shadow_mode":true,"stop_loss_pct":0.004,"symbol":"SOL/USDT","take_profit_pct":0.0075,"timeframe":"1m"}]'
+  TRADING_SHADOW_SYMBOLS: ''
+  TRADING_MODELS: '[{"exchange":"binance","max_hold_minutes":null,"max_spread_bps":15,"model":"xgb_primary","order_notional":80.0,"policy_id":"primary","shadow_mode":false,"stop_loss_pct":0.0,"take_profit_pct":0.0003,"timeframe":"1m","min_hold_bars_override":3,"symbol":"ETH/USDT"},{"exchange":"binance","max_hold_minutes":null,"max_spread_bps":20,"model":"xgb_primary","order_notional":50.0,"policy_id":"conservative","shadow_mode":false,"stop_loss_pct":0.0,"take_profit_pct":0.0003,"timeframe":"1m","min_hold_bars_override":3,"symbol":"BTC/USDT"},{"exchange":"binance","max_hold_minutes":null,"max_spread_bps":22,"model":"xgb_primary","order_notional":40.0,"policy_id":"conservative","shadow_mode":false,"stop_loss_pct":0.0,"take_profit_pct":0.0003,"timeframe":"1m","min_hold_bars_override":3,"symbol":"SOL/USDT"}]'
   TRADING_RISK_LIMITS_PATH: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides/risk_limits_stage_0.yaml
   TRADING_DEADLOCK_POLICY_PATH: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides/deadlock_policy_stage_0.yaml
   TRADING_INTENT_LEDGER_BACKEND: redis
+  TRADING_LAST_TS_GRACE_BARS: 10
+  TRADING_DECISION_MAX_AGE_SECONDS: 240
+  TRADING_STATE_BACKEND: file
+  TRADING_AUDIT_BACKEND: file
+  TRADING_AUDIT_LOG_PATH: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/data_lake/trading/audit.log
 risk_limits_path: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides/risk_limits_stage_0.yaml
 deadlock_policy_path: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides/deadlock_policy_stage_0.yaml
