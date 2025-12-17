@@ -1,0 +1,119 @@
+{
+  "generated_at": "2025-12-14T22:22:43.880964Z",
+  "trades": [
+    {
+      "model": "xgb_primary",
+      "symbol": "ETH/USDT",
+      "policy_id": "primary",
+      "exit_reason": "prob_floor",
+      "exit_reason_all": [
+        "prob_floor"
+      ],
+      "entry_ts": "2025-12-14T21:45:00+00:00",
+      "exit_ts": "2025-12-14T21:49:00+00:00",
+      "entry_price": 3079.98,
+      "exit_price": 3080.9,
+      "entry_amount": 0.025,
+      "exit_amount": 0.025,
+      "pnl_gross": 0.02300000000000182,
+      "pnl_net_estimate": 0.007600100000001818,
+      "pnl_net_realized": 0.007600100000001818,
+      "spread_bps": 0.03245799529606896
+    },
+    {
+      "model": "xgb_primary",
+      "symbol": "SOL/USDT",
+      "policy_id": "conservative",
+      "exit_reason": "take_profit",
+      "exit_reason_all": [
+        "take_profit",
+        "gate_close"
+      ],
+      "entry_ts": "2025-12-14T21:52:00+00:00",
+      "exit_ts": "2025-12-14T22:00:00+00:00",
+      "entry_price": 129.95,
+      "exit_price": 129.99,
+      "entry_amount": 0.3,
+      "exit_amount": 0.3,
+      "pnl_gross": 0.01200000000000614,
+      "pnl_net_estimate": 0.004203000000006141,
+      "pnl_net_realized": 0.004203000000006141,
+      "spread_bps": 0.7692603561668453
+    },
+    {
+      "model": "xgb_primary",
+      "symbol": "ETH/USDT",
+      "policy_id": "primary",
+      "exit_reason": "take_profit",
+      "exit_reason_all": [
+        "take_profit"
+      ],
+      "entry_ts": "2025-12-14T21:58:00+00:00",
+      "exit_ts": "2025-12-14T22:01:00+00:00",
+      "entry_price": 3081.81,
+      "exit_price": 3082.88,
+      "entry_amount": 0.025,
+      "exit_amount": 0.025,
+      "pnl_gross": 0.026750000000004093,
+      "pnl_net_estimate": 0.011340950000004091,
+      "pnl_net_realized": 0.011340950000004091,
+      "spread_bps": 0.032437148968461456
+    },
+    {
+      "model": "xgb_primary",
+      "symbol": "SOL/USDT",
+      "policy_id": "conservative",
+      "exit_reason": "take_profit",
+      "exit_reason_all": [
+        "take_profit",
+        "gate_close"
+      ],
+      "entry_ts": "2025-12-14T22:01:00+00:00",
+      "exit_ts": "2025-12-14T22:04:00+00:00",
+      "entry_price": 129.99,
+      "exit_price": 130.19,
+      "entry_amount": 0.3,
+      "exit_amount": 0.3,
+      "pnl_gross": 0.059999999999996584,
+      "pnl_net_estimate": 0.052200599999996586,
+      "pnl_net_realized": 0.052200599999996586,
+      "spread_bps": 0.7680786512531899
+    },
+    {
+      "model": "xgb_primary",
+      "symbol": "ETH/USDT",
+      "policy_id": "primary",
+      "exit_reason": "take_profit",
+      "exit_reason_all": [
+        "take_profit"
+      ],
+      "entry_ts": "2025-12-14T22:03:00+00:00",
+      "exit_ts": "2025-12-14T22:06:00+00:00",
+      "entry_price": 3086.77,
+      "exit_price": 3088.17,
+      "entry_amount": 0.025,
+      "exit_amount": 0.025,
+      "pnl_gross": 0.03500000000000227,
+      "pnl_net_estimate": 0.019566150000002273,
+      "pnl_net_realized": 0.019566150000002273,
+      "spread_bps": 0.03238158459207633
+    }
+  ],
+  "summary": {
+    "trade_count": 5,
+    "by_symbol": {
+      "ETH/USDT": {
+        "count": 3,
+        "positive_fraction_net": 1.0,
+        "total_pnl_net": 0.03850720000000818,
+        "total_pnl_gross": 0.08475000000000818
+      },
+      "SOL/USDT": {
+        "count": 2,
+        "positive_fraction_net": 1.0,
+        "total_pnl_net": 0.056403600000002725,
+        "total_pnl_gross": 0.07200000000000273
+      }
+    }
+  }
+}

@@ -1,0 +1,168 @@
+{
+  "trade_count": 239,
+  "by_reason": [
+    {
+      "reason": "gate_close",
+      "count": 185,
+      "avg_pnl": -0.3861487913385856,
+      "avg_pnl_gross": -0.3859134094488218,
+      "avg_pnl_net": -0.39764697962233964,
+      "avg_hold_seconds": 2061.259842519685,
+      "executed_fraction": 0.005405405405405406
+    },
+    {
+      "reason": "prob_floor",
+      "count": 33,
+      "avg_pnl": -0.48189999999999955,
+      "avg_pnl_gross": -0.48189999999999955,
+      "avg_pnl_net": -0.49194488429893196,
+      "avg_hold_seconds": 120.0,
+      "executed_fraction": 0.0
+    },
+    {
+      "reason": "take_profit",
+      "count": 15,
+      "avg_pnl": 0.11816206666666611,
+      "avg_pnl_gross": 0.11816206666666611,
+      "avg_pnl_net": 0.10612655513510888,
+      "avg_hold_seconds": 364.0,
+      "executed_fraction": 0.4
+    },
+    {
+      "reason": "trailing_prob_drop",
+      "count": 6,
+      "avg_pnl": -0.11960000000000577,
+      "avg_pnl_gross": -0.11960000000000577,
+      "avg_pnl_net": -0.12958816597970832,
+      "avg_hold_seconds": 1220.0,
+      "executed_fraction": 0.0
+    }
+  ],
+  "by_symbol_reason": {
+    "BTC/USDT": {
+      "gate_close": 59,
+      "prob_floor": 10,
+      "take_profit": 7
+    },
+    "ETH/USDT": {
+      "gate_close": 56,
+      "prob_floor": 11,
+      "take_profit": 5
+    },
+    "SOL/USDT": {
+      "gate_close": 70,
+      "prob_floor": 12,
+      "take_profit": 3,
+      "trailing_prob_drop": 6
+    }
+  },
+  "by_hour_reason": [
+    {
+      "hour": "2025-12-01T21:00:00+00:00",
+      "reason": "gate_close",
+      "count": 2
+    },
+    {
+      "hour": "2025-12-01T21:00:00+00:00",
+      "reason": "prob_floor",
+      "count": 4
+    },
+    {
+      "hour": "2025-12-01T22:00:00+00:00",
+      "reason": "gate_close",
+      "count": 55
+    },
+    {
+      "hour": "2025-12-01T22:00:00+00:00",
+      "reason": "prob_floor",
+      "count": 27
+    },
+    {
+      "hour": "2025-12-01T22:00:00+00:00",
+      "reason": "take_profit",
+      "count": 1
+    },
+    {
+      "hour": "2025-12-01T23:00:00+00:00",
+      "reason": "gate_close",
+      "count": 7
+    },
+    {
+      "hour": "2025-12-01T23:00:00+00:00",
+      "reason": "take_profit",
+      "count": 6
+    },
+    {
+      "hour": "2025-12-02T00:00:00+00:00",
+      "reason": "gate_close",
+      "count": 19
+    },
+    {
+      "hour": "2025-12-02T01:00:00+00:00",
+      "reason": "gate_close",
+      "count": 4
+    },
+    {
+      "hour": "2025-12-02T01:00:00+00:00",
+      "reason": "prob_floor",
+      "count": 2
+    },
+    {
+      "hour": "2025-12-02T02:00:00+00:00",
+      "reason": "gate_close",
+      "count": 98
+    },
+    {
+      "hour": "2025-12-02T02:00:00+00:00",
+      "reason": "take_profit",
+      "count": 8
+    },
+    {
+      "hour": "2025-12-02T02:00:00+00:00",
+      "reason": "trailing_prob_drop",
+      "count": 6
+    }
+  ],
+  "churn_fraction_le_one_bar": 0.029288702928870293,
+  "negative_fraction": 0.5815899581589958,
+  "negative_fraction_by_reason": [
+    {
+      "reason": "gate_close",
+      "negative_fraction": 0.6810810810810811
+    },
+    {
+      "reason": "prob_floor",
+      "negative_fraction": 0.030303030303030304
+    },
+    {
+      "reason": "take_profit",
+      "negative_fraction": 0.4
+    },
+    {
+      "reason": "trailing_prob_drop",
+      "negative_fraction": 1.0
+    }
+  ],
+  "churn_fraction_by_reason": [
+    {
+      "reason": "gate_close",
+      "fraction_le_one_bar": 0.016216216216216217
+    },
+    {
+      "reason": "prob_floor",
+      "fraction_le_one_bar": 0.0
+    },
+    {
+      "reason": "take_profit",
+      "fraction_le_one_bar": 0.26666666666666666
+    },
+    {
+      "reason": "trailing_prob_drop",
+      "fraction_le_one_bar": 0.0
+    }
+  ],
+  "avg_hold_seconds": 1843.489932885906,
+  "avg_pnl": -0.32528835906040554,
+  "avg_pnl_gross": -0.325087731543627,
+  "avg_pnl_net": -0.3367700803032731
+}

@@ -1,0 +1,350 @@
+{
+  "artifacts": {
+    "coverage_reports": [
+      "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/reports/live_readiness/preflight_coverage_20251213_0122.json",
+      "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/reports/live_readiness/preflight_coverage_20251213_0122.md"
+    ],
+    "readiness_json": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/reports/live_readiness/20251213T012158Z_live_readiness.json",
+    "readiness_md": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/reports/live_readiness/20251213T012158Z_live_readiness.md",
+    "shadow_reports": [],
+    "stage_reports": []
+  },
+  "audit_log": "data_lake/trading/audit.log",
+  "checks": [
+    {
+      "artifacts": [],
+      "details": {
+        "best_model_configs": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/best_model_configs.yaml",
+        "contract_path": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/deployment_portfolio_contract.yaml",
+        "dataset_contract": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/canonical_training_contract_market_multi_3symbol_1m.yaml",
+        "default_policy": "primary",
+        "live_invariants": {
+          "deadlock_policy": {
+            "actions": [
+              {
+                "adjust_prob_gate_min": {
+                  "floor": 0.5,
+                  "step": 0.02
+                }
+              },
+              {
+                "enter_safe_mode": true
+              }
+            ],
+            "adjust_floor": 0.5,
+            "adjust_step": 0.02,
+            "cooldown_minutes": 45,
+            "enabled": true,
+            "max_actions_per_day": 2,
+            "min_coverage_ratio_window": 0.02,
+            "min_trades_window": 1,
+            "window_minutes": 30
+          },
+          "intent_ledger_backend": "redis",
+          "kill_switch_behavior": "no_new_entries",
+          "kill_switch_env": "TRADING_KILL_SWITCH",
+          "mode": "dry_run",
+          "observability_audit_fields": [
+            "symbol",
+            "timeframe",
+            "ts",
+            "policy_id",
+            "gate_pass",
+            "prob",
+            "decision",
+            "skip_reason",
+            "audit_source",
+            "audit_run_id",
+            "audit_seq"
+          ],
+          "observability_counters": [
+            "trade_count",
+            "coverage",
+            "skips_by_reason",
+            "deadlock_action_taken_total"
+          ],
+          "require_live_reconcile_on_startup": true,
+          "require_order_intent_id": true,
+          "required_risk_limit_keys": [
+            "capital",
+            "max_gross_leverage",
+            "max_net_exposure",
+            "max_turnover_per_day",
+            "max_orders_per_hour",
+            "max_concurrent_positions",
+            "daily_loss_limit_pct",
+            "max_drawdown_pct",
+            "cooldown_minutes_after_exit",
+            "cooldown_minutes_after_loss",
+            "halt_on_safe_mode",
+            "halt_if_spread_bps_gt",
+            "halt_if_vol_zscore_gt",
+            "halt_if_missing_price_bars",
+            "halt_if_data_stale_seconds",
+            "symbols"
+          ],
+          "risk_limits_path": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides/risk_limits_stage_0.yaml",
+          "safe_mode_env": "TRADING_SAFE_MODE"
+        },
+        "models": {
+          "xgb_primary": "experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary"
+        },
+        "policy_ids": [
+          "aggressive",
+          "conservative",
+          "primary"
+        ],
+        "portfolio_policies": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/final_portfolio_policies.yaml",
+        "risk_limits": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides/risk_limits_stage_0.yaml",
+        "risk_limits_keys": [
+          "capital",
+          "max_gross_leverage",
+          "max_net_exposure",
+          "max_turnover_per_day",
+          "max_orders_per_hour",
+          "max_concurrent_positions",
+          "max_symbol_weight",
+          "max_symbol_notional",
+          "max_notional_per_symbol",
+          "max_total_notional",
+          "max_daily_turnover",
+          "daily_loss_limit_pct",
+          "max_drawdown_pct",
+          "max_drawdown",
+          "cooldown_minutes_after_exit",
+          "cooldown_minutes_after_loss",
+          "halt_on_safe_mode",
+          "allow_exits_during_halt",
+          "halt_if_spread_bps_gt",
+          "halt_if_vol_zscore_gt",
+          "halt_if_missing_price_bars",
+          "halt_if_data_stale_seconds",
+          "min_trade_notional",
+          "transaction_cost_bps",
+          "slippage_bps",
+          "spread_scale",
+          "spread_column",
+          "gate_mode",
+          "long_only",
+          "model_weights",
+          "ensemble_mode",
+          "gate_config",
+          "symbols",
+          "loss_guard"
+        ],
+        "symbols": {
+          "live_symbols": [
+            "ETH/USDT",
+            "BTC/USDT",
+            "SOL/USDT"
+          ],
+          "symbol_model_key": {
+            "BTC/USDT": "xgb_primary",
+            "ETH/USDT": "xgb_primary",
+            "SOL/USDT": "xgb_primary"
+          },
+          "symbol_policy_map": {
+            "BTC/USDT": "conservative",
+            "ETH/USDT": "primary",
+            "SOL/USDT": "conservative"
+          },
+          "symbol_shadow_mode": {
+            "BTC/USDT": false,
+            "ETH/USDT": false,
+            "SOL/USDT": false
+          }
+        }
+      },
+      "duration_ms": 27,
+      "name": "deployment_contract_validation",
+      "required": true,
+      "status": "PASS",
+      "summary": "Deployment contract validated successfully."
+    },
+    {
+      "artifacts": [
+        "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/reports/live_readiness/preflight_coverage_20251213_0122.json",
+        "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/reports/live_readiness/preflight_coverage_20251213_0122.md"
+      ],
+      "details": {
+        "allow_zero_coverage": false,
+        "no_go_reasons": []
+      },
+      "duration_ms": 5011,
+      "name": "coverage_preflight",
+      "required": true,
+      "status": "PASS",
+      "summary": "Coverage preflight passed."
+    },
+    {
+      "artifacts": [],
+      "duration_ms": 0,
+      "name": "shadow_readiness_and_promotion",
+      "required": false,
+      "status": "SKIP",
+      "summary": "Skipped (no shadow symbols and not required)."
+    },
+    {
+      "artifacts": [],
+      "duration_ms": 0,
+      "name": "launch_stage_evaluation",
+      "required": false,
+      "status": "SKIP",
+      "summary": "Skipped (no --stage provided)."
+    }
+  ],
+  "contract_summary": {
+    "best_model_configs": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/best_model_configs.yaml",
+    "contract_path": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/deployment_portfolio_contract.yaml",
+    "dataset_contract": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/canonical_training_contract_market_multi_3symbol_1m.yaml",
+    "default_policy": "primary",
+    "live_invariants": {
+      "deadlock_policy": {
+        "actions": [
+          {
+            "adjust_prob_gate_min": {
+              "floor": 0.5,
+              "step": 0.02
+            }
+          },
+          {
+            "enter_safe_mode": true
+          }
+        ],
+        "adjust_floor": 0.5,
+        "adjust_step": 0.02,
+        "cooldown_minutes": 45,
+        "enabled": true,
+        "max_actions_per_day": 2,
+        "min_coverage_ratio_window": 0.02,
+        "min_trades_window": 1,
+        "window_minutes": 30
+      },
+      "intent_ledger_backend": "redis",
+      "kill_switch_behavior": "no_new_entries",
+      "kill_switch_env": "TRADING_KILL_SWITCH",
+      "mode": "dry_run",
+      "observability_audit_fields": [
+        "symbol",
+        "timeframe",
+        "ts",
+        "policy_id",
+        "gate_pass",
+        "prob",
+        "decision",
+        "skip_reason",
+        "audit_source",
+        "audit_run_id",
+        "audit_seq"
+      ],
+      "observability_counters": [
+        "trade_count",
+        "coverage",
+        "skips_by_reason",
+        "deadlock_action_taken_total"
+      ],
+      "require_live_reconcile_on_startup": true,
+      "require_order_intent_id": true,
+      "required_risk_limit_keys": [
+        "capital",
+        "max_gross_leverage",
+        "max_net_exposure",
+        "max_turnover_per_day",
+        "max_orders_per_hour",
+        "max_concurrent_positions",
+        "daily_loss_limit_pct",
+        "max_drawdown_pct",
+        "cooldown_minutes_after_exit",
+        "cooldown_minutes_after_loss",
+        "halt_on_safe_mode",
+        "halt_if_spread_bps_gt",
+        "halt_if_vol_zscore_gt",
+        "halt_if_missing_price_bars",
+        "halt_if_data_stale_seconds",
+        "symbols"
+      ],
+      "risk_limits_path": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides/risk_limits_stage_0.yaml",
+      "safe_mode_env": "TRADING_SAFE_MODE"
+    },
+    "models": {
+      "xgb_primary": "experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary"
+    },
+    "policy_ids": [
+      "aggressive",
+      "conservative",
+      "primary"
+    ],
+    "portfolio_policies": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/final_portfolio_policies.yaml",
+    "risk_limits": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides/risk_limits_stage_0.yaml",
+    "risk_limits_keys": [
+      "capital",
+      "max_gross_leverage",
+      "max_net_exposure",
+      "max_turnover_per_day",
+      "max_orders_per_hour",
+      "max_concurrent_positions",
+      "max_symbol_weight",
+      "max_symbol_notional",
+      "max_notional_per_symbol",
+      "max_total_notional",
+      "max_daily_turnover",
+      "daily_loss_limit_pct",
+      "max_drawdown_pct",
+      "max_drawdown",
+      "cooldown_minutes_after_exit",
+      "cooldown_minutes_after_loss",
+      "halt_on_safe_mode",
+      "allow_exits_during_halt",
+      "halt_if_spread_bps_gt",
+      "halt_if_vol_zscore_gt",
+      "halt_if_missing_price_bars",
+      "halt_if_data_stale_seconds",
+      "min_trade_notional",
+      "transaction_cost_bps",
+      "slippage_bps",
+      "spread_scale",
+      "spread_column",
+      "gate_mode",
+      "long_only",
+      "model_weights",
+      "ensemble_mode",
+      "gate_config",
+      "symbols",
+      "loss_guard"
+    ],
+    "symbols": {
+      "live_symbols": [
+        "ETH/USDT",
+        "BTC/USDT",
+        "SOL/USDT"
+      ],
+      "symbol_model_key": {
+        "BTC/USDT": "xgb_primary",
+        "ETH/USDT": "xgb_primary",
+        "SOL/USDT": "xgb_primary"
+      },
+      "symbol_policy_map": {
+        "BTC/USDT": "conservative",
+        "ETH/USDT": "primary",
+        "SOL/USDT": "conservative"
+      },
+      "symbol_shadow_mode": {
+        "BTC/USDT": false,
+        "ETH/USDT": false,
+        "SOL/USDT": false
+      }
+    }
+  },
+  "deployment_contract_path": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/deployment_portfolio_contract.yaml",
+  "input_errors": [],
+  "lookback_hours": 48,
+  "mode": "live_like",
+  "overall_status": "GO",
+  "symbols_live": [
+    "ETH/USDT",
+    "BTC/USDT",
+    "SOL/USDT"
+  ],
+  "symbols_shadow": [],
+  "timestamp_utc": "2025-12-13T01:21:58.857204+00:00"
+}

@@ -295,6 +295,11 @@ def _render_markdown(report: dict) -> str:
         for reason in report["no_go_reasons"]:
             lines.append(f"- {reason}")
         lines.append("")
+    if report.get("warnings"):
+        lines.append("## Warnings")
+        for warning in report["warnings"]:
+            lines.append(f"- {warning}")
+        lines.append("")
     for sym, metrics in (report.get("symbols") or {}).items():
         lines.append(f"## {sym}")
         lines.append(f"- Model: {metrics.get('model')}")
@@ -352,7 +357,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     policies = _load_yaml(policy_path)
     risk_limits_path = _resolve_path(base_dir, contract.get("risk_limits", "configs/portfolio_risk_limits.yaml"))
     risk_cfg = _load_yaml(risk_limits_path)
-    gate_cfg = risk_cfg.get("gate_config") or {}
+    risk_gate_cfg = risk_cfg.get("gate_config") or {}
     gate_mode = args.gate_mode or risk_cfg.get("gate_mode") or "inference"
 
     symbols_cfg = summary.get("symbols", {}) or {}
@@ -371,6 +376,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     results: Dict[str, SymbolCoverage] = {}
     no_go_reasons: List[str] = []
+    warnings: List[str] = []
 
     for symbol, model_key in symbol_model_map.items():
         policy_id = symbol_policy_map.get(symbol, summary.get("default_policy"))
@@ -380,17 +386,38 @@ def main(argv: Optional[List[str]] = None) -> int:
         if model_path is None:
             no_go_reasons.append(f"{symbol}: missing model path for key {model_key}")
             continue
+        try:
+            artifacts = load_manifest_artifacts(model_path, model_label=model_key)
+        except Exception as exc:
+            no_go_reasons.append(f"{symbol}: unable to load manifest artifacts ({exc})")
+            continue
         metrics = _evaluate_symbol(
             features,
             symbol=symbol,
             model_dir=model_path,
             model_name=model_key,
-            gate_cfg=gate_cfg,
+            gate_cfg=artifacts.gate_config,
             gate_mode=gate_mode,
             threshold_cfg=threshold_cfg,
             regime_col=policy.get("regime_col"),
         )
         results[symbol] = metrics
+        # Guardrail: preflight uses manifest gating; warn when risk-limits gate differs so operators
+        # don't get a false "GO" from a config that's not used by runtime decision gating.
+        try:
+            if "symbol" in features.columns:
+                sym_df = features[features["symbol"].astype(str).str.upper() == symbol]
+            else:
+                sym_df = features
+            risk_thresholds = _resolve_prob_gate_min(risk_gate_cfg, sym_df, gate_mode)
+            if risk_thresholds is not None:
+                risk_gate_min = float(risk_thresholds.dropna().median())
+                if metrics.prob_gate_min is not None and abs(risk_gate_min - float(metrics.prob_gate_min)) > 1e-12:
+                    warnings.append(
+                        f"{symbol}: risk_limits prob_gate_min={risk_gate_min} differs from manifest={metrics.prob_gate_min} (preflight uses manifest)"
+                    )
+        except Exception:
+            pass
         if metrics.samples == 0:
             no_go_reasons.append(f"{symbol}: no samples available for coverage estimation")
         if metrics.fraction_above_prob_gate_min <= args.epsilon:
@@ -406,6 +433,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "feature_path": str(resolved_feature_path),
         "max_rows": args.max_rows,
         "gate_mode": gate_mode,
+        "gate_config_source": "manifest",
         "epsilon": args.epsilon,
         "symbols": {
             sym: {
@@ -425,6 +453,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             }
             for sym, m in results.items()
         },
+        "warnings": warnings,
         "no_go_reasons": no_go_reasons,
         "hard_fail": bool(no_go_reasons and not args.allow_no_go),
     }

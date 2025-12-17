@@ -1,0 +1,90 @@
+{
+  "trade_count": 105,
+  "by_reason": [
+    {
+      "reason": "gate_close",
+      "count": 67,
+      "avg_pnl": -0.06978992982455795,
+      "avg_pnl_gross": -0.06978992982455795,
+      "avg_pnl_net": -0.081159257114611,
+      "avg_hold_seconds": 748.421052631579,
+      "executed_fraction": 0.029850746268656716
+    },
+    {
+      "reason": "take_profit",
+      "count": 38,
+      "avg_pnl": 0.0037772631578972165,
+      "avg_pnl_gross": 0.0037772631578972165,
+      "avg_pnl_net": -0.007474288248845673,
+      "avg_hold_seconds": 355.2631578947368,
+      "executed_fraction": 0.18421052631578946
+    }
+  ],
+  "by_symbol_reason": {
+    "BTC/USDT": {
+      "gate_close": 21,
+      "take_profit": 10
+    },
+    "ETH/USDT": {
+      "gate_close": 17,
+      "take_profit": 9
+    },
+    "SOL/USDT": {
+      "gate_close": 29,
+      "take_profit": 19
+    }
+  },
+  "by_hour_reason": [
+    {
+      "hour": "2025-12-02T03:00:00+00:00",
+      "reason": "gate_close",
+      "count": 2
+    },
+    {
+      "hour": "2025-12-02T04:00:00+00:00",
+      "reason": "gate_close",
+      "count": 45
+    },
+    {
+      "hour": "2025-12-02T04:00:00+00:00",
+      "reason": "take_profit",
+      "count": 37
+    },
+    {
+      "hour": "2025-12-02T05:00:00+00:00",
+      "reason": "gate_close",
+      "count": 20
+    },
+    {
+      "hour": "2025-12-02T05:00:00+00:00",
+      "reason": "take_profit",
+      "count": 1
+    }
+  ],
+  "churn_fraction_le_one_bar": 0.08571428571428572,
+  "negative_fraction": 0.8095238095238095,
+  "negative_fraction_by_reason": [
+    {
+      "reason": "gate_close",
+      "negative_fraction": 0.8208955223880597
+    },
+    {
+      "reason": "take_profit",
+      "negative_fraction": 0.7894736842105263
+    }
+  ],
+  "churn_fraction_by_reason": [
+    {
+      "reason": "gate_close",
+      "fraction_le_one_bar": 0.07462686567164178
+    },
+    {
+      "reason": "take_profit",
+      "fraction_le_one_bar": 0.10526315789473684
+    }
+  ],
+  "avg_hold_seconds": 591.1578947368421,
+  "avg_pnl": -0.040363052631575885,
+  "avg_pnl_gross": -0.040363052631575885,
+  "avg_pnl_net": -0.05168526956830487
+}

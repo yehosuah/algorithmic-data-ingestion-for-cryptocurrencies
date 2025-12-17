@@ -1,0 +1,397 @@
+{
+  "trade_count": 1119,
+  "by_reason": [
+    {
+      "reason": "gate_close",
+      "count": 990,
+      "avg_pnl": -0.2089387505943891,
+      "avg_pnl_gross": -0.19814839898989842,
+      "avg_pnl_net": -0.2089387505943891,
+      "avg_hold_seconds": 7898.181818181818,
+      "executed_fraction": 0.0
+    },
+    {
+      "reason": "take_profit",
+      "count": 120,
+      "avg_pnl": 0.015697962183332824,
+      "avg_pnl_gross": 0.026940041666666158,
+      "avg_pnl_net": 0.015697962183332824,
+      "avg_hold_seconds": 985.0,
+      "executed_fraction": 1.0
+    },
+    {
+      "reason": "time_limit",
+      "count": 9,
+      "avg_pnl": -0.4417057682222235,
+      "avg_pnl_gross": -0.43099111111111243,
+      "avg_pnl_net": -0.4417057682222235,
+      "avg_hold_seconds": 21606.666666666668,
+      "executed_fraction": 1.0
+    }
+  ],
+  "by_reason_executed": [
+    {
+      "reason": "take_profit",
+      "count": 120,
+      "avg_pnl": 0.015697962183332824,
+      "avg_pnl_gross": 0.026940041666666158,
+      "avg_pnl_net": 0.015697962183332824,
+      "avg_hold_seconds": 985.0,
+      "negative_fraction": 0.008333333333333333
+    },
+    {
+      "reason": "time_limit",
+      "count": 9,
+      "avg_pnl": -0.4417057682222235,
+      "avg_pnl_gross": -0.43099111111111243,
+      "avg_pnl_net": -0.4417057682222235,
+      "avg_hold_seconds": 21606.666666666668,
+      "negative_fraction": 1.0
+    }
+  ],
+  "by_symbol_reason": {
+    "BTC/USDT": {
+      "gate_close": 419,
+      "take_profit": 38,
+      "time_limit": 3
+    },
+    "ETH/USDT": {
+      "gate_close": 73,
+      "take_profit": 47,
+      "time_limit": 3
+    },
+    "SOL/USDT": {
+      "gate_close": 498,
+      "take_profit": 35,
+      "time_limit": 3
+    }
+  },
+  "by_hour_reason": [
+    {
+      "hour": "2025-12-13T03:00:00+00:00",
+      "reason": "gate_close",
+      "count": 16
+    },
+    {
+      "hour": "2025-12-13T03:00:00+00:00",
+      "reason": "take_profit",
+      "count": 11
+    },
+    {
+      "hour": "2025-12-13T04:00:00+00:00",
+      "reason": "gate_close",
+      "count": 26
+    },
+    {
+      "hour": "2025-12-13T05:00:00+00:00",
+      "reason": "gate_close",
+      "count": 24
+    },
+    {
+      "hour": "2025-12-13T11:00:00+00:00",
+      "reason": "gate_close",
+      "count": 7
+    },
+    {
+      "hour": "2025-12-13T11:00:00+00:00",
+      "reason": "take_profit",
+      "count": 5
+    },
+    {
+      "hour": "2025-12-13T12:00:00+00:00",
+      "reason": "gate_close",
+      "count": 28
+    },
+    {
+      "hour": "2025-12-13T12:00:00+00:00",
+      "reason": "take_profit",
+      "count": 4
+    },
+    {
+      "hour": "2025-12-13T13:00:00+00:00",
+      "reason": "gate_close",
+      "count": 38
+    },
+    {
+      "hour": "2025-12-13T14:00:00+00:00",
+      "reason": "gate_close",
+      "count": 32
+    },
+    {
+      "hour": "2025-12-13T15:00:00+00:00",
+      "reason": "gate_close",
+      "count": 35
+    },
+    {
+      "hour": "2025-12-13T16:00:00+00:00",
+      "reason": "gate_close",
+      "count": 30
+    },
+    {
+      "hour": "2025-12-13T17:00:00+00:00",
+      "reason": "gate_close",
+      "count": 27
+    },
+    {
+      "hour": "2025-12-13T18:00:00+00:00",
+      "reason": "gate_close",
+      "count": 19
+    },
+    {
+      "hour": "2025-12-13T18:00:00+00:00",
+      "reason": "take_profit",
+      "count": 12
+    },
+    {
+      "hour": "2025-12-13T18:00:00+00:00",
+      "reason": "time_limit",
+      "count": 3
+    },
+    {
+      "hour": "2025-12-13T19:00:00+00:00",
+      "reason": "gate_close",
+      "count": 21
+    },
+    {
+      "hour": "2025-12-13T19:00:00+00:00",
+      "reason": "take_profit",
+      "count": 13
+    },
+    {
+      "hour": "2025-12-13T20:00:00+00:00",
+      "reason": "gate_close",
+      "count": 25
+    },
+    {
+      "hour": "2025-12-13T20:00:00+00:00",
+      "reason": "take_profit",
+      "count": 1
+    },
+    {
+      "hour": "2025-12-13T21:00:00+00:00",
+      "reason": "gate_close",
+      "count": 34
+    },
+    {
+      "hour": "2025-12-13T21:00:00+00:00",
+      "reason": "take_profit",
+      "count": 1
+    },
+    {
+      "hour": "2025-12-13T22:00:00+00:00",
+      "reason": "gate_close",
+      "count": 27
+    },
+    {
+      "hour": "2025-12-13T22:00:00+00:00",
+      "reason": "take_profit",
+      "count": 2
+    },
+    {
+      "hour": "2025-12-13T23:00:00+00:00",
+      "reason": "gate_close",
+      "count": 24
+    },
+    {
+      "hour": "2025-12-13T23:00:00+00:00",
+      "reason": "take_profit",
+      "count": 8
+    },
+    {
+      "hour": "2025-12-14T00:00:00+00:00",
+      "reason": "gate_close",
+      "count": 33
+    },
+    {
+      "hour": "2025-12-14T00:00:00+00:00",
+      "reason": "take_profit",
+      "count": 14
+    },
+    {
+      "hour": "2025-12-14T01:00:00+00:00",
+      "reason": "gate_close",
+      "count": 26
+    },
+    {
+      "hour": "2025-12-14T01:00:00+00:00",
+      "reason": "take_profit",
+      "count": 8
+    },
+    {
+      "hour": "2025-12-14T02:00:00+00:00",
+      "reason": "gate_close",
+      "count": 24
+    },
+    {
+      "hour": "2025-12-14T03:00:00+00:00",
+      "reason": "gate_close",
+      "count": 22
+    },
+    {
+      "hour": "2025-12-14T04:00:00+00:00",
+      "reason": "gate_close",
+      "count": 34
+    },
+    {
+      "hour": "2025-12-14T05:00:00+00:00",
+      "reason": "gate_close",
+      "count": 26
+    },
+    {
+      "hour": "2025-12-14T06:00:00+00:00",
+      "reason": "gate_close",
+      "count": 25
+    },
+    {
+      "hour": "2025-12-14T06:00:00+00:00",
+      "reason": "take_profit",
+      "count": 4
+    },
+    {
+      "hour": "2025-12-14T06:00:00+00:00",
+      "reason": "time_limit",
+      "count": 2
+    },
+    {
+      "hour": "2025-12-14T07:00:00+00:00",
+      "reason": "gate_close",
+      "count": 13
+    },
+    {
+      "hour": "2025-12-14T07:00:00+00:00",
+      "reason": "take_profit",
+      "count": 9
+    },
+    {
+      "hour": "2025-12-14T07:00:00+00:00",
+      "reason": "time_limit",
+      "count": 1
+    },
+    {
+      "hour": "2025-12-14T08:00:00+00:00",
+      "reason": "gate_close",
+      "count": 23
+    },
+    {
+      "hour": "2025-12-14T08:00:00+00:00",
+      "reason": "take_profit",
+      "count": 7
+    },
+    {
+      "hour": "2025-12-14T09:00:00+00:00",
+      "reason": "gate_close",
+      "count": 32
+    },
+    {
+      "hour": "2025-12-14T10:00:00+00:00",
+      "reason": "gate_close",
+      "count": 32
+    },
+    {
+      "hour": "2025-12-14T11:00:00+00:00",
+      "reason": "gate_close",
+      "count": 54
+    },
+    {
+      "hour": "2025-12-14T12:00:00+00:00",
+      "reason": "gate_close",
+      "count": 40
+    },
+    {
+      "hour": "2025-12-14T13:00:00+00:00",
+      "reason": "gate_close",
+      "count": 30
+    },
+    {
+      "hour": "2025-12-14T14:00:00+00:00",
+      "reason": "gate_close",
+      "count": 31
+    },
+    {
+      "hour": "2025-12-14T14:00:00+00:00",
+      "reason": "take_profit",
+      "count": 2
+    },
+    {
+      "hour": "2025-12-14T14:00:00+00:00",
+      "reason": "time_limit",
+      "count": 3
+    },
+    {
+      "hour": "2025-12-14T15:00:00+00:00",
+      "reason": "gate_close",
+      "count": 30
+    },
+    {
+      "hour": "2025-12-14T16:00:00+00:00",
+      "reason": "gate_close",
+      "count": 34
+    },
+    {
+      "hour": "2025-12-14T16:00:00+00:00",
+      "reason": "take_profit",
+      "count": 10
+    },
+    {
+      "hour": "2025-12-14T17:00:00+00:00",
+      "reason": "gate_close",
+      "count": 37
+    },
+    {
+      "hour": "2025-12-14T17:00:00+00:00",
+      "reason": "take_profit",
+      "count": 5
+    },
+    {
+      "hour": "2025-12-14T18:00:00+00:00",
+      "reason": "gate_close",
+      "count": 29
+    },
+    {
+      "hour": "2025-12-14T18:00:00+00:00",
+      "reason": "take_profit",
+      "count": 4
+    },
+    {
+      "hour": "2025-12-14T19:00:00+00:00",
+      "reason": "gate_close",
+      "count": 2
+    }
+  ],
+  "churn_fraction_le_one_bar": 0.041108132260947276,
+  "negative_fraction": 0.8936550491510277,
+  "executed_trade_count": 129,
+  "executed_negative_fraction": 0.07751937984496124,
+  "negative_fraction_by_reason": [
+    {
+      "reason": "gate_close",
+      "negative_fraction": 1.0
+    },
+    {
+      "reason": "take_profit",
+      "negative_fraction": 0.008333333333333333
+    },
+    {
+      "reason": "time_limit",
+      "negative_fraction": 1.0
+    }
+  ],
+  "churn_fraction_by_reason": [
+    {
+      "reason": "gate_close",
+      "fraction_le_one_bar": 0.01818181818181818
+    },
+    {
+      "reason": "take_profit",
+      "fraction_le_one_bar": 0.23333333333333334
+    },
+    {
+      "reason": "time_limit",
+      "fraction_le_one_bar": 0.0
+    }
+  ],
+  "avg_hold_seconds": 7267.077747989276,
+  "avg_pnl": -0.18672114346777952,
+  "avg_pnl_gross": -0.17588295799821224,
+  "avg_pnl_net": -0.18672114346777952
+}

@@ -1,0 +1,195 @@
+{
+  "trade_count": 240,
+  "by_reason": [
+    {
+      "reason": "gate_close",
+      "count": 185,
+      "avg_pnl": -0.3861487913385856,
+      "avg_pnl_gross": -0.3859134094488218,
+      "avg_pnl_net": -0.39764697962233964,
+      "avg_hold_seconds": 2061.259842519685,
+      "executed_fraction": 0.005405405405405406
+    },
+    {
+      "reason": "prob_floor",
+      "count": 33,
+      "avg_pnl": -0.48189999999999955,
+      "avg_pnl_gross": -0.48189999999999955,
+      "avg_pnl_net": -0.49194488429893196,
+      "avg_hold_seconds": 120.0,
+      "executed_fraction": 0.0
+    },
+    {
+      "reason": "take_profit",
+      "count": 16,
+      "avg_pnl": 0.11076443749999948,
+      "avg_pnl_gross": 0.11077693749999948,
+      "avg_pnl_net": 0.09948114543916457,
+      "avg_hold_seconds": 345.0,
+      "executed_fraction": 0.4375
+    },
+    {
+      "reason": "trailing_prob_drop",
+      "count": 6,
+      "avg_pnl": -0.11960000000000577,
+      "avg_pnl_gross": -0.11960000000000577,
+      "avg_pnl_net": -0.12958816597970832,
+      "avg_hold_seconds": 1220.0,
+      "executed_fraction": 0.0
+    }
+  ],
+  "by_reason_executed": [
+    {
+      "reason": "gate_close",
+      "count": 1,
+      "avg_pnl": -0.007800000000015075,
+      "avg_pnl_gross": -0.007800000000015075,
+      "avg_pnl_net": -0.017801156894143744,
+      "avg_hold_seconds": 1620.0,
+      "negative_fraction": 1.0
+    },
+    {
+      "reason": "take_profit",
+      "count": 7,
+      "avg_pnl": -0.0012994285714297525,
+      "avg_pnl_gross": -0.001270857142858324,
+      "avg_pnl_net": -0.011449007779123195,
+      "avg_hold_seconds": 668.5714285714286,
+      "negative_fraction": 1.0
+    }
+  ],
+  "by_symbol_reason": {
+    "BTC/USDT": {
+      "gate_close": 59,
+      "prob_floor": 10,
+      "take_profit": 7
+    },
+    "ETH/USDT": {
+      "gate_close": 56,
+      "prob_floor": 11,
+      "take_profit": 6
+    },
+    "SOL/USDT": {
+      "gate_close": 70,
+      "prob_floor": 12,
+      "take_profit": 3,
+      "trailing_prob_drop": 6
+    }
+  },
+  "by_hour_reason": [
+    {
+      "hour": "2025-10-01T00:00:00+00:00",
+      "reason": "take_profit",
+      "count": 1
+    },
+    {
+      "hour": "2025-12-01T21:00:00+00:00",
+      "reason": "gate_close",
+      "count": 2
+    },
+    {
+      "hour": "2025-12-01T21:00:00+00:00",
+      "reason": "prob_floor",
+      "count": 4
+    },
+    {
+      "hour": "2025-12-01T22:00:00+00:00",
+      "reason": "gate_close",
+      "count": 55
+    },
+    {
+      "hour": "2025-12-01T22:00:00+00:00",
+      "reason": "prob_floor",
+      "count": 27
+    },
+    {
+      "hour": "2025-12-01T22:00:00+00:00",
+      "reason": "take_profit",
+      "count": 1
+    },
+    {
+      "hour": "2025-12-01T23:00:00+00:00",
+      "reason": "gate_close",
+      "count": 7
+    },
+    {
+      "hour": "2025-12-01T23:00:00+00:00",
+      "reason": "take_profit",
+      "count": 6
+    },
+    {
+      "hour": "2025-12-02T00:00:00+00:00",
+      "reason": "gate_close",
+      "count": 19
+    },
+    {
+      "hour": "2025-12-02T01:00:00+00:00",
+      "reason": "gate_close",
+      "count": 4
+    },
+    {
+      "hour": "2025-12-02T01:00:00+00:00",
+      "reason": "prob_floor",
+      "count": 2
+    },
+    {
+      "hour": "2025-12-02T02:00:00+00:00",
+      "reason": "gate_close",
+      "count": 98
+    },
+    {
+      "hour": "2025-12-02T02:00:00+00:00",
+      "reason": "take_profit",
+      "count": 8
+    },
+    {
+      "hour": "2025-12-02T02:00:00+00:00",
+      "reason": "trailing_prob_drop",
+      "count": 6
+    }
+  ],
+  "churn_fraction_le_one_bar": 0.03333333333333333,
+  "negative_fraction": 0.9333333333333333,
+  "executed_trade_count": 8,
+  "executed_negative_fraction": 1.0,
+  "negative_fraction_by_reason": [
+    {
+      "reason": "gate_close",
+      "negative_fraction": 0.9921259842519685
+    },
+    {
+      "reason": "prob_floor",
+      "negative_fraction": 1.0
+    },
+    {
+      "reason": "take_profit",
+      "negative_fraction": 0.4375
+    },
+    {
+      "reason": "trailing_prob_drop",
+      "negative_fraction": 1.0
+    }
+  ],
+  "churn_fraction_by_reason": [
+    {
+      "reason": "gate_close",
+      "fraction_le_one_bar": 0.016216216216216217
+    },
+    {
+      "reason": "prob_floor",
+      "fraction_le_one_bar": 0.0
+    },
+    {
+      "reason": "take_profit",
+      "fraction_le_one_bar": 0.3125
+    },
+    {
+      "reason": "trailing_prob_drop",
+      "fraction_le_one_bar": 0.0
+    }
+  ],
+  "avg_hold_seconds": 1831.6,
+  "avg_pnl": -0.32312110333333616,
+  "avg_pnl_gross": -0.32292048000000284,
+  "avg_pnl_net": -0.33452627976791793
+}
