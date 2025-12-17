@@ -4,7 +4,8 @@ import time
 import json
 import fsspec
 import pandas as pd
-from typing import Dict
+from typing import Dict, Any
+from datetime import datetime
 from prometheus_client import Counter, Histogram, CollectorRegistry
 from app.ingestion_service.parquet_schemas import MARKET_SCHEMA, ONCHAIN_SCHEMA, SOCIAL_SCHEMA, NEWS_SCHEMA
 from app.common.time_norm import add_dt_partition
@@ -57,6 +58,20 @@ def _sanitize_part(val) -> str:
     # avoid path separators/spaces in partition names
     return s.replace("/", "-").replace(" ", "_")
 
+def _apply_ymd_from_dt(parts: Dict[str, Any], dt_value: Any) -> None:
+    """Ensure year/month/day partitions match the dt partition when present.
+
+    This prevents writing the same dt=YYYY-MM-DD under multiple day=* folders when a batch spans midnight.
+    """
+    if not any(key in parts for key in ("year", "month", "day")):
+        return
+    try:
+        dt_date = datetime.strptime(str(dt_value), "%Y-%m-%d").date()
+    except Exception:
+        return
+    parts["year"] = int(dt_date.year)
+    parts["month"] = int(dt_date.month)
+    parts["day"] = int(dt_date.day)
 
 # Inline schema validator
 def validate_schema(
@@ -108,16 +123,21 @@ def write_to_parquet(df, base_path, partitions, filename=None):
             raise ValueError(f"Normalization error: {ts_col} must be tz-aware UTC, found {df[ts_col].dtype}")
 
     # Ensure a single dt per write (split upstream if needed)
-    unique_dt = df["dt"].dropna().unique().tolist()
+    unique_dt = [d for d in df["dt"].dropna().unique().tolist() if d]
+    unique_dt = sorted(unique_dt)
     if len(unique_dt) != 1:
         results = []
         for dt_value in unique_dt:
             sub_df = df[df["dt"] == dt_value].copy()
             parts_dict = dict(partitions or {})
             parts_dict["dt"] = dt_value
+            _apply_ymd_from_dt(parts_dict, dt_value)
             results.append(write_to_parquet(sub_df, base_path, parts_dict, filename=None))
         return results[-1] if results else None
     dt_value = unique_dt[0]
+    # If caller supplied year/month/day, keep them consistent with dt.
+    parts_dict = dict(partitions or {})
+    _apply_ymd_from_dt(parts_dict, dt_value)
 
     # Schema validation before write
     if "market" in base_path:
@@ -142,7 +162,6 @@ def write_to_parquet(df, base_path, partitions, filename=None):
         fs = fs(root)
 
     # Build directory path with sanitized partitions and required dt
-    parts_dict = dict(partitions or {})
     parts_dict.setdefault("dt", dt_value)
     parts = [f"{k}={_sanitize_part(v)}" for k, v in parts_dict.items() if v is not None]
     dir_path = os.path.join(root, *parts)

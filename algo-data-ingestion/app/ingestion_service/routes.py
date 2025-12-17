@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import logging
+import contextlib
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Any
 from urllib.parse import urlparse
@@ -208,97 +209,108 @@ async def ingest_market(exchange: str, body: MarketIngestRequest):
     from ccxt.base.errors import BadSymbol
     adapter = CCXTAdapter(exchange)
 
-    with ingest_span("market") as span:
-        try:
-            # ---- Fetch via YOUR adapter ----
+    try:
+        with ingest_span("market") as span:
             try:
-                df = await adapter.fetch_ohlcv(
-                    body.symbol,
-                    body.granularity,
-                    since=None,
-                    limit=body.limit,
-                )
-            except BadSymbol as e:
-                # 400 so clients can correct the request
-                span.set_status("error")
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"{exchange} does not have market symbol {body.symbol}",
-                ) from e
+                # ---- Fetch via YOUR adapter ----
+                try:
+                    df = await adapter.fetch_ohlcv(
+                        body.symbol,
+                        body.granularity,
+                        since=None,
+                        limit=body.limit,
+                    )
+                except BadSymbol as e:
+                    # 400 so clients can correct the request
+                    span.set_status("error")
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"{exchange} does not have market symbol {body.symbol}",
+                    ) from e
 
-            # ---- Normalize + write parquet (with feature enrichment) ----
-            try:
-                features = pd.DataFrame()
-                if not df.empty:
-                    df["symbol"] = body.symbol
-                    df["exchange"] = exchange
+                # ---- Normalize + write parquet (with feature enrichment) ----
+                try:
+                    features = pd.DataFrame()
+                    if not df.empty:
+                        df["symbol"] = body.symbol
+                        df["exchange"] = exchange
 
-                    if "timestamp" not in df.columns:
-                        raise ValueError("Missing columns: ['timestamp']")
+                        if "timestamp" not in df.columns:
+                            raise ValueError("Missing columns: ['timestamp']")
 
-                    s = df["timestamp"]
-                    if pd.api.types.is_datetime64_any_dtype(s):
-                        if getattr(s.dt, "tz", None) is not None:
-                            df["timestamp"] = s.dt.tz_convert("UTC")
+                        s = df["timestamp"]
+                        if pd.api.types.is_datetime64_any_dtype(s):
+                            if getattr(s.dt, "tz", None) is not None:
+                                df["timestamp"] = s.dt.tz_convert("UTC")
+                            else:
+                                df["timestamp"] = s.dt.tz_localize("UTC")
                         else:
-                            df["timestamp"] = s.dt.tz_localize("UTC")
-                    else:
-                        df["timestamp"] = pd.to_datetime(s, utc=True)
+                            df["timestamp"] = pd.to_datetime(s, utc=True)
 
+                        try:
+                            features = build_market_features(df)
+                            features = augment_market_features(features, inplace=False)
+                        except Exception as feat_exc:
+                            logger.warning(
+                                "Feature build during ingest failed; proceeding with raw OHLCV: %s",
+                                feat_exc,
+                            )
+                            features = pd.DataFrame()
+
+                        if not features.empty:
+                            enriched = features.drop(columns=["dt"], errors="ignore")
+                            df = df.merge(
+                                enriched,
+                                on=["timestamp", "symbol", "exchange", "timeframe"],
+                                how="left",
+                            )
+                            # ensure dt exists for downstream parquet partitioning even if early rows lack features
+                            add_dt_partition(df, ts_col="timestamp")
+
+                    base = settings.MARKET_PATH
+                    partitions = {
+                        "exchange": exchange,
+                        "symbol": body.symbol,
+                        "year": df["timestamp"].dt.year.iloc[0] if not df.empty else None,
+                        "month": df["timestamp"].dt.month.iloc[0] if not df.empty else None,
+                        "day": df["timestamp"].dt.day.iloc[0] if not df.empty else None,
+                    }
+
+                    path = write_to_parquet(df, base, partitions)
+
+                except ValueError as ve:
+                    span.set_status("error")
+                    raise HTTPException(status_code=422, detail=str(ve))
+                except Exception as e:
+                    span.set_status("error")
+                    raise HTTPException(status_code=500, detail=f"Write failed: {e}")
+
+                # ---- Feature fan-out ----
+                features_written = 0
+                if not df.empty:
                     try:
-                        features = build_market_features(df)
-                        features = augment_market_features(features, inplace=False)
-                    except Exception as feat_exc:
-                        logger.warning("Feature build during ingest failed; proceeding with raw OHLCV: %s", feat_exc)
-                        features = pd.DataFrame()
+                        features_written = await _write_market_features_to_store(df, feats=features)
+                    except Exception as e:
+                        logger.warning("Feature write failed", exc_info=e)
+                        features_written = 0
 
-                    if not features.empty:
-                        enriched = features.drop(columns=["dt"], errors="ignore")
-                        df = df.merge(
-                            enriched,
-                            on=["timestamp", "symbol", "exchange", "timeframe"],
-                            how="left",
-                        )
-                        # ensure dt exists for downstream parquet partitioning even if early rows lack features
-                        add_dt_partition(df, ts_col="timestamp")
-
-                base = settings.MARKET_PATH
-                partitions = {
-                    "exchange": exchange,
-                    "symbol": body.symbol,
-                    "year": df["timestamp"].dt.year.iloc[0] if not df.empty else None,
-                    "month": df["timestamp"].dt.month.iloc[0] if not df.empty else None,
-                    "day": df["timestamp"].dt.day.iloc[0] if not df.empty else None,
+                status = "ok" if path is not None else "no_data"
+                span.set_status(status)
+                return {
+                    "status": status,
+                    "path": None if path is None else str(path),
+                    "features_written": features_written,
                 }
 
-                path = write_to_parquet(df, base, partitions)
-
-            except ValueError as ve:
-                span.set_status("error")
-                raise HTTPException(status_code=422, detail=str(ve))
+            except HTTPException:
+                # status already set
+                raise
             except Exception as e:
                 span.set_status("error")
-                raise HTTPException(status_code=500, detail=f"Write failed: {e}")
-
-            # ---- Feature fan-out ----
-            features_written = 0
-            if not df.empty:
-                try:
-                    features_written = await _write_market_features_to_store(df, feats=features)
-                except Exception as e:
-                    logger.warning("Feature write failed", exc_info=e)
-                    features_written = 0
-
-            status = "ok" if path is not None else "no_data"
-            span.set_status(status)
-            return {"status": status, "path": None if path is None else str(path), "features_written": features_written}
-
-        except HTTPException:
-            # status already set
-            raise
-        except Exception as e:
-            span.set_status("error")
-            raise HTTPException(status_code=500, detail=f"ingest_market failed: {e}")
+                raise HTTPException(status_code=500, detail=f"ingest_market failed: {e}")
+    finally:
+        with contextlib.suppress(Exception):
+            await adapter.close()
 
 
 # ---------------------------

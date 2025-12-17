@@ -24,6 +24,19 @@ from redis import asyncio as aioredis
 from zoneinfo import ZoneInfo
 import shutil
 
+from labels.label_generator import (
+    generate_cost_adjusted_lookback_feature,
+    generate_directional_lookback_feature,
+    generate_meta_lookback_feature,
+    generate_continuous_return_lookback_feature,
+)
+from regimes.regime_builder import (
+    assign_event_flag,
+    assign_liquidity_regime,
+    assign_spread_regime,
+    assign_vol_regime,
+)
+
 # Ensure inference metrics register on the global Prometheus registry so they surface on /metrics.
 if "USE_INGEST_METRICS_REGISTRY" not in os.environ:
     os.environ["USE_INGEST_METRICS_REGISTRY"] = "0"
@@ -119,6 +132,21 @@ DECISION_QUEUE_KEY: str = os.getenv("DECISION_QUEUE_KEY", "trading:decisions")
 DEFAULT_DECISION_PAYLOAD_ITEMS: int = max(1, int(os.getenv("DECISION_PAYLOAD_ITEMS", "3")))
 DEFAULT_INFER_STRIDE: int = max(1, int(os.getenv("INFER_DEFAULT_STRIDE", "30")))
 DEFAULT_HISTORY_MARGIN_MIN: int = max(0, int(os.getenv("INFER_HISTORY_MARGIN_MIN", "120")))
+
+
+def _env_override_bool(name: str) -> Optional[bool]:
+    raw = os.getenv(name)
+    if raw is None:
+        return None
+    value = raw.strip().lower()
+    if not value:
+        return None
+    if value in ("1", "true", "t", "yes", "y", "on"):
+        return True
+    if value in ("0", "false", "f", "no", "n", "off"):
+        return False
+    log.warning("Invalid boolean override for %s=%r (ignoring)", name, raw)
+    return None
 
 # Market jobs JSON: list of {"exchange","symbol","timeframe","lookback_minutes","cron"}
 def _get_market_jobs() -> List[Dict[str, Any]]:
@@ -684,21 +712,90 @@ def _load_recent_ohlcv(job: InferenceJob, now: datetime, history_minutes: int) -
     cutoff = now - timedelta(minutes=history_minutes)
     earliest_dt = (cutoff - timedelta(days=1)).date()
 
+    # Read the newest parquet files first and stop once we have enough bars to cover the requested
+    # history. This avoids scanning the entire dt=* tree when many small files exist.
+    tf_minutes = max(1, _timeframe_to_minutes(job.timeframe))
+    bars_needed = max(1, math.ceil(history_minutes / tf_minutes))
     frames: List[pd.DataFrame] = []
-    for dt_dir in sorted(p for p in data_dir.rglob("dt=*") if p.is_dir()):
+    rows_loaded = 0
+    # Group dt partitions by date value so duplicate dt=YYYY-MM-DD folders (caused by upstream
+    # partitioning bugs or backfills) don't cause us to stop early on a stale subset.
+    dt_dirs_by_value: Dict[date, List[Path]] = defaultdict(list)
+    for dt_dir in (p for p in data_dir.rglob("dt=*") if p.is_dir()):
         try:
             dt_value = datetime.strptime(dt_dir.name.split("=", 1)[1], "%Y-%m-%d").date()
         except Exception:
             continue
-        if dt_value < earliest_dt or dt_value > now.date():
+        if dt_value > now.date() or dt_value < earliest_dt:
             continue
-        for pq_path in sorted(dt_dir.glob("*.parquet")):
-            try:
-                df = pd.read_parquet(pq_path)
-            except Exception as exc:
-                log.warning("Failed to read parquet %s: %s", pq_path, exc)
-                continue
-            frames.append(df)
+        dt_dirs_by_value[dt_value].append(dt_dir)
+
+    dt_values = sorted(dt_dirs_by_value.keys(), reverse=True)
+    global_ts_min: Optional[pd.Timestamp] = None
+    global_ts_max: Optional[pd.Timestamp] = None
+    done = False
+
+    def _dir_recency_key(dt_dir: Path) -> float:
+        # Directory mtime advances when new parquet parts are written.
+        try:
+            return float(dt_dir.stat().st_mtime)
+        except Exception:
+            return 0.0
+
+    for dt_value in dt_values:
+        if rows_loaded >= bars_needed and dt_value < earliest_dt:
+            break
+        dt_dirs = dt_dirs_by_value.get(dt_value, [])
+        dt_dirs = sorted(dt_dirs, key=_dir_recency_key, reverse=True)
+        for dt_dir in dt_dirs:
+            # Read newest file first within each dt partition.
+            first_file = True
+            for pq_path in sorted(dt_dir.glob("*.parquet"), reverse=True):
+                try:
+                    df = pd.read_parquet(pq_path)
+                except Exception as exc:
+                    log.warning("Failed to read parquet %s: %s", pq_path, exc)
+                    continue
+                if df is None or df.empty:
+                    continue
+                frames.append(df)
+                rows_loaded += len(df)
+
+                ts_min: Optional[pd.Timestamp] = None
+                ts_max: Optional[pd.Timestamp] = None
+                try:
+                    ts_series = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+                    ts_min = ts_series.min()
+                    ts_max = ts_series.max()
+                except Exception:
+                    ts_min = None
+                    ts_max = None
+
+                if ts_min is not None and pd.notna(ts_min):
+                    global_ts_min = ts_min if global_ts_min is None else min(global_ts_min, ts_min)
+                if ts_max is not None and pd.notna(ts_max):
+                    global_ts_max = ts_max if global_ts_max is None else max(global_ts_max, ts_max)
+
+                have_window = global_ts_max is not None and pd.notna(global_ts_max) and global_ts_max >= cutoff
+                have_history = global_ts_min is not None and pd.notna(global_ts_min) and global_ts_min <= cutoff
+                # If the newest file in this dt partition is entirely older than the cutoff and we still
+                # don't have any bars within the window, skip scanning older files and try the next dt dir.
+                if (
+                    first_file
+                    and not have_window
+                    and ts_max is not None
+                    and pd.notna(ts_max)
+                    and ts_max < cutoff
+                ):
+                    break
+                first_file = False
+                if rows_loaded >= bars_needed and have_window and have_history:
+                    done = True
+                    break
+            if done:
+                break
+        if done:
+            break
 
     if not frames:
         return pd.DataFrame()
@@ -740,11 +837,37 @@ def _build_feature_frame(job: InferenceJob, ohlcv: pd.DataFrame) -> pd.DataFrame
     return features
 
 
-def _ensure_required_features(frame: pd.DataFrame, required: List[str], *, job_id: str) -> pd.DataFrame:
+def _label_horizon_bars(timeframe: str, default_minutes: int = 15) -> int:
+    try:
+        tf_minutes = max(1, _timeframe_to_minutes(timeframe))
+    except Exception:
+        tf_minutes = default_minutes
+    return max(1, int(round(float(default_minutes) / float(tf_minutes))))
+
+
+_SPECIAL_FEATURES = {
+    "rvol5",
+    "rvol20",
+    "sym_btc",
+    "sym_eth",
+    "sym_sol",
+    "directional_15m",
+    "cost_adjusted_15m",
+    "meta_15m_feat_log_return_1m",
+    "net_return_15m",
+    "vol_regime",
+    "liquidity_regime",
+    "spread_regime",
+    "event_flag",
+}
+
+
+def _ensure_required_features(frame: pd.DataFrame, required: List[str], *, job_id: str, timeframe: str = "1m") -> pd.DataFrame:
     """
     Ensure all manifest-declared features exist before scoring.
 
     - Compute any missing FEATURE_REGISTRY entries on the fly.
+    - Populate manifest-only aliases/label/regime columns so the model sees the shape it was trained on.
     - Backfill any remaining missing columns with 0.0 to avoid silent model drift.
     """
     if not required:
@@ -760,6 +883,83 @@ def _ensure_required_features(frame: pd.DataFrame, required: List[str], *, job_i
             except Exception as exc:
                 log.warning("Failed to compute feature %s; filling with 0.0 (job %s): %s", col, job_id, exc)
                 out[col] = 0.0
+    special_missing = [col for col in required if col not in out.columns and col in _SPECIAL_FEATURES]
+    if special_missing:
+        out = out.copy()
+        horizon_bars = _label_horizon_bars(timeframe, default_minutes=15)
+        if "rvol5" in special_missing and "rvol_5" in out.columns:
+            out["rvol5"] = pd.to_numeric(out["rvol_5"], errors="coerce")
+        if "rvol20" in special_missing and "rvol_20" in out.columns:
+            out["rvol20"] = pd.to_numeric(out["rvol_20"], errors="coerce")
+        if "symbol" in out.columns:
+            sym_series = out["symbol"].astype(str)
+            sym_map = {
+                "sym_btc": "BTC/USDT",
+                "sym_eth": "ETH/USDT",
+                "sym_sol": "SOL/USDT",
+            }
+            for col, sym in sym_map.items():
+                if col in required and col not in out.columns:
+                    out[col] = (sym_series == sym).astype(float)
+        needs_label_like = any(
+            col in special_missing
+            for col in ("directional_15m", "cost_adjusted_15m", "meta_15m_feat_log_return_1m", "net_return_15m")
+        )
+        if needs_label_like:
+            if "feat_log_return_1m" not in out.columns and "feat_log_return_1m" in FEATURE_REGISTRY:
+                try:
+                    out["feat_log_return_1m"] = FEATURE_REGISTRY["feat_log_return_1m"](out)
+                except Exception:
+                    out["feat_log_return_1m"] = 0.0
+            try:
+                if "directional_15m" in special_missing:
+                    out["directional_15m"] = generate_directional_lookback_feature(out, horizon_bars)
+            except Exception:
+                out["directional_15m"] = 0.0
+            try:
+                if "cost_adjusted_15m" in special_missing:
+                    out["cost_adjusted_15m"] = generate_cost_adjusted_lookback_feature(out, horizon_bars)
+            except Exception:
+                out["cost_adjusted_15m"] = 0.0
+            try:
+                if "meta_15m_feat_log_return_1m" in special_missing:
+                    out["meta_15m_feat_log_return_1m"] = generate_meta_lookback_feature(
+                        out,
+                        horizon_bars,
+                        base_signal_col="feat_log_return_1m",
+                        edge_threshold=0.0,
+                    )
+            except Exception:
+                out["meta_15m_feat_log_return_1m"] = 0.0
+            try:
+                if "net_return_15m" in special_missing:
+                    out["net_return_15m"] = generate_continuous_return_lookback_feature(out, horizon_bars)
+            except Exception:
+                out["net_return_15m"] = 0.0
+        if any(col in special_missing for col in ("vol_regime", "liquidity_regime", "spread_regime", "event_flag")):
+            try:
+                if "vol_regime" in special_missing:
+                    out["vol_regime"] = assign_vol_regime(out)
+            except Exception:
+                out["vol_regime"] = 0.0
+            try:
+                if "liquidity_regime" in special_missing:
+                    out["liquidity_regime"] = assign_liquidity_regime(out)
+            except Exception:
+                out["liquidity_regime"] = 0.0
+            try:
+                if "spread_regime" in special_missing:
+                    out["spread_regime"] = assign_spread_regime(out)
+            except Exception:
+                out["spread_regime"] = 0.0
+            try:
+                if "event_flag" in special_missing:
+                    out["event_flag"] = assign_event_flag(out, return_col="feat_log_return_1m")
+            except Exception:
+                out["event_flag"] = 0.0
+        for col in special_missing:
+            if col in out.columns:
+                out[col] = pd.to_numeric(out[col], errors="coerce").fillna(0.0)
     missing_any = [col for col in required if col not in out.columns]
     if missing_any:
         out = out.copy()
@@ -783,10 +983,21 @@ def _get_base_context(label: str) -> Tuple[Any, object, List[str]]:
     _register_metric_thresholds(artifacts)
     model_dir = _ensure_local_model_dir(label, registry.get_path(label))
     prob_col = artifacts.prob_column or "base_prob"
+    apply_calibration = getattr(artifacts, "apply_calibration", True)
+    override = _env_override_bool("INFER_APPLY_CALIBRATION")
+    if override is not None:
+        if bool(override) != bool(apply_calibration):
+            log.info(
+                "Overriding apply_calibration for model=%s from %s -> %s via INFER_APPLY_CALIBRATION",
+                label,
+                apply_calibration,
+                override,
+            )
+        apply_calibration = bool(override)
     calibrator, feature_columns = load_base_predictor(
         model_dir,
         prob_column=prob_col,
-        apply_calibration=getattr(artifacts, "apply_calibration", True),
+        apply_calibration=apply_calibration,
     )
     ctx = (artifacts, calibrator, list(feature_columns))
     _BASE_MODEL_CACHE[label] = ctx
@@ -885,7 +1096,7 @@ def _run_inference_sync(job: InferenceJob, now: datetime) -> List[Dict[str, Any]
 
     if base_ctx is not None:
         artifacts, calibrator, feature_cols = base_ctx
-        working = _ensure_required_features(working, feature_cols, job_id=job.job_id)
+        working = _ensure_required_features(working, feature_cols, job_id=job.job_id, timeframe=job.timeframe)
         prob_series = predict_base(working, calibrator, feature_cols)
         prob_col = artifacts.prob_column or "base_prob"
         working = working.copy()
