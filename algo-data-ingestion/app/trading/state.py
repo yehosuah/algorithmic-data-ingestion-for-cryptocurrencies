@@ -99,6 +99,13 @@ class PositionState:
         self.entry_ts = None
         self.bars_in_position = 0
 
+    def touch(self, ts: Optional[datetime] = None) -> None:
+        """
+        Lightweight helper to mark the state as updated.
+        """
+        if ts:
+            self.last_timestamp = ts
+
     @classmethod
     def from_dict(cls, payload: Dict[str, object]) -> "PositionState":
         return cls(

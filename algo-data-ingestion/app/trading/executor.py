@@ -237,6 +237,46 @@ class OrderExecutor:
             return {}
         return {}
 
+    async def fetch_quote(self, exchange: str, symbol: str) -> Optional[Dict[str, float]]:
+        """
+        Fetch the latest bid/ask quote for a symbol and derive spread in basis points.
+
+        Returns None when bid/ask cannot be determined.
+        """
+        adapter = await self._get_adapter(exchange)
+        try:
+            ticker = await adapter.fetch_ticker(symbol)
+        except (ExchangeNotAvailable, NetworkError) as exc:
+            logger.warning("Quote fetch unavailable for %s %s: %s", exchange, symbol, exc)
+            return None
+        bid = float(ticker.get("bid") or 0.0)
+        ask = float(ticker.get("ask") or 0.0)
+        if bid <= 0 or ask <= 0:
+            try:
+                order_book = await adapter.fetch_order_book(symbol, limit=5)
+            except Exception:
+                order_book = None
+            if order_book is not None:
+                best_bid = 0.0
+                best_ask = 0.0
+                for row in order_book.itertuples(index=False):
+                    side = getattr(row, "side", "").lower()
+                    price = float(getattr(row, "price", 0.0) or 0.0)
+                    if price <= 0:
+                        continue
+                    if side == "bid":
+                        best_bid = max(best_bid, price)
+                    elif side == "ask":
+                        if best_ask == 0.0 or price < best_ask:
+                            best_ask = price
+                if best_bid > 0 and best_ask > 0 and best_bid < best_ask:
+                    bid, ask = best_bid, best_ask
+        if bid <= 0 or ask <= 0:
+            return None
+        mid = (ask + bid) / 2.0
+        spread_bps = ((ask - bid) / mid) * 1e4 if mid > 0 else 0.0
+        return {"bid": float(bid), "ask": float(ask), "mid": float(mid), "spread_bps": float(spread_bps)}
+
     async def fetch_order(self, exchange: str, symbol: str, order_id: str) -> Dict[str, Any]:
         adapter = await self._get_adapter(exchange)
         return await adapter.fetch_order(order_id=order_id, symbol=symbol)

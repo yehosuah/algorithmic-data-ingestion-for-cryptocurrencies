@@ -70,6 +70,11 @@ class TradingConfig(BaseSettings):
     decision_queue_key: str = Field("trading:decisions", alias="DECISION_QUEUE_KEY")
     last_timestamp_hash: str = Field("trading:last_processed_ts", alias="TRADING_LAST_TS_HASH")
     redis_poll_timeout: int = Field(1, alias="TRADING_QUEUE_POLL_TIMEOUT")
+    decision_max_age_seconds: Optional[int] = Field(
+        None,
+        alias="TRADING_DECISION_MAX_AGE_SECONDS",
+        description="Optional age cutoff (seconds) for dropping old decision payloads; unset to accept all.",
+    )
     dry_run: bool = Field(True, alias="TRADING_DRY_RUN")
     models_root: Path = Field(Path("models"), alias="MODELS_ROOT")
     risk_limits_path: Path = Field(Path("configs/portfolio_risk_limits.yaml"), alias="TRADING_RISK_LIMITS_PATH")

@@ -206,6 +206,7 @@ class TradingAuditLogger:
         policy_id: Optional[str] = None,
         risk_payload: Optional[Dict[str, Any]] = None,
         decision_namespace: Optional[str] = None,
+        extra: Optional[Dict[str, Any]] = None,
     ) -> None:
         ts = _ensure_utc(timestamp)
         payload: Dict[str, Any] = {
@@ -247,6 +248,8 @@ class TradingAuditLogger:
         )
         if decision.order_payload is not None:
             payload["order_payload"] = _json_ready(decision.order_payload)
+        if extra:
+            payload.update(_json_ready(extra))
         await self._log_event("trade", model, symbol, ts, payload)
 
     async def log_safe_mode(self, *, reason: str, active: bool, timestamp: Optional[datetime] = None) -> None:

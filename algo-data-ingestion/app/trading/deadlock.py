@@ -175,7 +175,10 @@ class DeadlockMonitor:
                 "p99": float(np.nanquantile(probs, 0.99)) if len(probs) else 0.0,
             }
             block_counts: Counter[str] = Counter()
+            executed_trades = 0
             for trade in trades:
+                if trade.get("executed"):
+                    executed_trades += 1
                 reason = trade.get("reason")
                 if reason and not trade.get("executed"):
                     block_counts[str(reason)] += 1
@@ -183,8 +186,8 @@ class DeadlockMonitor:
             mins = [g.get("prob_gate_min") for g in gates if g.get("prob_gate_min") is not None]
             if mins:
                 prob_gate_min_used = float(np.nanmedian(np.array(mins, dtype=float)))
-            trade_count = len(trades)
-            total_trades += trade_count
+            trade_count = executed_trades
+            total_trades += executed_trades
             portfolio_coverage.append(coverage_ratio)
             timeframe = None
             if gates:

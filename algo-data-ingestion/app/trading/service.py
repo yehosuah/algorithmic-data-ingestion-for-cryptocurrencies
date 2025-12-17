@@ -103,6 +103,8 @@ def _extract_spread_from_item(item: Dict[str, object]) -> Optional[float]:
             spread = float(raw_value)
         except (TypeError, ValueError):
             continue
+        if key == "hl_spread":
+            spread *= 1e4
         return spread
     return None
 
@@ -568,6 +570,7 @@ class TradingService:
         if not self.config.dry_run and self.config.reconcile_interval_seconds > 0:
             self._reconcile_task = asyncio.create_task(self._reconcile_loop())
         self._poll_task = asyncio.create_task(self._poll_loop())
+        logger.info("Trading poll loop started (queue=%s)", self.config.decision_queue_key)
 
     async def stop(self) -> None:
         self._running = False
@@ -916,6 +919,168 @@ class TradingService:
         if pnl < 0:
             self._risk_last_loss_ts = ts
 
+    def _get_loss_guard_cfg(self, symbol: Optional[str]) -> Dict[str, object]:
+        base: Dict[str, object] = {}
+        try:
+            base = dict(self.risk_limits.get("loss_guard") or {})
+        except Exception:
+            base = {}
+        sym_cfg = {}
+        try:
+            sym_cfg = ((self.risk_limits.get("symbols") or {}).get(symbol or "", {}) or {}).get("loss_guard") or {}
+        except Exception:
+            sym_cfg = {}
+        if isinstance(sym_cfg, dict):
+            for key, value in sym_cfg.items():
+                if value is not None:
+                    base[key] = value
+        return base
+
+    def _loss_guard_status(
+        self,
+        state: PositionState,
+        ts: datetime,
+        cfg: Mapping[str, object],
+    ) -> Tuple[bool, int, Optional[datetime]]:
+        """
+        Determine if the loss-streak guard is active for this position.
+        Returns (is_active, streak_count, active_until).
+        """
+        threshold = 0
+        cooldown_minutes = 0
+        try:
+            threshold = int(cfg.get("max_consecutive_losses") or 0)
+        except Exception:
+            threshold = 0
+        try:
+            cooldown_minutes = int(cfg.get("cooldown_minutes") or 0)
+        except Exception:
+            cooldown_minutes = 0
+        enabled = True
+        try:
+            enabled_val = cfg.get("enabled", True)
+            if isinstance(enabled_val, str):
+                enabled = enabled_val.strip().lower() not in {"false", "0", "no", "off"}
+            else:
+                enabled = bool(enabled_val)
+        except Exception:
+            enabled = True
+        if not enabled:
+            threshold = 0
+        count = 0
+        try:
+            count = int(state.metadata.get("loss_streak_count") or 0)
+        except Exception:
+            count = 0
+        active_until = _parse_timestamp(state.metadata.get("loss_streak_active_until"))
+        if active_until and ts > active_until:
+            # Expired guard window; clear it.
+            state.metadata.pop("loss_streak_active_until", None)
+            active_until = None
+        active = False
+        if threshold > 0 and count >= threshold:
+            active = True
+            if cooldown_minutes > 0 and active_until is None:
+                active_until = ts + timedelta(minutes=cooldown_minutes)
+                state.metadata["loss_streak_active_until"] = active_until.isoformat()
+        if active_until and ts <= active_until:
+            active = True
+        return active, count, active_until
+
+    def _update_loss_streak_after_exit(
+        self,
+        state: PositionState,
+        ts: datetime,
+        pnl_value: float,
+        cfg: Mapping[str, object],
+    ) -> None:
+        """
+        Update per-position loss streak counters after a realized exit.
+        """
+        enabled = True
+        try:
+            enabled_val = cfg.get("enabled", True)
+            if isinstance(enabled_val, str):
+                enabled = enabled_val.strip().lower() not in {"false", "0", "no", "off"}
+            else:
+                enabled = bool(enabled_val)
+        except Exception:
+            enabled = True
+        if not enabled:
+            return
+
+        threshold = 0
+        cooldown_minutes = 0
+        try:
+            threshold = int(cfg.get("max_consecutive_losses") or 0)
+        except Exception:
+            threshold = 0
+        try:
+            cooldown_minutes = int(cfg.get("cooldown_minutes") or 0)
+        except Exception:
+            cooldown_minutes = 0
+        reset_on_profit = True
+        try:
+            reset_on_profit = bool(cfg.get("reset_after_profit", True))
+        except Exception:
+            reset_on_profit = True
+
+        dirty = False
+        if pnl_value < 0:
+            count = 0
+            try:
+                count = int(state.metadata.get("loss_streak_count") or 0)
+            except Exception:
+                count = 0
+            count += 1
+            state.metadata["loss_streak_count"] = str(count)
+            state.metadata["loss_streak_last_ts"] = ts.isoformat()
+            active_until = _parse_timestamp(state.metadata.get("loss_streak_active_until"))
+            if threshold > 0 and count >= threshold and active_until is None and cooldown_minutes > 0:
+                state.metadata["loss_streak_active_until"] = (ts + timedelta(minutes=cooldown_minutes)).isoformat()
+            dirty = True
+        else:
+            if reset_on_profit and (
+                state.metadata.get("loss_streak_count") or state.metadata.get("loss_streak_active_until")
+            ):
+                dirty = True
+            if reset_on_profit:
+                state.metadata["loss_streak_count"] = "0"
+                state.metadata.pop("loss_streak_active_until", None)
+                state.metadata["loss_streak_last_ts"] = ts.isoformat()
+        if dirty:
+            state.touch(ts)
+
+    def _loss_guard_entry_params(
+        self,
+        state: PositionState,
+        ts: datetime,
+        entry_threshold: float,
+        cfg: Mapping[str, object],
+    ) -> Tuple[bool, float, float, int]:
+        """
+        Compute entry-time adjustments when a loss streak is active.
+        Returns (guard_active, required_prob, notional_scale, streak_count).
+        """
+        active, count, _ = self._loss_guard_status(state, ts, cfg)
+        prob_buffer = 0.0
+        notional_scale = 1.0
+        try:
+            prob_buffer = float(cfg.get("prob_buffer") or 0.0)
+        except Exception:
+            prob_buffer = 0.0
+        try:
+            notional_scale = float(cfg.get("notional_scale") or cfg.get("notional_scale_factor") or 1.0)
+        except Exception:
+            notional_scale = 1.0
+        if notional_scale <= 0:
+            notional_scale = 1.0
+        required_prob = entry_threshold
+        if active and prob_buffer > 0:
+            required_prob = entry_threshold + prob_buffer
+        return active, required_prob, notional_scale, count
+
+
     async def _get_symbol_limits(self, model_cfg: TradingModelConfig) -> Dict[str, object]:
         symbol_cfg = (self.risk_limits.get("symbols") or {}).get(model_cfg.symbol, {}) if self.risk_limits else {}
         limits: Dict[str, object] = {
@@ -1070,33 +1235,62 @@ class TradingService:
         model_cfg: TradingModelConfig,
         state: PositionState,
         items: List[Tuple[datetime, Dict[str, object]]],
+        *,
+        now: Optional[datetime] = None,
     ) -> List[Tuple[datetime, Dict[str, object]]]:
         if not items:
             return items
+        max_age_seconds = None
+        try:
+            max_age_seconds = (
+                int(self.config.decision_max_age_seconds) if self.config.decision_max_age_seconds else None
+            )
+        except Exception:
+            max_age_seconds = None
+        now_ts = now or datetime.now(timezone.utc)
         cutoff = state.last_timestamp
         redis_cutoff = await self._read_last_processed_ts(model_cfg.state_key)
         if redis_cutoff is not None and (cutoff is None or redis_cutoff > cutoff):
             cutoff = redis_cutoff
-        if cutoff is None:
+        if cutoff is None and max_age_seconds is None:
             return items
         fresh: List[Tuple[datetime, Dict[str, object]]] = []
+        grace_bars = max(0, int(self.config.last_timestamp_grace_bars))
+        grace_seconds = grace_bars * max(1, model_cfg.bar_seconds)
+        aged_out = 0
         for ts, payload in items:
-            if ts > cutoff:
+            if max_age_seconds and ts < (now_ts - timedelta(seconds=max_age_seconds)):
+                aged_out += 1
+                continue
+            if cutoff is None or ts > cutoff:
+                fresh.append((ts, payload))
+                continue
+            if grace_seconds and cutoff > ts:
+                try:
+                    if (cutoff - ts).total_seconds() <= grace_seconds:
+                        fresh.append((ts, payload))
+                        continue
+                except Exception:
+                    pass
                 fresh.append((ts, payload))
         dropped = len(items) - len(fresh)
-        if dropped:
+        if dropped or aged_out:
             logger.info(
-                "Dropping %s stale decision(s) for %s %s (<= %s)",
-                dropped,
+                "Dropping %s stale decision(s) for %s %s (<= %s, aged_out=%s, max_age=%s)",
+                dropped or 0,
                 model_cfg.model,
                 model_cfg.symbol,
-                cutoff.isoformat(),
+                cutoff.isoformat() if cutoff else "<none>",
+                aged_out,
+                max_age_seconds,
             )
         return fresh
 
     async def _poll_loop(self) -> None:
         timeout = max(1, int(self.config.redis_poll_timeout))
+        iteration = 0
         while self._running:
+            iteration += 1
             if self._redis is None:
                 try:
                     await self._reconnect_redis()
@@ -1108,6 +1302,8 @@ class TradingService:
             try:
                 assert self._redis is not None
                 await self._record_queue_depth()
+                if iteration % 10 == 0:
+                    logger.debug("poll_loop heartbeat (queue=%s)", self.config.decision_queue_key)
                 result = await self._redis.blpop(
                     self.config.decision_queue_key,
                     timeout=timeout,
@@ -1127,7 +1323,10 @@ class TradingService:
             if result is None:
                 continue
             _, payload = result
-            await self._handle_payload(payload)
+            try:
+                await self._handle_payload(payload)
+            except Exception as exc:
+                logger.exception("Failed to process decision payload: %s", exc)
 
     async def _handle_payload(self, raw: str) -> None:
         try:
@@ -1219,7 +1418,12 @@ class TradingService:
 
         state = self.state_store.get(model_cfg.state_key)
         set_position_active(model_cfg.model, model_cfg.symbol, state.in_position)
-        parsed = await self._filter_stale_decisions(model_cfg, state, parsed)
+        parsed = await self._filter_stale_decisions(
+            model_cfg,
+            state,
+            parsed,
+            now=datetime.now(timezone.utc),
+        )
         if not parsed:
             return
 
@@ -1227,6 +1431,13 @@ class TradingService:
         min_hold_seconds = max(1, min_hold_bars) * model_cfg.bar_seconds
         max_hold_minutes_cfg = model_cfg.max_hold_minutes
         max_hold_seconds: Optional[int] = None
+        # Enforce the stricter of model-config max hold and symbol risk limit (if present).
+        symbol_limits = (self.risk_limits.get("symbols") or {}).get(model_cfg.symbol or "", {})
+        max_age_minutes_limit = None
+        try:
+            max_age_minutes_limit = float(symbol_limits.get("max_position_age_minutes")) if symbol_limits else None
+        except Exception:
+            max_age_minutes_limit = None
         if max_hold_minutes_cfg is not None:
             try:
                 max_hold_seconds = max(1, int(max_hold_minutes_cfg) * 60)
@@ -1240,6 +1451,12 @@ class TradingService:
                     model_cfg.symbol,
                 )
                 max_hold_seconds = min_hold_seconds
+        if max_age_minutes_limit is not None:
+            try:
+                limit_seconds = max(1, int(max_age_minutes_limit * 60))
+                max_hold_seconds = limit_seconds if max_hold_seconds is None else min(max_hold_seconds, limit_seconds)
+            except Exception:
+                pass
         entry_threshold = float(manifest.entry_threshold)
         exit_threshold = float(manifest.exit_threshold)
         exit_prob_drop = float(manifest.exit_prob_drop)
@@ -1250,6 +1467,9 @@ class TradingService:
             )
         except (TypeError, ValueError):
             stop_loss_pct = None
+        # Fail-safe: apply a small stop-loss if none configured or it was disabled (<=0).
+        if stop_loss_pct is None or stop_loss_pct <= 0.0:
+            stop_loss_pct = 0.01 if not self.config.dry_run else None
         try:
             take_profit_pct = (
                 float(model_cfg.take_profit_pct)
@@ -1258,8 +1478,6 @@ class TradingService:
             )
         except (TypeError, ValueError):
             take_profit_pct = None
-        if stop_loss_pct is not None and stop_loss_pct <= 0.0:
-            stop_loss_pct = None
         if take_profit_pct is not None and take_profit_pct <= 0.0:
             take_profit_pct = None
 
@@ -1275,6 +1493,8 @@ class TradingService:
             take_profit_pct=take_profit_pct,
             max_spread_bps=model_cfg.max_spread_bps,
         )
+
+        loss_guard_cfg = self._get_loss_guard_cfg(model_cfg.symbol)
 
         for ts, item in parsed:
             probability = float(item.get("probability") or 0.0)
@@ -1331,8 +1551,50 @@ class TradingService:
                 else:
                     if entry_price <= 0.0:
                         entry_price = None
-            current_price = _extract_price_from_item(item)
-            spread_bps = _extract_spread_from_item(item)
+            entry_amount: Optional[float] = None
+            if state.metadata.get("open_amount") is not None:
+                try:
+                    entry_amount = float(state.metadata["open_amount"])
+                except (TypeError, ValueError):
+                    entry_amount = None
+                else:
+                    if entry_amount <= 0.0:
+                        entry_amount = None
+            exit_qty: Optional[float] = None
+            feature_price = _extract_price_from_item(item)
+            feature_spread_bps = _extract_spread_from_item(item)
+            current_price = feature_price
+            spread_bps = feature_spread_bps
+            decision_price_source = "feature"
+            quote: Optional[Dict[str, float]] = None
+            quote_fetch = getattr(self.executor, "fetch_quote", None)
+            if callable(quote_fetch):
+                try:
+                    quote = await quote_fetch(exchange=model_cfg.exchange, symbol=model_cfg.symbol)
+                except Exception:
+                    quote = None
+            if isinstance(quote, dict):
+                quote_bid = quote.get("bid")
+                quote_ask = quote.get("ask")
+                quote_spread = quote.get("spread_bps")
+                if state.in_position and quote_bid is not None and quote_bid > 0:
+                    current_price = float(quote_bid)
+                    decision_price_source = "quote_bid"
+                elif not state.in_position and quote_ask is not None and quote_ask > 0:
+                    current_price = float(quote_ask)
+                    decision_price_source = "quote_ask"
+                if quote_spread is not None and math.isfinite(float(quote_spread)):
+                    spread_bps = float(quote_spread)
+            fee_estimate_bps = None
+            try:
+                fee_estimate_bps = float(self.risk_limits.get("transaction_cost_bps"))
+            except Exception:
+                fee_estimate_bps = None
+            slippage_estimate_bps = None
+            try:
+                slippage_estimate_bps = float(self.risk_limits.get("slippage_bps"))
+            except Exception:
+                slippage_estimate_bps = None
 
             outcome = decide_bar(
                 ts=ts,
@@ -1342,9 +1604,24 @@ class TradingService:
                 cfg=trigger_cfg,
                 current_price=current_price,
                 entry_price=entry_price,
+                entry_amount=entry_amount,
                 spread_bps=spread_bps,
+                include_spread_cost=not decision_price_source.startswith("quote"),
                 safe_mode_active=self._is_safe_mode_active(),
+                fee_estimate_bps=fee_estimate_bps,
+                slippage_estimate_bps=slippage_estimate_bps,
             )
+            try:
+                outcome.exit_context["decision_price_source"] = decision_price_source
+                outcome.exit_context["price_feature"] = feature_price
+                outcome.exit_context["spread_feature_bps"] = feature_spread_bps
+                if isinstance(quote, dict):
+                    outcome.exit_context["quote_bid"] = quote.get("bid")
+                    outcome.exit_context["quote_ask"] = quote.get("ask")
+                    outcome.exit_context["quote_mid"] = quote.get("mid")
+                    outcome.exit_context["quote_spread_bps"] = quote.get("spread_bps")
+            except Exception:
+                pass
 
             if outcome.entry_block_reason and not outcome.should_exit:
                 logger.warning(
@@ -1361,6 +1638,42 @@ class TradingService:
 
             if outcome.should_enter:
                 record_would_trade(model_cfg.model, model_cfg.symbol, "buy")
+                guard_active, required_prob, notional_scale, loss_count = self._loss_guard_entry_params(
+                    state=state,
+                    ts=ts,
+                    entry_threshold=entry_threshold,
+                    cfg=loss_guard_cfg,
+                )
+                if guard_active and probability < required_prob:
+                    reason = "loss_guard"
+                    record_skip_reason(model_cfg.model, model_cfg.symbol, reason)
+                    state.metadata["last_entry_reason"] = reason
+                    state.metadata["last_entry_trigger"] = reason
+                    state.metadata["loss_guard_blocked_at"] = ts.isoformat()
+                    dirty = True
+                    blocked_decision = OrderDecision(
+                        executed=False,
+                        price_used=current_price,
+                        amount=None,
+                        reason=reason,
+                        blocked_reason=reason,
+                    )
+                    await self.audit_logger.log_trade(
+                        model=model_cfg.model,
+                        symbol=model_cfg.symbol,
+                        timeframe=timeframe,
+                        timestamp=ts,
+                        side="buy",
+                        gate_pass=gate_pass,
+                        probability=probability,
+                        threshold=entry_threshold,
+                        decision=blocked_decision,
+                        policy_id=policy_id,
+                        risk_payload={"loss_streak_count": loss_count, "loss_guard_active": guard_active},
+                        decision_namespace=decision_namespace,
+                    )
+                    self._record_deadlock_trade_event(model_cfg, ts, executed=False, reason=reason)
+                    continue
                 intent_id = _build_order_intent_id(model_cfg, ts, "buy")
                 portfolio_state = self._build_portfolio_state(ts=ts, price_hints={model_cfg.symbol: current_price})
                 portfolio_state["orders_last_hour"] = int(portfolio_state.get("orders_last_hour", 0)) + 1
@@ -1373,6 +1686,11 @@ class TradingService:
                 )
                 desired_notional = model_cfg.order_notional
                 desired_qty = model_cfg.order_amount
+                if guard_active and notional_scale and notional_scale < 0.999:
+                    if desired_notional is not None:
+                        desired_notional = float(desired_notional) * float(notional_scale)
+                    elif desired_qty is not None:
+                        desired_qty = float(desired_qty) * float(notional_scale)
                 if desired_notional is None and desired_qty is not None and current_price:
                     desired_notional = float(desired_qty) * float(current_price)
                 risk_result = assess_and_adjust_order(
@@ -1463,6 +1781,17 @@ class TradingService:
                     ts,
                     executed=trade_executed,
                     reason=None if trade_executed else (decision.reason or decision.blocked_reason),
+                )
+                entry_amount_for_exit = entry_amount
+                exit_payload = self._build_exit_audit_payload(
+                    outcome=outcome,
+                    entry_price=entry_price,
+                    entry_amount=entry_amount_for_exit,
+                    decision=decision,
+                    current_price=current_price,
+                    spread_bps=spread_bps,
+                    fee_estimate_bps=fee_estimate_bps,
+                    slippage_estimate_bps=slippage_estimate_bps,
                 )
                 await self.audit_logger.log_trade(
                     model=model_cfg.model,
@@ -1565,6 +1894,38 @@ class TradingService:
                     record_skip_reason(model_cfg.model, model_cfg.symbol, "safe_mode")
                     state.metadata["last_exit_reason"] = "safe_mode"
                     dirty = True
+                    exit_decision = OrderDecision(
+                        executed=False,
+                        price_used=current_price,
+                        amount=entry_amount,
+                        reason="safe_mode",
+                        blocked_reason="safe_mode",
+                    )
+                    exit_payload = self._build_exit_audit_payload(
+                        outcome=outcome,
+                        entry_price=entry_price,
+                        entry_amount=entry_amount,
+                        decision=exit_decision,
+                        current_price=current_price,
+                        spread_bps=spread_bps,
+                        fee_estimate_bps=fee_estimate_bps,
+                        slippage_estimate_bps=slippage_estimate_bps,
+                    )
+                    await self.audit_logger.log_trade(
+                        model=model_cfg.model,
+                        symbol=model_cfg.symbol,
+                        timeframe=timeframe,
+                        timestamp=ts,
+                        side="sell",
+                        gate_pass=gate_pass,
+                        probability=probability,
+                        threshold=exit_threshold if outcome.exit_reason_primary in {"prob_floor", "prob_trailing", "trailing_prob_drop"} else entry_threshold,
+                        decision=exit_decision,
+                        policy_id=policy_id,
+                        risk_payload=None,
+                        decision_namespace=decision_namespace,
+                        extra=exit_payload,
+                    )
                     continue
                 if outcome.exit_trigger == "time_limit":
                     logger.info(
@@ -1638,6 +1999,25 @@ class TradingService:
                     state.metadata["last_exit_reason"] = reason
                     self._record_deadlock_trade_event(model_cfg, ts, executed=False, reason=reason)
                     dirty = True
+                    blocked_decision = OrderDecision(
+                        executed=False,
+                        price_used=current_price,
+                        amount=exit_qty,
+                        reason=reason,
+                        blocked_reason=reason,
+                        order_intent_id=intent_id,
+                        notional=risk_result.get("final_notional"),
+                    )
+                    exit_payload = self._build_exit_audit_payload(
+                        outcome=outcome,
+                        entry_price=entry_price,
+                        entry_amount=entry_amount,
+                        decision=blocked_decision,
+                        current_price=current_price,
+                        spread_bps=spread_bps,
+                        fee_estimate_bps=fee_estimate_bps,
+                        slippage_estimate_bps=slippage_estimate_bps,
+                    )
                     await self.audit_logger.log_trade(
                         model=model_cfg.model,
                         symbol=model_cfg.symbol,
@@ -1647,24 +2027,130 @@ class TradingService:
                         gate_pass=gate_pass,
                         probability=probability,
                         threshold=exit_threshold if outcome.exit_trigger in {"prob_floor", "prob_trailing"} else entry_threshold,
-                        decision=OrderDecision(
-                            executed=False,
-                            price_used=current_price,
-                            amount=exit_qty,
-                            reason=reason,
-                            blocked_reason=reason,
-                            order_intent_id=intent_id,
-                            notional=risk_result.get("final_notional"),
-                        ),
+                        decision=blocked_decision,
                         policy_id=policy_id,
                         risk_payload=risk_result,
                         decision_namespace=decision_namespace,
+                        extra=exit_payload,
                     )
                     continue
                 final_exit_notional = risk_result.get("final_notional", exit_notional)
                 final_exit_qty = risk_result.get("final_qty", exit_qty)
                 for clip_reason in risk_result.get("clip_reasons", []):
                     record_risk_clipped(model_cfg.symbol, clip_reason)
+                pnl_blocked = False
+                expected_pnl = None
+                expected_net = None
+                prices_from_quote = decision_price_source.startswith("quote")
+                if entry_price is not None and current_price is not None:
+                    qty_for_pnl = entry_amount
+                    if qty_for_pnl is None or qty_for_pnl <= 0:
+                        qty_for_pnl = final_exit_qty
+                    try:
+                        if qty_for_pnl is not None and qty_for_pnl > 0:
+                            expected_pnl = (float(current_price) - float(entry_price)) * float(qty_for_pnl)
+                            expected_net = expected_pnl
+                    except Exception:
+                        expected_pnl = None
+                        expected_net = None
+                    notional_hint = None
+                    try:
+                        if qty_for_pnl is not None:
+                            notional_hint = float(qty_for_pnl) * float(entry_price)
+                    except Exception:
+                        notional_hint = None
+                    total_cost_bps = 0.0
+                    try:
+                        if fee_estimate_bps is not None and math.isfinite(float(fee_estimate_bps)):
+                            total_cost_bps += float(fee_estimate_bps) * 2.0
+                    except Exception:
+                        pass
+                    try:
+                        if slippage_estimate_bps is not None and math.isfinite(float(slippage_estimate_bps)):
+                            total_cost_bps += float(slippage_estimate_bps)
+                    except Exception:
+                        pass
+                    if not prices_from_quote:
+                        try:
+                            if spread_bps is not None and math.isfinite(float(spread_bps)):
+                                total_cost_bps += float(spread_bps)
+                        except Exception:
+                            pass
+                    if expected_net is not None and notional_hint is not None and total_cost_bps:
+                        expected_net = expected_net - (notional_hint * total_cost_bps / 1e4)
+                    loss_frac = None
+                    if expected_net is not None and notional_hint:
+                        try:
+                            loss_frac = abs(expected_net) / float(notional_hint)
+                        except Exception:
+                            loss_frac = None
+                    block_on_net = (
+                        expected_net is not None
+                        and expected_net <= 0
+                        and outcome.exit_trigger in {"prob_floor", "prob_trailing", "gate_close", "take_profit"}
+                    )
+                    if block_on_net and loss_frac is not None and stop_loss_pct:
+                        try:
+                            if float(loss_frac) >= float(stop_loss_pct):
+                                block_on_net = False
+                        except Exception:
+                            pass
+                    if block_on_net and max_hold_seconds and state.entry_ts:
+                        try:
+                            age_seconds = (ts - state.entry_ts).total_seconds()
+                            if age_seconds >= max_hold_seconds:
+                                block_on_net = False
+                        except Exception:
+                            pass
+                    if block_on_net:
+                        pnl_blocked = True
+                        reason = "pnl_block"
+                        record_skip_reason(model_cfg.model, model_cfg.symbol, reason)
+                        state.metadata["last_exit_reason"] = reason
+                        self._record_deadlock_trade_event(model_cfg, ts, executed=False, reason=reason)
+                        blocked_decision = OrderDecision(
+                            executed=False,
+                            price_used=current_price,
+                            amount=final_exit_qty,
+                            reason=reason,
+                            blocked_reason=reason,
+                            order_intent_id=intent_id,
+                            notional=final_exit_notional,
+                        )
+                        exit_payload = self._build_exit_audit_payload(
+                            outcome=outcome,
+                            entry_price=entry_price,
+                            entry_amount=entry_amount,
+                            decision=blocked_decision,
+                            current_price=current_price,
+                            spread_bps=spread_bps,
+                            fee_estimate_bps=fee_estimate_bps,
+                            slippage_estimate_bps=slippage_estimate_bps,
+                        )
+                        if expected_pnl is not None:
+                            exit_payload["pnl_expected"] = expected_pnl
+                            exit_payload["pnl_expected_net"] = expected_net
+                            exit_payload["pnl_blocked"] = pnl_blocked
+                        await self.audit_logger.log_trade(
+                            model=model_cfg.model,
+                            symbol=model_cfg.symbol,
+                            timeframe=timeframe,
+                            timestamp=ts,
+                            side="sell",
+                            gate_pass=gate_pass,
+                            probability=probability,
+                            threshold=exit_threshold
+                            if outcome.exit_trigger in {"prob_floor", "prob_trailing"}
+                            else entry_threshold,
+                            decision=blocked_decision,
+                            policy_id=policy_id,
+                            risk_payload=risk_result,
+                            decision_namespace=decision_namespace,
+                            extra=exit_payload,
+                        )
+                        dirty = True
+                        continue
+
                 self._record_turnover(ts, final_exit_notional)
                 self._record_order_timestamp(ts)
                 decision = await self.executor.submit(
@@ -1701,6 +2187,41 @@ class TradingService:
                     decision.price_used,
                     decision.amount,
                 )
+                if decision.executed and entry_price is not None:
+                    try:
+                        qty_for_pnl = entry_amount
+                        if qty_for_pnl is None or qty_for_pnl <= 0:
+                            qty_for_pnl = decision.amount
+                        if qty_for_pnl is not None and qty_for_pnl > 0 and decision.price_used is not None:
+                            expected_pnl = (float(decision.price_used) - float(entry_price)) * float(qty_for_pnl)
+                            expected_net = expected_pnl
+                    except Exception:
+                        expected_pnl = None
+                    notional_hint = None
+                    try:
+                        if qty_for_pnl is not None and entry_price is not None:
+                            notional_hint = float(qty_for_pnl) * float(entry_price)
+                    except Exception:
+                        notional_hint = None
+                    total_cost_bps = 0.0
+                    try:
+                        if fee_estimate_bps is not None and math.isfinite(float(fee_estimate_bps)):
+                            total_cost_bps += float(fee_estimate_bps) * 2.0
+                    except Exception:
+                        pass
+                    try:
+                        if slippage_estimate_bps is not None and math.isfinite(float(slippage_estimate_bps)):
+                            total_cost_bps += float(slippage_estimate_bps)
+                    except Exception:
+                        pass
+                    if not prices_from_quote:
+                        try:
+                            if spread_bps is not None and math.isfinite(float(spread_bps)):
+                                total_cost_bps += float(spread_bps)
+                        except Exception:
+                            pass
+                    if expected_net is not None and notional_hint is not None and total_cost_bps:
+                        expected_net = expected_net - (notional_hint * total_cost_bps / 1e4)
                 trade_executed = bool(decision.executed or decision.shadow_mode)
                 self._record_deadlock_trade_event(
                     model_cfg,
@@ -1708,6 +2229,20 @@ class TradingService:
                     executed=trade_executed,
                     reason=None if trade_executed else (decision.reason or decision.blocked_reason),
                 )
+                exit_payload = self._build_exit_audit_payload(
+                    outcome=outcome,
+                    entry_price=entry_price,
+                    entry_amount=entry_amount,
+                    decision=decision,
+                    current_price=current_price,
+                    spread_bps=spread_bps,
+                    fee_estimate_bps=fee_estimate_bps,
+                    slippage_estimate_bps=slippage_estimate_bps,
+                )
+                if expected_pnl is not None:
+                    exit_payload["pnl_expected"] = expected_pnl
+                    exit_payload["pnl_expected_net"] = expected_net
+                    exit_payload["pnl_blocked"] = pnl_blocked
                 await self.audit_logger.log_trade(
                     model=model_cfg.model,
                     symbol=model_cfg.symbol,
@@ -1721,6 +2256,7 @@ class TradingService:
                     policy_id=policy_id,
                     risk_payload=risk_result,
                     decision_namespace=decision_namespace,
+                    extra=exit_payload,
                 )
                 fill_confirmed = self.config.dry_run or decision.intent_status in {IntentStatus.FILLED.value}
                 if decision.executed and fill_confirmed:
@@ -1738,6 +2274,7 @@ class TradingService:
                         pnl_value = (exit_price - entry_price) * qty
                         record_realized_pnl(model_cfg.model, model_cfg.symbol, pnl_value)
                         self._update_risk_pnl(ts, pnl_value)
+                        self._update_loss_streak_after_exit(state, ts, pnl_value, loss_guard_cfg)
                         state.metadata["last_realized_pnl"] = f"{pnl_value:.10f}"
                     state.metadata.pop("open_price", None)
                     state.metadata.pop("open_amount", None)
@@ -1819,6 +2356,54 @@ class TradingService:
                         executed=False,
                         reason=decision.reason or "skipped",
                     )
+            elif outcome.exit_armed:
+                if outcome.exit_blocked_by_hold:
+                    skip_reason = "min_hold"
+                elif getattr(outcome, "exit_blocked_by_pnl", False):
+                    skip_reason = "pnl_block"
+                else:
+                    skip_reason = outcome.exit_reason_primary or "exit_armed"
+                record_skip_reason(model_cfg.model, model_cfg.symbol, skip_reason)
+                state.metadata["last_exit_reason"] = skip_reason
+                state.metadata["last_exit_spread_bps"] = (
+                    f"{spread_bps:.4f}" if spread_bps is not None else ""
+                )
+                state.metadata["last_exit_trigger"] = outcome.exit_reason_primary or ""
+                exit_decision = OrderDecision(
+                    executed=False,
+                    price_used=current_price,
+                    amount=entry_amount,
+                    reason=skip_reason,
+                    blocked_reason=skip_reason,
+                    order_intent_id=None,
+                    notional=None,
+                )
+                exit_payload = self._build_exit_audit_payload(
+                    outcome=outcome,
+                    entry_price=entry_price,
+                    entry_amount=entry_amount,
+                    decision=exit_decision,
+                    current_price=current_price,
+                    spread_bps=spread_bps,
+                    fee_estimate_bps=fee_estimate_bps,
+                    slippage_estimate_bps=slippage_estimate_bps,
+                )
+                await self.audit_logger.log_trade(
+                    model=model_cfg.model,
+                    symbol=model_cfg.symbol,
+                    timeframe=timeframe,
+                    timestamp=ts,
+                    side="sell",
+                    gate_pass=gate_pass,
+                    probability=probability,
+                    threshold=exit_threshold if outcome.exit_reason_primary in {"prob_floor", "prob_trailing", "trailing_prob_drop"} else entry_threshold,
+                    decision=exit_decision,
+                    policy_id=policy_id,
+                    risk_payload=None,
+                    decision_namespace=decision_namespace,
+                    extra=exit_payload,
+                )
+                dirty = True
 
         if dirty:
             self.state_store.update(model_cfg.state_key, state)
@@ -2188,6 +2773,88 @@ class TradingService:
             exit_trigger or "",
             decision.reason or "",
         )
+
+    def _build_exit_audit_payload(
+        self,
+        *,
+        outcome: DecisionOutcome,
+        entry_price: Optional[float],
+        entry_amount: Optional[float],
+        decision: Optional[OrderDecision] = None,
+        current_price: Optional[float] = None,
+        spread_bps: Optional[float] = None,
+        fee_estimate_bps: Optional[float] = None,
+        slippage_estimate_bps: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {}
+        if outcome.exit_context:
+            payload.update(outcome.exit_context)
+        payload.update(
+            {
+                "exit_reason_primary": outcome.exit_reason_primary,
+                "exit_reason_all": list(outcome.exit_reasons or []),
+                "exit_armed": bool(outcome.exit_armed),
+                "exit_blocked_by_hold": bool(outcome.exit_blocked_by_hold),
+                "exit_blocked_by_pnl": bool(getattr(outcome, "exit_blocked_by_pnl", False)),
+            }
+        )
+        entry_price_val = entry_price if entry_price is not None and entry_price > 0 else None
+        entry_amount_val = entry_amount if entry_amount is not None and entry_amount > 0 else None
+        decision_price = None
+        if decision and decision.price_used is not None:
+            try:
+                decision_price = float(decision.price_used)
+            except (TypeError, ValueError):
+                decision_price = None
+        if decision_price is None and current_price is not None:
+            try:
+                decision_price = float(current_price)
+            except (TypeError, ValueError):
+                decision_price = None
+        decision_amount = None
+        if decision and decision.amount is not None:
+            try:
+                decision_amount = float(decision.amount)
+            except (TypeError, ValueError):
+                decision_amount = None
+
+        qty = None
+        if entry_amount_val is not None and entry_amount_val > 0:
+            qty = entry_amount_val
+            if decision_amount is not None and decision_amount > 0:
+                qty = min(entry_amount_val, decision_amount)
+
+        if entry_price_val is not None and decision_price is not None and qty is not None:
+            pnl_gross = (decision_price - entry_price_val) * qty
+            payload["pnl_gross"] = pnl_gross
+            total_cost_bps = 0.0
+            trade_executed = bool(decision and decision.executed and not decision.shadow_mode)
+            try:
+                if fee_estimate_bps is not None and math.isfinite(float(fee_estimate_bps)):
+                    total_cost_bps += float(fee_estimate_bps) * 2.0
+            except Exception:
+                pass
+            try:
+                if slippage_estimate_bps is not None and math.isfinite(float(slippage_estimate_bps)):
+                    total_cost_bps += float(slippage_estimate_bps)
+            except Exception:
+                pass
+            if not trade_executed:
+                try:
+                    if spread_bps is not None and math.isfinite(float(spread_bps)):
+                        total_cost_bps += float(spread_bps)
+                except Exception:
+                    pass
+            pnl_net = pnl_gross - (entry_price_val * qty * total_cost_bps / 1e4) if total_cost_bps else pnl_gross
+            payload["pnl_net_estimate"] = pnl_net
+            if trade_executed:
+                payload["pnl_net_realized"] = pnl_net
+        payload.setdefault("spread_bps_now", spread_bps if spread_bps is not None else None)
+        if decision:
+            payload["decision_price_used"] = decision.price_used
+            payload["decision_amount"] = decision.amount
+            payload["decision_reason"] = decision.reason
+        return payload
 
     def _resolve_manifest(
         self,
