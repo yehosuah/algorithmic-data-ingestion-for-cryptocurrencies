@@ -1,6 +1,8 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-11-30 22:29 UTC_
+_Last updated: 2025-12-17 00:30 UTC_
+
+> Update 2025-12-17: Added a single-command live-readiness check plus post-launch diagnostics (`analysis/live_readiness_check`, `analysis/acceptance_trade_proof`, `analysis/exit_attribution_report`, `analysis/project_stance_snapshot`) and hardened scheduler/trading with loss-guarding, queue-age pruning, quote-aware exits, and the `INFER_APPLY_CALIBRATION` override so experiments stay aligned with production.
 
 > Update 2025-11-30 22:29 UTC: Stage-0 runtime risk overrides now cut the post-exit cooldown to 1 minute and the post-loss cooldown to 5 minutes, the dry-run compose wires BTC/ETH/SOL as primary entries with 300 USDT notional + 10 bps spread guards (no `TRADING_SHADOW_SYMBOLS`), and the bulky parquet datasets were dropped from git—regenerate them via the sanity scripts when you need fresh snapshots.
 > Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
@@ -103,11 +105,18 @@ The scheduler now orchestrates three job types:
 - **Inference jobs (`INFER_JOBS`)** that replay the latest parquet window, score base/TCN manifests, and enqueue trading payloads to Redis (`DECISION_QUEUE_KEY`, default `trading:decisions`).
 
 Each payload carries manifest metadata, side, and probability, so the trading worker can:
-- Stream and dedupe decisions from Redis (`DECISION_QUEUE_URL`), caching artifacts via `training.infer.load_manifest_artifacts`.
+- Stream and dedupe decisions from Redis (`DECISION_QUEUE_URL`), caching artifacts via `training.infer.load_manifest_artifacts` and honoring each manifest’s `apply_calibration` flag (override with `INFER_APPLY_CALIBRATION` when you need deterministic logits in dry runs).
+- Backfill missing manifest/labeled columns (regimes, `directional_15m`, `net_return_15m`, etc.) on the fly so the live model always sees the shape it was trained on even when the parquet window is short.
 - Apply min-hold and stale-position guards per `TRADING_MODELS`, using spread checks before routing orders with the CCXT adapter. Set `TRADING_DRY_RUN=0` when moving to live execution.
 - Persist per-symbol state with the configured backend (`file`, `redis`, `postgres`) and mirror audit events (`gate_toggle`, `trade`) to Redis streams or Postgres tables.
 - Expose Prometheus counters/gauges (`trading_trade_attempts_total`, `trading_trade_notional_total`, `trading_gate_toggles_total`, `trading_position_active`, `trading_realized_pnl_total`) on `TRADING_METRICS_PORT` (default 9010).
 - Trim per-job decision payloads to the freshest `DECISION_PAYLOAD_ITEMS` (default 3; override per job with `max_decision_items`) so Redis does not accumulate stale signals; monitor `trading_decision_queue_depth{queue="trading:decisions"}` to ensure the consumer keeps up.
+
+Loss-streak protection: the runtime risk limits now expose a `loss_guard` block (default: 3 consecutive losses, 90-minute cooldown, notional scaled by 50%) and the driver emits `loss_guard` metrics/audit entries whenever it rejects a decision.
+
+Decision deduping: `TRADING_LAST_TS_GRACE_BARS` lets trading accept decisions a few bars older than the stored timestamp so short restarts keep running, while `TRADING_DECISION_MAX_AGE_SECONDS` (240 in stage-0) skips stale payloads and keeps the queue healthy instead of reprocessing old signals.
+
+Quote-aware exits: the executor now fetches live bid/ask quotes (with order-book fallbacks) so `decide_bar` gets fresh spreads and computes expected PnL/net before hitting a `pnl_block` skip—spread estimates from quotes only apply when we can trust live prices.
 
 Trading also clears stale dedupe timestamps after restarts when downtime exceeds `TRADING_LAST_TS_GRACE_BARS` bars (default 3) so fresh decisions are not dropped due to old state; increase the grace if using long bar intervals.
 
@@ -132,6 +141,7 @@ Useful helpers:
 - **Signed audit & provenance** – Trading now requires `TRADING_AUDIT_HMAC_KEY` (plus optional `TRADING_AUDIT_RUN_ID`/`TRADING_AUDIT_HOST_ID`) and writes `audit_source`/`audit_run_id`/`audit_seq` metadata inside every event so `analysis.validate_deployment_contract` can assert observability requirements before go-live. Redis/Postgres/file backends all compute the HMAC digest.
 - **Intent ledger + reconciliation** – `TRADING_INTENT_LEDGER_BACKEND=redis`, `TRADING_INTENT_LEDGER_REDIS_URL`, and the new `IntentLedger` class dedupe order intents, track lifecycle status (`pending_submit`→`filled`/`canceled`/`error`), and feed metrics (`trading_intent_ledger_state_total`). A periodic reconcile loop compares internal state vs exchange truth and latches safe-mode until a healthy streak succeeds; emissions land in the audit stream under `reconciliation`.
 - **Runtime risk engine** – `app/trading/risk.py::assess_and_adjust_order` consumes `configs/portfolio_risk_limits.yaml` (or the stage overrides) to block/clip orders based on turnover, exposure, drawdown, order cadence, cooldowns, and per-symbol spread/notional/qty rules. Stage-0 overrides now cut `cooldown_minutes_after_exit` to 1 and `cooldown_minutes_after_loss` to 5 so reconciliations can resume trading faster while keeping the risk counters honest. Audit payloads include `risk_block_reason`/`risk_clip_reasons`, and Prometheus gets `trading_risk_blocked_total`/`trading_risk_clipped_total`.
+- **Loss guard & aged decisions** – The stage risk limits ship a `loss_guard` block (3-loss cooldown with optional notional downscaling) plus `TRADING_LAST_TS_GRACE_BARS`/`TRADING_DECISION_MAX_AGE_SECONDS` so repeated losses raise `loss_guard` audits and stale queue items are silently skipped; `TRADING_STATE_BACKEND`/`TRADING_AUDIT_BACKEND` keep persistence consistent when stage bundles move between file/redis clients.
 - **Deadlock policy automation** – `app/trading/deadlock.py`, the new `analysis.*launch_stage*` CLIs, and the Prometheus suite (`trading_deadlock_*`, `deadlock_action_taken_total`) monitor per-symbol coverage windows, execute staged mitigations (prob gate adjustments, policy switches, safe-mode), and log actions/audits with policy hashes.
 - **Observability & controls** – Kill-/safe-mode env vars (`TRADING_KILL_SWITCH`, `TRADING_SAFE_MODE`) are enforced inside `app/trading/decision.py`; trading only enters when both are clear or we’re exiting safely. Metrics now include decision coverage, skip/dedup/risk block counters, orders-per-hour, turnover/drawdown gauges, safe-mode latch state, and reconciliation health. Grafana’s `trading-overview.json` dashboard plots the additional telemetry, and alert rules reference the same invariants listed in the deployment contract.
 
@@ -143,6 +153,12 @@ Promotion checklist:
 1. Export the current stage bundle (`configs/runtime_overrides/stage_N.yaml`) and set `TRADING_AUDIT_HMAC_KEY`, `TRADING_INTENT_LEDGER_*`, `TRADING_KILL_SWITCH`, and `TRADING_SAFE_MODE` before starting trading.
 2. Run `analysis.preflight_coverage`, `analysis.shadow_readiness`, and the deployment contract validator; review the Markdown/JSON reports (coverage, deadlock health, symbol readiness) under `reports/`.
 3. Start trading with the exported env, leave kill/safe-mode asserted until reconciliation succeeds, and monitor Prometheus counters (`deadlock_action_taken_total`, `trading_deadlock_coverage_ratio`, `trading_safe_mode_latched`, `trading_risk_blocked_total`, `trading_reconcile_runs_total`) plus audit logs for provenance.
+
+### Operational readiness reports
+
+- **Live readiness check** – `python3 -m analysis.live_readiness_check --deployment-contract configs/deployment_portfolio_contract.yaml` chains contract validation, coverage/shadow/promotion preflights, and optional stage evaluation, writes GO/NO-GO Markdown+JSON bundles under `reports/live_readiness/`, links the underlying artifacts so every stage promotion has a single status artifact, and lets `analysis.preflight_coverage` warn when the manifest gate thresholds differ from the portfolio risk limits so operators spot config skew before promoting a stage.
+- **Acceptance trade proof** – `analysis/acceptance_trade_proof.py` reads the audit log, filters executed sell exits, and writes Markdown/JSON pairs (e.g., `reports/acceptance_trade_proof_latest.*`) that summarize per-symbol counts/PnL so ops can prove the last trades honored guardrails.
+- **Exit attribution + stance snapshot** – `analysis/exit_attribution_report.py` tallies exit reasons, churn, and PnL fractions while `analysis/project_stance_snapshot.py` snapshots the deployment contract, runtime env vars, risk limits, and deadlock policy so review decks cite the exact configuration used for the current ladder.
 
 ---
 

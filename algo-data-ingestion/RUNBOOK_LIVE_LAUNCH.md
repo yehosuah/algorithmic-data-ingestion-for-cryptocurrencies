@@ -1,6 +1,6 @@
 # Live Launch Ladder Runbook (ETH → BTC → SOL)
 
-_Last updated: 2025-11-30 18:55 UTC_
+_Last updated: 2025-12-17 00:30 UTC_
 
 > Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
@@ -14,6 +14,25 @@ This runbook is the operator guide for staged rollout using the launch ladder in
 - Credentials for exchange/API already loaded; models present under `models_root`.
 - Audit log writable at `data_lake/trading/audit.log`; HMAC validation must pass for live.
 - Ensure `docker-compose` (or systemd) can restart trading service after config changes.
+
+## Single-command preflight (GO/NO-GO)
+Use `analysis/live_readiness_check.py` to deterministically answer “are we live-run ready right now?” and write a single JSON + Markdown report bundle.
+
+- Dry-run (no audit-based checks):
+  `python3 -m analysis.live_readiness_check --deployment-contract configs/deployment_portfolio_contract.yaml --mode dry_run --no-require-shadow-preflight --output-dir reports/live_readiness`
+- Live-like (recommended before promotions; requires an audit log when shadow/stage checks are enabled):
+  `python3 -m analysis.live_readiness_check --deployment-contract configs/deployment_portfolio_contract.yaml --mode live_like --audit-log data_lake/trading/audit.log --lookback-hours 48 --output-dir reports/live_readiness`
+- Live (strict):
+  `python3 -m analysis.live_readiness_check --deployment-contract configs/deployment_portfolio_contract.yaml --mode live --audit-log data_lake/trading/audit.log --lookback-hours 48 --output-dir reports/live_readiness`
+
+Interpretation:
+- `GO` means every required check `PASS`ed; `NO_GO` means at least one required check `FAIL`ed.
+- The report bundle is written under `reports/live_readiness/<stamp>_live_readiness.json` and `.md`, and links the underlying artifacts (coverage, shadow readiness, stage eval) in the same directory.
+
+Top failure playbooks:
+- **Coverage deadlock / implied trades == 0**: inspect `preflight_coverage_*.md` in the output dir; verify feature feed freshness and `gate_config.prob_gate_min` in risk limits (don’t relax silently).
+- **Audit provenance/HMAC failures**: ensure audit lines include `audit_source`, `audit_run_id`, `audit_seq`, and `audit_hmac`; set/rotate `TRADING_AUDIT_HMAC_KEY` and rerun (no unauthenticated overrides in live).
+- **Contract mismatch**: rerun `analysis.validate_deployment_contract`; fix missing model paths, missing risk limits per symbol, or `TRADING_MODELS` not covering every `live_symbol`.
 
 ## Stage Ladder (source of truth)
 - Ladder file: `configs/live_launch_ladder.yaml`.
@@ -31,9 +50,8 @@ This runbook is the operator guide for staged rollout using the launch ladder in
 
 ## GO-Live Sequence (for each promotion)
 1) Apply current stage (above command) and export the env bundle from `configs/runtime_overrides/stage_N.yaml`.  
-2) Validate contract: `python -m analysis.validate_deployment_contract --contract configs/deployment_portfolio_contract.yaml`.  
-3) Coverage readiness: `python -m analysis.preflight_coverage --contract configs/deployment_portfolio_contract.yaml --output-dir reports` and `python -m analysis.shadow_readiness --contract configs/deployment_portfolio_contract.yaml --reports-dir reports`.  
-4) Optional stress: `python -m analysis.preflight_symbol_promotion --stage stage_N --ladder configs/live_launch_ladder.yaml --contract configs/deployment_portfolio_contract.yaml` to simulate kill/safe toggles and dedupe load.  
+2) Run the single-command preflight (above). Add `--stage stage_N --ladder configs/live_launch_ladder.yaml` to gate stage promotions.  
+3) If `NO_GO`, fix the failing check and rerun until `GO`. Archive the readiness artifacts under `reports/live_readiness/`.  
 5) Start/refresh trading service (docker-compose up or `python -m app.trading.main`) with env from stage bundle. Keep `TRADING_KILL_SWITCH=1` and allow exits-only until reconciliation emits `reconciliation` audit entries with a healthy streak.  
 6) Monitor metrics: Prometheus `9010` (`trade_count`, `coverage`, `deadlock_action_taken_total`, `trading_safe_mode_latched`, `trading_risk_blocked_total`, `trading_intent_ledger_state_total`, `trading_reconcile_runs_total`). Watch audit HMAC validity and Redis intent ledger health.  
 7) Run gate evaluation for the next stage (command above). Review `reports/launch_stage_eval_stage_N_*.md/.json` and deadlock drill output.  
@@ -44,6 +62,7 @@ This runbook is the operator guide for staged rollout using the launch ladder in
 - **Reconciliation mismatches**: Audit `reconciliation` events; latch `TRADING_SAFE_MODE=1`, rerun reconcile, and if mismatch persists, rollback to `stage_0`.
 - **Excessive spread blocks**: Inspect audit `risk_block_reason`/`spread_bps`. Consider tightening stage sizing or reverting to prior stage; do not relax spread limits while live without evaluation.
 - **Repeated order rejects / intent collisions**: Verify Redis intent ledger health; ensure `TRADING_INTENT_LEDGER_BACKEND=redis` and redis URL valid. Enable kill switch if rejects persist.
+- **Loss guard & stale decisions**: The runtime risk limits now include a `loss_guard` (three losses → 90-minute cooldown with optional notional scaling) and trading honors `TRADING_DECISION_MAX_AGE_SECONDS`/`TRADING_LAST_TS_GRACE_BARS`. Look for `loss_guard` or `pnl_block` reasons in the audit stream, escalate the path if repeated skips are blocking entries, and check whether the Redis queue is emitting stale decision warnings (increase the grace/age if the scheduler burst is healthy).
 - **Drawdown breach**: Immediately set `TRADING_KILL_SWITCH=1`, keep `TRADING_SAFE_MODE=1`, then rollback to `stage_0`.
 - **Audit or HMAC failures**: Halt trading, rotate `TRADING_AUDIT_HMAC_KEY`, re-run contract validation, and replay the last ladder stage before re-enabling entries.
 
