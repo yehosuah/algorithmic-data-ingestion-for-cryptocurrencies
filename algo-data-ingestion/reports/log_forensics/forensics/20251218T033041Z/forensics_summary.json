@@ -1,0 +1,17 @@
+{
+  "symbols": [],
+  "per_symbol": {},
+  "portfolio": {
+    "trades": 0,
+    "executed": 0,
+    "pnl": 0.0,
+    "win_rate": 0.0,
+    "profit_factor": null,
+    "median_hold_min": null,
+    "exit_reasons": {},
+    "skip_reasons": {},
+    "gate_failures": 0,
+    "max_drawdown": 0.0
+  },
+  "equity_curve": []
+}

@@ -1,0 +1,64 @@
+{
+  "positions": {
+    "binance:xgb_primary:BTC/USDT": {
+      "bars_in_position": 0,
+      "entry_ts": null,
+      "hold_until": "2025-12-18T00:05:00+00:00",
+      "in_position": false,
+      "last_exit_ts": "2025-12-18T00:32:00+00:00",
+      "last_gate": false,
+      "last_probability": 0.3245033025741577,
+      "last_timestamp": "2025-12-18T03:28:00+00:00",
+      "metadata": {
+        "last_entry_reason": "turnover_limit",
+        "last_entry_spread_bps": "0.0012",
+        "last_exit_reason": "dry_run",
+        "last_exit_spread_bps": "2.0007",
+        "last_exit_trigger": "take_profit",
+        "last_realized_pnl": "0.0153040000",
+        "loss_streak_count": "0",
+        "loss_streak_last_ts": "2025-12-18T00:32:00+00:00"
+      }
+    },
+    "binance:xgb_primary:ETH/USDT": {
+      "bars_in_position": 0,
+      "entry_ts": null,
+      "hold_until": "2025-12-18T00:03:00+00:00",
+      "in_position": false,
+      "last_exit_ts": "2025-12-18T00:33:00+00:00",
+      "last_gate": false,
+      "last_probability": 0.41829004883766174,
+      "last_timestamp": "2025-12-18T03:29:00+00:00",
+      "metadata": {
+        "last_entry_reason": "turnover_limit",
+        "last_entry_spread_bps": "0.0353",
+        "last_exit_reason": "dry_run",
+        "last_exit_spread_bps": "0.0352",
+        "last_exit_trigger": "take_profit",
+        "last_realized_pnl": "0.0312200000",
+        "loss_streak_count": "0",
+        "loss_streak_last_ts": "2025-12-18T00:33:00+00:00"
+      }
+    },
+    "binance:xgb_primary:SOL/USDT": {
+      "bars_in_position": 0,
+      "entry_ts": null,
+      "hold_until": "2025-12-18T00:15:00+00:00",
+      "in_position": false,
+      "last_exit_ts": "2025-12-18T00:15:00+00:00",
+      "last_gate": false,
+      "last_probability": 0.3245033025741577,
+      "last_timestamp": "2025-12-18T03:28:00+00:00",
+      "metadata": {
+        "last_entry_reason": "turnover_limit",
+        "last_entry_spread_bps": "0.8103",
+        "last_exit_reason": "dry_run",
+        "last_exit_spread_bps": "0.8094",
+        "last_exit_trigger": "take_profit",
+        "last_realized_pnl": "0.0280000000",
+        "loss_streak_count": "0",
+        "loss_streak_last_ts": "2025-12-18T00:15:00+00:00"
+      }
+    }
+  }
+}

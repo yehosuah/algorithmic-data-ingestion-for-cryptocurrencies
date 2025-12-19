@@ -1,0 +1,75 @@
+{
+  "positions": {
+    "binance:xgb_primary:BTC/USDT": {
+      "bars_in_position": 64,
+      "entry_ts": "2025-12-18T22:55:00+00:00",
+      "hold_until": "2025-12-18T23:00:00+00:00",
+      "in_position": true,
+      "last_exit_ts": null,
+      "last_gate": false,
+      "last_probability": 0.5002435445785522,
+      "last_timestamp": "2025-12-19T00:00:00+00:00",
+      "metadata": {
+        "last_entry_reason": "dry_run",
+        "last_entry_spread_bps": "0.0012",
+        "last_exit_reason": "pnl_block",
+        "last_exit_spread_bps": "0.0012",
+        "last_exit_trigger": "prob_floor",
+        "last_realized_pnl": "0.0019330000",
+        "loss_streak_count": "0",
+        "loss_streak_last_ts": "2025-12-18T22:52:00+00:00",
+        "open_amount": "0.0001000000",
+        "open_entry_prob": "0.5656820536",
+        "open_price": "85694.0500000000",
+        "open_side": "long"
+      }
+    },
+    "binance:xgb_primary:ETH/USDT": {
+      "bars_in_position": 5,
+      "entry_ts": "2025-12-18T23:55:00+00:00",
+      "hold_until": "2025-12-19T00:01:00+00:00",
+      "in_position": true,
+      "last_exit_ts": null,
+      "last_gate": true,
+      "last_probability": 0.565682053565979,
+      "last_timestamp": "2025-12-19T00:01:00+00:00",
+      "metadata": {
+        "last_entry_reason": "dry_run",
+        "last_entry_spread_bps": "0.0353",
+        "last_exit_reason": "dry_run",
+        "last_exit_spread_bps": "0.0354",
+        "last_realized_pnl": "0.0133000000",
+        "loss_streak_count": "0",
+        "loss_streak_last_ts": "2025-12-18T23:50:00+00:00",
+        "open_amount": "0.0070000000",
+        "open_entry_prob": "0.5002435446",
+        "open_price": "2829.0600000000",
+        "open_side": "long"
+      }
+    },
+    "binance:xgb_primary:SOL/USDT": {
+      "bars_in_position": 67,
+      "entry_ts": "2025-12-18T22:52:00+00:00",
+      "hold_until": "2025-12-18T22:57:00+00:00",
+      "in_position": true,
+      "last_exit_ts": null,
+      "last_gate": true,
+      "last_probability": 0.5878524780273438,
+      "last_timestamp": "2025-12-19T00:00:00+00:00",
+      "metadata": {
+        "last_entry_reason": "dry_run",
+        "last_entry_spread_bps": "0.8333",
+        "last_exit_reason": "pnl_block",
+        "last_exit_spread_bps": "0.8357",
+        "last_exit_trigger": "gate_close",
+        "last_realized_pnl": "0.0136000000",
+        "loss_streak_count": "0",
+        "loss_streak_last_ts": "2025-12-18T22:50:00+00:00",
+        "open_amount": "0.0800000000",
+        "open_entry_prob": "0.6076040864",
+        "open_price": "120.0100000000",
+        "open_side": "long"
+      }
+    }
+  }
+}

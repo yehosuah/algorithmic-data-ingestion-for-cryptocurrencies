@@ -1,0 +1,1 @@
+symbol,model,policy_id,timeframe,occurred_at,entry_ts,exit_ts,side,gate_pass,decision,skip_reason,risk_block_reason,risk_clip_reasons,executed,entry_prob,exit_prob,entry_threshold,exit_threshold,exit_reason_primary,exit_reason_all,pnl_gross,pnl_net,pnl_notional,probability,spread_entry_bps,spread_exit_bps,intended_notional,entry_price,exit_price,pnl,hold_minutes

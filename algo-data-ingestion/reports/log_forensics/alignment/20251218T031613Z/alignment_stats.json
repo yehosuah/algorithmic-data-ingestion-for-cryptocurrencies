@@ -1,0 +1,110 @@
+{
+  "per_symbol": {
+    "ETH/USDT": {
+      "trades_aligned": 72,
+      "mfe_mean": 0.199105627066958,
+      "mae_mean": -0.004425981286640512,
+      "exit_return_mean": 0.0006953096598629749,
+      "post_exit_max_return_mean": 0.018984324875121535,
+      "post_exit_min_return_mean": -0.003896105626400387,
+      "exit_reason_stats": [
+        {
+          "exit_reason": "take_profit",
+          "exit_return_pct": 0.0006953096598629749,
+          "post_exit_max_return_pct": 0.0008958677219566002,
+          "post_exit_min_return_pct": -0.004620420140799331
+        },
+        {
+          "exit_reason": "dry_run",
+          "exit_return_pct": NaN,
+          "post_exit_max_return_pct": 0.199105627066958,
+          "post_exit_min_return_pct": -0.004425981286640512
+        },
+        {
+          "exit_reason": "turnover_limit",
+          "exit_return_pct": NaN,
+          "post_exit_max_return_pct": 0.016669569945997654,
+          "post_exit_min_return_pct": -0.003878188623905543
+        }
+      ]
+    },
+    "BTC/USDT": {
+      "trades_aligned": 56,
+      "mfe_mean": 0.0019625821874786897,
+      "mae_mean": -0.0019006425368810476,
+      "exit_return_mean": -0.0007213765449389786,
+      "post_exit_max_return_mean": 0.004697643565661503,
+      "post_exit_min_return_mean": -0.007152606656664383,
+      "exit_reason_stats": [
+        {
+          "exit_reason": "prob_floor",
+          "exit_return_pct": -0.000969343932669009,
+          "post_exit_max_return_pct": 0.0029348829131360943,
+          "post_exit_min_return_pct": -0.004272530739638014
+        },
+        {
+          "exit_reason": "take_profit",
+          "exit_return_pct": 0.0002704930059811428,
+          "post_exit_max_return_pct": 0.0016916316069792714,
+          "post_exit_min_return_pct": -0.018152338917255983
+        },
+        {
+          "exit_reason": "dry_run",
+          "exit_return_pct": NaN,
+          "post_exit_max_return_pct": 0.0019625821874786897,
+          "post_exit_min_return_pct": -0.0019006425368810476
+        },
+        {
+          "exit_reason": "turnover_limit",
+          "exit_return_pct": NaN,
+          "post_exit_max_return_pct": 0.004953485884600837,
+          "post_exit_min_return_pct": -0.007268057367210328
+        }
+      ]
+    },
+    "SOL/USDT": {
+      "trades_aligned": 76,
+      "mfe_mean": 0.003633361838659299,
+      "mae_mean": -0.002270831416071717,
+      "exit_return_mean": 0.0001458919991257579,
+      "post_exit_max_return_mean": 0.0024516930606227265,
+      "post_exit_min_return_mean": -0.003340412944889192,
+      "exit_reason_stats": [
+        {
+          "exit_reason": "gate_close",
+          "exit_return_pct": -0.00024338793639488987,
+          "post_exit_max_return_pct": 0.0038950079615801547,
+          "post_exit_min_return_pct": -0.001986268807900482
+        },
+        {
+          "exit_reason": "take_profit",
+          "exit_return_pct": 0.0004054119561395231,
+          "post_exit_max_return_pct": 0.0032173415973765587,
+          "post_exit_min_return_pct": -0.0027816954352057146
+        },
+        {
+          "exit_reason": "dry_run",
+          "exit_return_pct": NaN,
+          "post_exit_max_return_pct": 0.0036496416381992525,
+          "post_exit_min_return_pct": -0.0022303160927317767
+        },
+        {
+          "exit_reason": "turnover_limit",
+          "exit_return_pct": NaN,
+          "post_exit_max_return_pct": 0.002341845632110706,
+          "post_exit_min_return_pct": -0.003436132285575318
+        }
+      ]
+    }
+  },
+  "recommendations": [
+    "ETH/USDT exit_reason=dry_run insufficient data for regret; review exit logic.",
+    "ETH/USDT exit_reason=turnover_limit insufficient data for regret; review exit logic.",
+    "BTC/USDT exit_reason=prob_floor shows negative exit return but positive post-exit drift (0.0029); consider relaxing/retiming exits.",
+    "BTC/USDT exit_reason=dry_run insufficient data for regret; review exit logic.",
+    "BTC/USDT exit_reason=turnover_limit insufficient data for regret; review exit logic.",
+    "SOL/USDT exit_reason=gate_close shows negative exit return but positive post-exit drift (0.0039); consider relaxing/retiming exits.",
+    "SOL/USDT exit_reason=dry_run insufficient data for regret; review exit logic.",
+    "SOL/USDT exit_reason=turnover_limit insufficient data for regret; review exit logic."
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "symbols": [
+    "ETH/USDT"
+  ],
+  "per_symbol": {
+    "ETH/USDT": {
+      "trades": 1,
+      "executed": 1,
+      "pnl": 0.0,
+      "win_rate": 0.0,
+      "avg_win": null,
+      "avg_loss": null,
+      "profit_factor": null,
+      "median_hold_min": null,
+      "exit_reasons": [
+        [
+          "dry_run",
+          1
+        ]
+      ],
+      "skip_reasons": [
+        [
+          "dry_run",
+          1
+        ]
+      ],
+      "gate_failures": 0
+    }
+  },
+  "portfolio": {
+    "trades": 1,
+    "executed": 1,
+    "pnl": 0.0,
+    "win_rate": 0.0,
+    "avg_win": null,
+    "avg_loss": null,
+    "profit_factor": null,
+    "median_hold_min": null,
+    "exit_reasons": [
+      [
+        "dry_run",
+        1
+      ]
+    ],
+    "skip_reasons": [
+      [
+        "dry_run",
+        1
+      ]
+    ],
+    "gate_failures": 0,
+    "max_drawdown": 0.0
+  },
+  "equity_curve": [
+    {
+      "ts": "2025-12-18T03:40:00+00:00",
+      "equity": 0.0,
+      "drawdown": 0.0
+    }
+  ]
+}

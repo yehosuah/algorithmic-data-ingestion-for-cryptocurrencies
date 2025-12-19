@@ -1,0 +1,216 @@
+{
+  "per_symbol": {
+    "ETH/USDT": {
+      "trades_aligned": 557,
+      "mfe_mean": 0.05214420723795185,
+      "mae_mean": -0.05616237865388215,
+      "exit_return_mean": -0.001282883835587448,
+      "post_exit_max_return_mean": 0.06278117022180663,
+      "post_exit_min_return_mean": -0.05246064867901232,
+      "exit_reason_stats": [
+        {
+          "exit_reason": "time_limit",
+          "exit_return_pct": -0.008060735593747684,
+          "post_exit_max_return_pct": 0.06828826542885036,
+          "post_exit_min_return_pct": -0.048272154296193616
+        },
+        {
+          "exit_reason": "prob_floor",
+          "exit_return_pct": -0.0054789367458187,
+          "post_exit_max_return_pct": 0.07382003836863177,
+          "post_exit_min_return_pct": -0.044764680984683676
+        },
+        {
+          "exit_reason": "trailing_prob_drop",
+          "exit_return_pct": -0.003999543688392872,
+          "post_exit_max_return_pct": 0.002620666452813664,
+          "post_exit_min_return_pct": -0.04788004793903331
+        },
+        {
+          "exit_reason": "gate_close",
+          "exit_return_pct": -0.0012522254751563668,
+          "post_exit_max_return_pct": 0.005234510568364239,
+          "post_exit_min_return_pct": -0.018633867123697176
+        },
+        {
+          "exit_reason": "cooldown_after_exit",
+          "exit_return_pct": 0.0,
+          "post_exit_max_return_pct": 0.00423417435706433,
+          "post_exit_min_return_pct": -0.02686394959768315
+        },
+        {
+          "exit_reason": "cooldown_after_loss",
+          "exit_return_pct": 0.0,
+          "post_exit_max_return_pct": 0.13462978794870326,
+          "post_exit_min_return_pct": -0.04533438801990445
+        },
+        {
+          "exit_reason": "dry_run",
+          "exit_return_pct": 0.0,
+          "post_exit_max_return_pct": 0.023990280251372474,
+          "post_exit_min_return_pct": -0.03148322331415934
+        },
+        {
+          "exit_reason": "turnover_limit",
+          "exit_return_pct": 0.0,
+          "post_exit_max_return_pct": 0.07399974654742003,
+          "post_exit_min_return_pct": -0.05983826917285468
+        },
+        {
+          "exit_reason": "prob_trailing",
+          "exit_return_pct": 0.0002460507078414498,
+          "post_exit_max_return_pct": 0.011183640583388943,
+          "post_exit_min_return_pct": -0.0005347612647460531
+        },
+        {
+          "exit_reason": "take_profit",
+          "exit_return_pct": 0.0014107028034614651,
+          "post_exit_max_return_pct": 0.013105964205337606,
+          "post_exit_min_return_pct": -0.026563548220705387
+        }
+      ]
+    },
+    "BTC/USDT": {
+      "trades_aligned": 475,
+      "mfe_mean": 0.008312083786670763,
+      "mae_mean": -0.13993923887080342,
+      "exit_return_mean": -0.0022810615575788937,
+      "post_exit_max_return_mean": 0.009095268621473215,
+      "post_exit_min_return_mean": -0.08142220857894522,
+      "exit_reason_stats": [
+        {
+          "exit_reason": "time_limit",
+          "exit_return_pct": -0.01394003528370269,
+          "post_exit_max_return_pct": 0.003934033088144107,
+          "post_exit_min_return_pct": -0.0040811254312750345
+        },
+        {
+          "exit_reason": "prob_floor",
+          "exit_return_pct": -0.005548871722002193,
+          "post_exit_max_return_pct": 0.006451467612616215,
+          "post_exit_min_return_pct": -0.07748253791645313
+        },
+        {
+          "exit_reason": "trailing_prob_drop",
+          "exit_return_pct": -0.003047374510860218,
+          "post_exit_max_return_pct": 0.006135981318686803,
+          "post_exit_min_return_pct": -0.2018366060594832
+        },
+        {
+          "exit_reason": "gate_close",
+          "exit_return_pct": -0.0010852960674363576,
+          "post_exit_max_return_pct": 0.004401677036509458,
+          "post_exit_min_return_pct": -0.17152256640262303
+        },
+        {
+          "exit_reason": "cooldown_after_exit",
+          "exit_return_pct": 0.0,
+          "post_exit_max_return_pct": 0.0019061332737762005,
+          "post_exit_min_return_pct": -0.0030382899036577593
+        },
+        {
+          "exit_reason": "cooldown_after_loss",
+          "exit_return_pct": 0.0,
+          "post_exit_max_return_pct": 0.0030491075981229354,
+          "post_exit_min_return_pct": -0.0032452132267587475
+        },
+        {
+          "exit_reason": "dry_run",
+          "exit_return_pct": 0.0,
+          "post_exit_max_return_pct": 0.003903025975285246,
+          "post_exit_min_return_pct": -0.09474942796165575
+        },
+        {
+          "exit_reason": "turnover_limit",
+          "exit_return_pct": 0.0,
+          "post_exit_max_return_pct": 0.014956313670337243,
+          "post_exit_min_return_pct": -0.01792197186084414
+        },
+        {
+          "exit_reason": "prob_trailing",
+          "exit_return_pct": 0.0007327243489693713,
+          "post_exit_max_return_pct": 0.0038166268608453846,
+          "post_exit_min_return_pct": -0.0026129892232480967
+        },
+        {
+          "exit_reason": "take_profit",
+          "exit_return_pct": 0.0009117913033963721,
+          "post_exit_max_return_pct": 0.005903684911438711,
+          "post_exit_min_return_pct": -0.17098294167152633
+        }
+      ]
+    },
+    "SOL/USDT": {
+      "trades_aligned": 604,
+      "mfe_mean": 0.0030072364507608427,
+      "mae_mean": -0.008177680119079439,
+      "exit_return_mean": -0.0036556683315546717,
+      "post_exit_max_return_mean": 0.004621029209372983,
+      "post_exit_min_return_mean": -0.008181945822162412,
+      "exit_reason_stats": [
+        {
+          "exit_reason": "time_limit",
+          "exit_return_pct": -0.02798469440840523,
+          "post_exit_max_return_pct": 0.0055370347685813615,
+          "post_exit_min_return_pct": -0.0034227926922427154
+        },
+        {
+          "exit_reason": "prob_floor",
+          "exit_return_pct": -0.009476307715773633,
+          "post_exit_max_return_pct": 0.004018924908156326,
+          "post_exit_min_return_pct": -0.011482056535600884
+        },
+        {
+          "exit_reason": "gate_close",
+          "exit_return_pct": -0.0029835236219020716,
+          "post_exit_max_return_pct": 0.007026784021059635,
+          "post_exit_min_return_pct": -0.009124473204318473
+        },
+        {
+          "exit_reason": "trailing_prob_drop",
+          "exit_return_pct": -0.002783082358072984,
+          "post_exit_max_return_pct": 0.0012642589868608676,
+          "post_exit_min_return_pct": -0.010937530814338438
+        },
+        {
+          "exit_reason": "cooldown_after_exit",
+          "exit_return_pct": 0.0,
+          "post_exit_max_return_pct": 8.331944675887826e-05,
+          "post_exit_min_return_pct": -0.005832361273121145
+        },
+        {
+          "exit_reason": "dry_run",
+          "exit_return_pct": 0.0,
+          "post_exit_max_return_pct": 0.0036401482526104848,
+          "post_exit_min_return_pct": -0.006292660770627035
+        },
+        {
+          "exit_reason": "turnover_limit",
+          "exit_return_pct": 0.0,
+          "post_exit_max_return_pct": 0.00505770838848683,
+          "post_exit_min_return_pct": -0.005233333244693618
+        },
+        {
+          "exit_reason": "take_profit",
+          "exit_return_pct": 0.0001043687309724195,
+          "post_exit_max_return_pct": 0.004511101452433009,
+          "post_exit_min_return_pct": -0.007153964912006954
+        }
+      ]
+    }
+  },
+  "recommendations": [
+    "ETH/USDT exit_reason=time_limit shows negative exit return but positive post-exit drift (0.0683); consider relaxing/retiming exits.",
+    "ETH/USDT exit_reason=prob_floor shows negative exit return but positive post-exit drift (0.0738); consider relaxing/retiming exits.",
+    "ETH/USDT exit_reason=trailing_prob_drop shows negative exit return but positive post-exit drift (0.0026); consider relaxing/retiming exits.",
+    "ETH/USDT exit_reason=gate_close shows negative exit return but positive post-exit drift (0.0052); consider relaxing/retiming exits.",
+    "BTC/USDT exit_reason=time_limit shows negative exit return but positive post-exit drift (0.0039); consider relaxing/retiming exits.",
+    "BTC/USDT exit_reason=prob_floor shows negative exit return but positive post-exit drift (0.0065); consider relaxing/retiming exits.",
+    "BTC/USDT exit_reason=trailing_prob_drop shows negative exit return but positive post-exit drift (0.0061); consider relaxing/retiming exits.",
+    "BTC/USDT exit_reason=gate_close shows negative exit return but positive post-exit drift (0.0044); consider relaxing/retiming exits.",
+    "SOL/USDT exit_reason=time_limit shows negative exit return but positive post-exit drift (0.0055); consider relaxing/retiming exits.",
+    "SOL/USDT exit_reason=prob_floor shows negative exit return but positive post-exit drift (0.0040); consider relaxing/retiming exits.",
+    "SOL/USDT exit_reason=gate_close shows negative exit return but positive post-exit drift (0.0070); consider relaxing/retiming exits.",
+    "SOL/USDT exit_reason=trailing_prob_drop shows negative exit return but positive post-exit drift (0.0013); consider relaxing/retiming exits."
+  ]
+}
