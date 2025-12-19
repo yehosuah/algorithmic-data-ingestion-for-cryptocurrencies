@@ -1,8 +1,9 @@
 # Sanity Checks and Optional Improvements
 
-_Last updated: 2025-11-30 22:29 UTC_
+_Last updated: 2025-12-19 00:11 UTC_
 
-> Update 2025-11-30 22:29 UTC: Trimmed the checked-in parquet snapshots (regenerate via the scripts below), dropped `TRADING_SHADOW_SYMBOLS` so dry-runs exercise BTC/ETH/SOL as true primary entries (300 USDT notional, 10 bps spread guard), and lowered the runtime risk cooldowns to 1 minute after exits/5 minutes after losses in the stage-0 overrides.
+> Update 2025-12-19: Stage-0 dry-runs now use equity-fraction sizing (capital 100, base notionals 20/15/12 before scaling, `equity_fraction=0.2`, `max_equity_fraction=0.3`, `compounding_step_usd=5`, `max_total_notional=80`), per-symbol trigger overrides (lower exit thresholds, longer holds, `take_profit_pct=0.001`), and `cooldown_minutes_after_exit: 2` / `cooldown_minutes_after_loss: 5`; pair runs with the new profit forensics loop in `RUNBOOK_DRY_RUN_PROFIT.md`.
+> Update 2025-11-30 22:29 UTC: Trimmed the checked-in parquet snapshots (regenerate via the scripts below), dropped `TRADING_SHADOW_SYMBOLS` so dry-runs exercise BTC/ETH/SOL as true primary entries (300 USDT notional, 10 bps spread guard), and lowered the runtime risk cooldowns to 1 minute after exits/5 minutes after losses in the stage-0 overrides.
 > Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
 > Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
@@ -82,7 +83,7 @@ Check the generated JSON into `release/symbol_gates/` so CI + manifests inherit 
 ## Trading Dry Run Validation
 
 With manifests refreshed and the Docker stack running, validate the scheduler → Redis → trading loop:
-1. Before booting containers, confirm `TRADING_MODELS` matches the stage-0 ladder (BTC/ETH/SOL, `order_notional=300`, `max_spread_bps=10`, `shadow_mode=false`) and keep `TRADING_SHADOW_SYMBOLS=[]` so rehearsals exercise the real policy mix. Re-run `analysis.apply_launch_stage` if env files drifted, and verify `configs/runtime_overrides/risk_limits_stage_0.yaml` shows `cooldown_minutes_after_exit: 1` / `cooldown_minutes_after_loss: 5` so the tighter runtime risk cadence is active.
+1. Before booting containers, confirm `TRADING_MODELS` matches the stage-0 ladder (BTC/ETH/SOL, base notionals 20/15/12 before equity scaling, `max_spread_bps=15/20/22`, `take_profit_pct=0.001`, `max_hold_minutes=90`, min_hold overrides 6/5/5, `shadow_mode=false`) and keep `TRADING_SHADOW_SYMBOLS=[]` so rehearsals exercise the real policy mix. Re-run `analysis.apply_launch_stage` if env files drifted, and verify `configs/runtime_overrides/risk_limits_stage_0.yaml` shows `sizing_mode: equity_fraction` (`capital=100`, `equity_fraction=0.2`, `max_equity_fraction=0.3`, `compounding_step_usd=5`, `max_total_notional=80`) plus `cooldown_minutes_after_exit: 2` / `cooldown_minutes_after_loss: 5` so the updated runtime risk cadence is active.
 1. Run a quick trigger preflight before booting containers so dry-runs do not start with zero coverage: `python scripts/trigger_preflight.py --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml --policy configs/final_trigger_policy.yaml --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary --max-rows 5000`.
 1. Ensure `./experiments/perf_sweeps` is mounted (compose already does) and the promoted bundle exists at `experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary` (or whatever path your deployment contract references).
 1. Point `INFER_JOBS` to `configs/dry_run/infer_jobs_portfolio_policy.yaml` (or inline JSON) and restart `scheduler` so it reloads manifests from `MODELS_ROOT`; keep `TRADING_MODELS` aligned with the contract (`xgb_primary` on BTC/USDT, ETH/USDT, SOL/USDT; 1m; guard fields for spread/SL/TP/max hold).
@@ -122,6 +123,7 @@ With manifests refreshed and the Docker stack running, validate the scheduler �
    python scripts/verify_trading_redis.py
    ```
    Review the `trading:positions` hash and `trading:audit` stream for gate/trade entries.
+1. Capture run evidence and profit forensics per `RUNBOOK_DRY_RUN_PROFIT.md`: extract container logs/configs (`python -m scripts.extract_container_logs ...`), run audit forensics (`python -m analysis.trading_log_forensics ...`), then align trades vs OHLCV (`python -m analysis.market_trade_alignment ...`) so each rehearsal ships with PnL/equity/regret summaries under `reports/log_forensics/`.
 1. Grafana dashboards `scheduler-overview` and `trading-overview` visualise queue depth, coverage, trade attempts, and dry-run P&L; keep Prometheus alert rules green throughout the exercise.
 1. Export a parity slice and compare it with the sanitized training parquet before loosening gates:
    ```bash

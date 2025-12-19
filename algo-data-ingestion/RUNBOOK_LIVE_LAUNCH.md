@@ -1,7 +1,8 @@
 # Live Launch Ladder Runbook (ETH → BTC → SOL)
 
-_Last updated: 2025-12-17 00:30 UTC_
+_Last updated: 2025-12-19 00:11 UTC_
 
+> Update 2025-12-19: Stage-0 bundle now uses equity-fraction sizing (capital 100, base notionals 20/15/12, compounding step 5, per-symbol trigger overrides with longer holds) and the dry-run profit forensics loop (`RUNBOOK_DRY_RUN_PROFIT.md`) is available for post-rehearsal signoff.
 > Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
 
@@ -56,6 +57,7 @@ Top failure playbooks:
 6) Monitor metrics: Prometheus `9010` (`trade_count`, `coverage`, `deadlock_action_taken_total`, `trading_safe_mode_latched`, `trading_risk_blocked_total`, `trading_intent_ledger_state_total`, `trading_reconcile_runs_total`). Watch audit HMAC validity and Redis intent ledger health.  
 7) Run gate evaluation for the next stage (command above). Review `reports/launch_stage_eval_stage_N_*.md/.json` and deadlock drill output.  
 8) If status is GO, apply the next stage and repeat. If NO-GO, hold stage, fix issues, and re-evaluate.
+- After each rehearsal, capture a forensics bundle per `RUNBOOK_DRY_RUN_PROFIT.md` (extract container logs, run trading log forensics, align trades vs OHLCV) so approvals include PnL/regret evidence.
 
 ## Incident Playbooks
 - **Coverage deadlock / no trades**: Check `deadlock_action_taken_total`, `decision_coverage`, audit `deadlock_status`. Keep `TRADING_SAFE_MODE=1` if positions exist, apply next deadlock action from policy, or rollback stage.
