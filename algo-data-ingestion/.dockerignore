@@ -21,9 +21,6 @@ data_lake/
 **/data_lake/
 data_lake/**
 **/data_lake/**
-!data_lake/market/
-!data_lake/market/exchange=binance/**
-!data_lake/market/exchange=binance_ETH/USDT/**
 models
 models/
 **/models
@@ -34,6 +31,16 @@ models/**
 !models/base_xgb_cost_spread/**
 !models/tcn_h120_calmon_relaxed/**
 !models/blender_h120_v6/**
+experiments
+experiments/
+data
+data/
+reports
+reports/
+release
+release/
+logs
+logs/
 datasets
 datasets/
 **/datasets
