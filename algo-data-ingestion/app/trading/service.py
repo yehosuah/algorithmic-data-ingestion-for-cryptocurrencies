@@ -890,6 +890,86 @@ class TradingService:
             return None
         return notional
 
+    def _equity_scaled_notional(self, model_cfg: TradingModelConfig) -> Optional[float]:
+        limits = self.risk_limits or {}
+        mode = str(limits.get("sizing_mode") or "").lower()
+        if mode != "equity_fraction":
+            return model_cfg.order_notional
+        base_notional = model_cfg.order_notional or 0.0
+        if base_notional <= 0:
+            return None
+        try:
+            initial_capital = float(
+                limits.get("initial_capital_usd")
+                or limits.get("capital")
+                or self._risk_capital
+                or 0.0
+            )
+        except Exception:
+            initial_capital = self._risk_capital
+        equity = max(self._risk_equity, initial_capital)
+        scale = equity / initial_capital if initial_capital > 0 else 1.0
+        target = base_notional * scale
+        try:
+            equity_fraction = float(limits.get("equity_fraction") or 0.0)
+        except Exception:
+            equity_fraction = 0.0
+        try:
+            max_fraction = float(limits.get("max_equity_fraction") or equity_fraction or 0.0)
+        except Exception:
+            max_fraction = equity_fraction or 0.0
+        if max_fraction > 0:
+            target = min(target, equity * max_fraction)
+        try:
+            step_val = float(limits.get("compounding_step_usd") or 0.0)
+        except Exception:
+            step_val = 0.0
+        if step_val > 0:
+            target = math.floor(target / step_val) * step_val
+        min_notional = None
+        try:
+            min_notional = limits.get("min_trade_notional")
+        except Exception:
+            min_notional = None
+        try:
+            sym_min = ((limits.get("symbols") or {}).get(model_cfg.symbol, {}) or {}).get("min_trade_notional")
+            if sym_min is not None:
+                min_notional = sym_min
+        except Exception:
+            pass
+        if min_notional is not None:
+            try:
+                target = max(target, float(min_notional))
+            except Exception:
+                pass
+        per_symbol_cfg: Dict[str, object] = {}
+        try:
+            per_symbol_cfg = (limits.get("symbols") or {}).get(model_cfg.symbol, {}) or {}
+        except Exception:
+            per_symbol_cfg = {}
+        caps = [
+            per_symbol_cfg.get("max_symbol_notional"),
+            limits.get("max_notional_per_symbol_usd"),
+            limits.get("max_notional_per_symbol"),
+            limits.get("max_symbol_notional"),
+        ]
+        cap_val: Optional[float] = None
+        for cap in caps:
+            try:
+                if cap is not None and float(cap) > 0:
+                    cap_val = float(cap) if cap_val is None else min(cap_val, float(cap))
+            except Exception:
+                continue
+        if cap_val is not None:
+            target = min(target, cap_val)
+        try:
+            total_cap = float(limits.get("max_total_notional") or 0.0)
+            if total_cap > 0:
+                target = min(target, total_cap)
+        except Exception:
+            pass
+        return target
+
     def _prune_order_times(self, now: datetime) -> None:
         cutoff = now - timedelta(hours=1)
         while self._risk_order_times and self._risk_order_times[0] < cutoff:
@@ -1684,7 +1764,7 @@ class TradingService:
                     price=current_price,
                     item=item,
                 )
-                desired_notional = model_cfg.order_notional
+                desired_notional = self._equity_scaled_notional(model_cfg)
                 desired_qty = model_cfg.order_amount
                 if guard_active and notional_scale and notional_scale < 0.999:
                     if desired_notional is not None:
@@ -2894,12 +2974,40 @@ class TradingService:
             entry_threshold = 0.5
         if exit_threshold is None:
             exit_threshold = entry_threshold
+        metadata = artifacts.manifest.get("metadata") or {}
+        exit_prob_drop = float(metadata.get("exit_prob_drop", 0.15))
+        trigger_overrides = self.risk_limits.get("trigger_overrides") or {}
+        symbol_overrides: Dict[str, object] = {}
+        if symbol:
+            try:
+                symbol_overrides = (
+                    (self.risk_limits.get("symbols") or {}).get(symbol, {}) or {}
+                ).get("trigger_overrides") or {}
+            except Exception:
+                symbol_overrides = {}
+
+        def _override_value(key: str, value: float, cast: type = float) -> float:
+            raw = symbol_overrides.get(key)
+            if raw is None:
+                raw = trigger_overrides.get(key)
+            if raw is None:
+                return value
+            try:
+                return cast(raw)
+            except (TypeError, ValueError):
+                return value
+
+        entry_threshold = float(_override_value("entry_threshold", entry_threshold))
+        exit_threshold = float(_override_value("exit_threshold", exit_threshold))
+        exit_prob_drop = float(_override_value("exit_prob_drop", exit_prob_drop))
+        if exit_prob_drop < 0:
+            exit_prob_drop = 0.0
+        if exit_threshold > entry_threshold:
+            exit_threshold = entry_threshold
         override_key = symbol if symbol is not None else None
         if override_key is not None and override_key in self._prob_gate_overrides:
             entry_threshold = max(self._prob_gate_overrides[override_key], 0.0)
             exit_threshold = min(exit_threshold, entry_threshold) if exit_threshold is not None else entry_threshold
-        metadata = artifacts.manifest.get("metadata") or {}
-        exit_prob_drop = float(metadata.get("exit_prob_drop", 0.15))
         min_hold_raw = _resolve_symbol_value(infer_cfg.get("min_hold_bars"), symbol)
         try:
             min_hold_bars = int(min_hold_raw or 1)

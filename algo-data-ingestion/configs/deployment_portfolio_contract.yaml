@@ -94,7 +94,7 @@ live_invariants:
     - audit_run_id
     - audit_seq
 symbol_order_notional:
-  ETH/USDT: 80.0
-  BTC/USDT: 50.0
-  SOL/USDT: 40.0
+  ETH/USDT: 20.0
+  BTC/USDT: 15.0
+  SOL/USDT: 12.0
 intent_ledger_backend: redis
