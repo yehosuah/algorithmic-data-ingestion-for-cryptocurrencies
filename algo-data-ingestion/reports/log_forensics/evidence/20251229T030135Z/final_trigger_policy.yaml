@@ -1,0 +1,31 @@
+primary:
+  entry_threshold: 0.51
+  exit_threshold: 0.5
+  exit_prob_drop: 0.18
+  min_hold_bars: 8
+  max_hold_minutes: 90
+  stop_loss_pct: 0.005
+  take_profit_pct: 0.0
+  max_spread_bps: 8
+conservative:
+  entry_threshold: 0.56
+  exit_threshold: 0.54
+  exit_prob_drop: 0.15
+  min_hold_bars: 8
+  max_hold_minutes: 90
+  stop_loss_pct: 0.005
+  take_profit_pct: 0.0
+  max_spread_bps: 8
+aggressive:
+  entry_threshold: 0.48
+  exit_threshold: 0.47
+  exit_prob_drop: 0.15
+  min_hold_bars: 3
+  max_hold_minutes: 90
+  stop_loss_pct: 0.004
+  take_profit_pct: 0.0
+  max_spread_bps: 8
+meta:
+  generated_from: reports/expectancy_fix/final_verification.md
+  timeframe: 1m
+  active_policy: primary

@@ -1,0 +1,278 @@
+# HELP python_gc_objects_collected_total Objects collected during gc
+# TYPE python_gc_objects_collected_total counter
+python_gc_objects_collected_total{generation="0"} 93057.0
+python_gc_objects_collected_total{generation="1"} 10367.0
+python_gc_objects_collected_total{generation="2"} 105.0
+# HELP python_gc_objects_uncollectable_total Uncollectable objects found during GC
+# TYPE python_gc_objects_uncollectable_total counter
+python_gc_objects_uncollectable_total{generation="0"} 0.0
+python_gc_objects_uncollectable_total{generation="1"} 0.0
+python_gc_objects_uncollectable_total{generation="2"} 0.0
+# HELP python_gc_collections_total Number of times this generation was collected
+# TYPE python_gc_collections_total counter
+python_gc_collections_total{generation="0"} 1208.0
+python_gc_collections_total{generation="1"} 109.0
+python_gc_collections_total{generation="2"} 7.0
+# HELP python_info Python platform information
+# TYPE python_info gauge
+python_info{implementation="CPython",major="3",minor="11",patchlevel="14",version="3.11.14"} 1.0
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 2.181771264e+09
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 4.99908608e+08
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.76697657e+09
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 271.24
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 16.0
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1.048576e+06
+# HELP trading_gate_toggles_total Count of gate toggles recorded by the trading service.
+# TYPE trading_gate_toggles_total counter
+trading_gate_toggles_total{model="xgb_primary",state="open",symbol="BTC/USDT"} 83.0
+trading_gate_toggles_total{model="xgb_primary",state="closed",symbol="SOL/USDT"} 113.0
+trading_gate_toggles_total{model="xgb_primary",state="open",symbol="SOL/USDT"} 113.0
+trading_gate_toggles_total{model="xgb_primary",state="closed",symbol="BTC/USDT"} 82.0
+trading_gate_toggles_total{model="xgb_primary",state="closed",symbol="ETH/USDT"} 64.0
+trading_gate_toggles_total{model="xgb_primary",state="open",symbol="ETH/USDT"} 64.0
+# HELP trading_gate_toggles_created Count of gate toggles recorded by the trading service.
+# TYPE trading_gate_toggles_created gauge
+trading_gate_toggles_created{model="xgb_primary",state="open",symbol="BTC/USDT"} 1.7669766057791564e+09
+trading_gate_toggles_created{model="xgb_primary",state="closed",symbol="SOL/USDT"} 1.766976781099779e+09
+trading_gate_toggles_created{model="xgb_primary",state="open",symbol="SOL/USDT"} 1.766976901141309e+09
+trading_gate_toggles_created{model="xgb_primary",state="closed",symbol="BTC/USDT"} 1.7669774421456997e+09
+trading_gate_toggles_created{model="xgb_primary",state="closed",symbol="ETH/USDT"} 1.7669776217372668e+09
+trading_gate_toggles_created{model="xgb_primary",state="open",symbol="ETH/USDT"} 1.7669776815687532e+09
+# HELP trading_trade_attempts_total Number of trade submissions issued by the trading service.
+# TYPE trading_trade_attempts_total counter
+trading_trade_attempts_total{executed="yes",model="xgb_primary",side="buy",symbol="SOL/USDT"} 41.0
+trading_trade_attempts_total{executed="yes",model="xgb_primary",side="buy",symbol="BTC/USDT"} 38.0
+trading_trade_attempts_total{executed="yes",model="xgb_primary",side="sell",symbol="SOL/USDT"} 41.0
+trading_trade_attempts_total{executed="yes",model="xgb_primary",side="sell",symbol="BTC/USDT"} 37.0
+trading_trade_attempts_total{executed="yes",model="xgb_primary",side="sell",symbol="ETH/USDT"} 36.0
+trading_trade_attempts_total{executed="yes",model="xgb_primary",side="buy",symbol="ETH/USDT"} 36.0
+trading_trade_attempts_total{executed="no",model="xgb_primary",side="buy",symbol="BTC/USDT"} 1.0
+trading_trade_attempts_total{executed="no",model="xgb_primary",side="sell",symbol="ETH/USDT"} 1.0
+# HELP trading_trade_attempts_created Number of trade submissions issued by the trading service.
+# TYPE trading_trade_attempts_created gauge
+trading_trade_attempts_created{executed="yes",model="xgb_primary",side="buy",symbol="SOL/USDT"} 1.7669766047051053e+09
+trading_trade_attempts_created{executed="yes",model="xgb_primary",side="buy",symbol="BTC/USDT"} 1.7669766065573213e+09
+trading_trade_attempts_created{executed="yes",model="xgb_primary",side="sell",symbol="SOL/USDT"} 1.766976781751427e+09
+trading_trade_attempts_created{executed="yes",model="xgb_primary",side="sell",symbol="BTC/USDT"} 1.7669775026809695e+09
+trading_trade_attempts_created{executed="yes",model="xgb_primary",side="sell",symbol="ETH/USDT"} 1.7669780422062392e+09
+trading_trade_attempts_created{executed="yes",model="xgb_primary",side="buy",symbol="ETH/USDT"} 1.766978162816622e+09
+trading_trade_attempts_created{executed="no",model="xgb_primary",side="buy",symbol="BTC/USDT"} 1.766981463158853e+09
+trading_trade_attempts_created{executed="no",model="xgb_primary",side="sell",symbol="ETH/USDT"} 1.7669922019822624e+09
+# HELP trading_trade_notional_total Total notional value routed through the trading service, bucketed by execution outcome.
+# TYPE trading_trade_notional_total counter
+trading_trade_notional_total{executed="yes",model="xgb_primary",side="buy",symbol="SOL/USDT"} 737.0926000000001
+trading_trade_notional_total{executed="yes",model="xgb_primary",side="buy",symbol="BTC/USDT"} 638.906488
+trading_trade_notional_total{executed="yes",model="xgb_primary",side="sell",symbol="SOL/USDT"} 736.8897000000002
+trading_trade_notional_total{executed="yes",model="xgb_primary",side="sell",symbol="BTC/USDT"} 478.8489200000001
+trading_trade_notional_total{executed="yes",model="xgb_primary",side="sell",symbol="ETH/USDT"} 861.1916200000001
+trading_trade_notional_total{executed="yes",model="xgb_primary",side="buy",symbol="ETH/USDT"} 863.5028199999999
+# HELP trading_trade_notional_created Total notional value routed through the trading service, bucketed by execution outcome.
+# TYPE trading_trade_notional_created gauge
+trading_trade_notional_created{executed="yes",model="xgb_primary",side="buy",symbol="SOL/USDT"} 1.7669766047051182e+09
+trading_trade_notional_created{executed="yes",model="xgb_primary",side="buy",symbol="BTC/USDT"} 1.7669766065574288e+09
+trading_trade_notional_created{executed="yes",model="xgb_primary",side="sell",symbol="SOL/USDT"} 1.7669767817515953e+09
+trading_trade_notional_created{executed="yes",model="xgb_primary",side="sell",symbol="BTC/USDT"} 1.766977502681004e+09
+trading_trade_notional_created{executed="yes",model="xgb_primary",side="sell",symbol="ETH/USDT"} 1.7669780422062578e+09
+trading_trade_notional_created{executed="yes",model="xgb_primary",side="buy",symbol="ETH/USDT"} 1.76697816281666e+09
+# HELP trading_realized_pnl_total Cumulative realized P&L (quote currency) for completed positions.
+# TYPE trading_realized_pnl_total gauge
+trading_realized_pnl_total{model="xgb_primary",symbol="SOL/USDT"} -0.2028999999999958
+trading_realized_pnl_total{model="xgb_primary",symbol="BTC/USDT"} -0.3308670000000042
+trading_realized_pnl_total{model="xgb_primary",symbol="ETH/USDT"} -0.027800000000019316
+# HELP trading_position_active Whether the trading service currently holds an open position (1=yes, 0=no).
+# TYPE trading_position_active gauge
+trading_position_active{model="xgb_primary",symbol="SOL/USDT"} 0.0
+trading_position_active{model="xgb_primary",symbol="ETH/USDT"} 1.0
+trading_position_active{model="xgb_primary",symbol="BTC/USDT"} 1.0
+# HELP trading_decision_queue_depth Depth of the Redis decision queue consumed by the trading service.
+# TYPE trading_decision_queue_depth gauge
+trading_decision_queue_depth{queue="trading:decisions"} 0.0
+# HELP trading_gate_coverage_ratio Share of decisions that passed gate checks per symbol.
+# TYPE trading_gate_coverage_ratio gauge
+trading_gate_coverage_ratio{model="xgb_primary",symbol="SOL/USDT"} 0.29791894852135814
+trading_gate_coverage_ratio{model="xgb_primary",symbol="ETH/USDT"} 0.5425149700598803
+trading_gate_coverage_ratio{model="xgb_primary",symbol="BTC/USDT"} 0.22172452407614782
+# HELP trading_decisions_total Number of decisions consumed by the trading service, labeled by gate outcome.
+# TYPE trading_decisions_total counter
+trading_decisions_total{gate_pass="yes",model="xgb_primary",symbol="SOL/USDT"} 272.0
+trading_decisions_total{gate_pass="yes",model="xgb_primary",symbol="ETH/USDT"} 453.0
+trading_decisions_total{gate_pass="yes",model="xgb_primary",symbol="BTC/USDT"} 198.0
+trading_decisions_total{gate_pass="no",model="xgb_primary",symbol="SOL/USDT"} 641.0
+trading_decisions_total{gate_pass="no",model="xgb_primary",symbol="BTC/USDT"} 695.0
+trading_decisions_total{gate_pass="no",model="xgb_primary",symbol="ETH/USDT"} 382.0
+# HELP trading_decisions_created Number of decisions consumed by the trading service, labeled by gate outcome.
+# TYPE trading_decisions_created gauge
+trading_decisions_created{gate_pass="yes",model="xgb_primary",symbol="SOL/USDT"} 1.7669766008827312e+09
+trading_decisions_created{gate_pass="yes",model="xgb_primary",symbol="ETH/USDT"} 1.7669766050875578e+09
+trading_decisions_created{gate_pass="yes",model="xgb_primary",symbol="BTC/USDT"} 1.7669766057785118e+09
+trading_decisions_created{gate_pass="no",model="xgb_primary",symbol="SOL/USDT"} 1.766976780804624e+09
+trading_decisions_created{gate_pass="no",model="xgb_primary",symbol="BTC/USDT"} 1.7669774418515542e+09
+trading_decisions_created{gate_pass="no",model="xgb_primary",symbol="ETH/USDT"} 1.7669776214650958e+09
+# HELP trading_would_trade_total Number of times the service decided to enter/exit (pre-execution).
+# TYPE trading_would_trade_total counter
+trading_would_trade_total{model="xgb_primary",side="buy",symbol="SOL/USDT"} 78.0
+trading_would_trade_total{model="xgb_primary",side="buy",symbol="BTC/USDT"} 71.0
+trading_would_trade_total{model="xgb_primary",side="sell",symbol="SOL/USDT"} 41.0
+trading_would_trade_total{model="xgb_primary",side="sell",symbol="BTC/USDT"} 37.0
+trading_would_trade_total{model="xgb_primary",side="sell",symbol="ETH/USDT"} 37.0
+trading_would_trade_total{model="xgb_primary",side="buy",symbol="ETH/USDT"} 51.0
+# HELP trading_would_trade_created Number of times the service decided to enter/exit (pre-execution).
+# TYPE trading_would_trade_created gauge
+trading_would_trade_created{model="xgb_primary",side="buy",symbol="SOL/USDT"} 1.7669766043556268e+09
+trading_would_trade_created{model="xgb_primary",side="buy",symbol="BTC/USDT"} 1.7669766060170372e+09
+trading_would_trade_created{model="xgb_primary",side="sell",symbol="SOL/USDT"} 1.7669767815013561e+09
+trading_would_trade_created{model="xgb_primary",side="sell",symbol="BTC/USDT"} 1.7669775024128015e+09
+trading_would_trade_created{model="xgb_primary",side="sell",symbol="ETH/USDT"} 1.7669780419494379e+09
+trading_would_trade_created{model="xgb_primary",side="buy",symbol="ETH/USDT"} 1.7669781625743027e+09
+# HELP trading_shadow_blocked_total Orders blocked at the executor boundary due to shadow mode.
+# TYPE trading_shadow_blocked_total counter
+# HELP trading_skips_by_reason_total Orders skipped or blocked, bucketed by reason.
+# TYPE trading_skips_by_reason_total counter
+trading_skips_by_reason_total{model="xgb_primary",reason="min_hold",symbol="SOL/USDT"} 22.0
+trading_skips_by_reason_total{model="xgb_primary",reason="cooldown_after_loss",symbol="BTC/USDT"} 29.0
+trading_skips_by_reason_total{model="xgb_primary",reason="min_hold",symbol="BTC/USDT"} 20.0
+trading_skips_by_reason_total{model="xgb_primary",reason="cooldown_after_exit",symbol="ETH/USDT"} 4.0
+trading_skips_by_reason_total{model="xgb_primary",reason="spread_too_wide",symbol="BTC/USDT"} 1.0
+trading_skips_by_reason_total{model="xgb_primary",reason="spread_too_wide",symbol="ETH/USDT"} 1.0
+trading_skips_by_reason_total{model="xgb_primary",reason="cooldown_after_loss",symbol="SOL/USDT"} 30.0
+trading_skips_by_reason_total{model="xgb_primary",reason="spread_threshold",symbol="BTC/USDT"} 1.0
+trading_skips_by_reason_total{model="xgb_primary",reason="cooldown_after_exit",symbol="SOL/USDT"} 7.0
+trading_skips_by_reason_total{model="xgb_primary",reason="cooldown_after_loss",symbol="ETH/USDT"} 10.0
+trading_skips_by_reason_total{model="xgb_primary",reason="spread_threshold",symbol="ETH/USDT"} 1.0
+trading_skips_by_reason_total{model="xgb_primary",reason="cooldown_after_exit",symbol="BTC/USDT"} 2.0
+trading_skips_by_reason_total{model="xgb_primary",reason="min_hold",symbol="ETH/USDT"} 1.0
+# HELP trading_skips_by_reason_created Orders skipped or blocked, bucketed by reason.
+# TYPE trading_skips_by_reason_created gauge
+trading_skips_by_reason_created{model="xgb_primary",reason="min_hold",symbol="SOL/USDT"} 1.7669779819310727e+09
+trading_skips_by_reason_created{model="xgb_primary",reason="cooldown_after_loss",symbol="BTC/USDT"} 1.7669786428464987e+09
+trading_skips_by_reason_created{model="xgb_primary",reason="min_hold",symbol="BTC/USDT"} 1.7669792420901978e+09
+trading_skips_by_reason_created{model="xgb_primary",reason="cooldown_after_exit",symbol="ETH/USDT"} 1.766979421737722e+09
+trading_skips_by_reason_created{model="xgb_primary",reason="spread_too_wide",symbol="BTC/USDT"} 1.7669796631959276e+09
+trading_skips_by_reason_created{model="xgb_primary",reason="spread_too_wide",symbol="ETH/USDT"} 1.7669797218757672e+09
+trading_skips_by_reason_created{model="xgb_primary",reason="cooldown_after_loss",symbol="SOL/USDT"} 1.766980201655887e+09
+trading_skips_by_reason_created{model="xgb_primary",reason="spread_threshold",symbol="BTC/USDT"} 1.7669814632142966e+09
+trading_skips_by_reason_created{model="xgb_primary",reason="cooldown_after_exit",symbol="SOL/USDT"} 1.766989321555885e+09
+trading_skips_by_reason_created{model="xgb_primary",reason="cooldown_after_loss",symbol="ETH/USDT"} 1.766989561761288e+09
+trading_skips_by_reason_created{model="xgb_primary",reason="spread_threshold",symbol="ETH/USDT"} 1.7669922022458951e+09
+trading_skips_by_reason_created{model="xgb_primary",reason="cooldown_after_exit",symbol="BTC/USDT"} 1.766996642309889e+09
+trading_skips_by_reason_created{model="xgb_primary",reason="min_hold",symbol="ETH/USDT"} 1.7670172217389545e+09
+# HELP trading_dedup_blocked_orders_total Orders blocked at submit-time due to duplicate intent ids.
+# TYPE trading_dedup_blocked_orders_total counter
+# HELP trading_reconcile_runs_total Number of reconciliation cycles executed.
+# TYPE trading_reconcile_runs_total counter
+# HELP trading_safe_mode_latched Current safe-mode latch state (1=latched).
+# TYPE trading_safe_mode_latched gauge
+# HELP trading_intent_ledger_state_total Counts of intent ledger state transitions.
+# TYPE trading_intent_ledger_state_total counter
+trading_intent_ledger_state_total{state="pending_submit"} 231.0
+trading_intent_ledger_state_total{state="filled"} 229.0
+trading_intent_ledger_state_total{state="rejected"} 2.0
+# HELP trading_intent_ledger_state_created Counts of intent ledger state transitions.
+# TYPE trading_intent_ledger_state_created gauge
+trading_intent_ledger_state_created{state="pending_submit"} 1.7669766044031177e+09
+trading_intent_ledger_state_created{state="filled"} 1.7669766047049568e+09
+trading_intent_ledger_state_created{state="rejected"} 1.7669814631588037e+09
+# HELP trading_risk_blocked_total Orders blocked by runtime risk checks, grouped by symbol and reason.
+# TYPE trading_risk_blocked_total counter
+trading_risk_blocked_total{reason="cooldown_after_loss",symbol="BTC/USDT"} 29.0
+trading_risk_blocked_total{reason="cooldown_after_exit",symbol="ETH/USDT"} 4.0
+trading_risk_blocked_total{reason="spread_too_wide",symbol="BTC/USDT"} 1.0
+trading_risk_blocked_total{reason="spread_too_wide",symbol="ETH/USDT"} 1.0
+trading_risk_blocked_total{reason="cooldown_after_loss",symbol="SOL/USDT"} 30.0
+trading_risk_blocked_total{reason="cooldown_after_exit",symbol="SOL/USDT"} 7.0
+trading_risk_blocked_total{reason="cooldown_after_loss",symbol="ETH/USDT"} 10.0
+trading_risk_blocked_total{reason="cooldown_after_exit",symbol="BTC/USDT"} 2.0
+# HELP trading_risk_blocked_created Orders blocked by runtime risk checks, grouped by symbol and reason.
+# TYPE trading_risk_blocked_created gauge
+trading_risk_blocked_created{reason="cooldown_after_loss",symbol="BTC/USDT"} 1.7669786428464139e+09
+trading_risk_blocked_created{reason="cooldown_after_exit",symbol="ETH/USDT"} 1.766979421737681e+09
+trading_risk_blocked_created{reason="spread_too_wide",symbol="BTC/USDT"} 1.7669796631958292e+09
+trading_risk_blocked_created{reason="spread_too_wide",symbol="ETH/USDT"} 1.7669797218757417e+09
+trading_risk_blocked_created{reason="cooldown_after_loss",symbol="SOL/USDT"} 1.7669802016548877e+09
+trading_risk_blocked_created{reason="cooldown_after_exit",symbol="SOL/USDT"} 1.7669893215556235e+09
+trading_risk_blocked_created{reason="cooldown_after_loss",symbol="ETH/USDT"} 1.766989561761259e+09
+trading_risk_blocked_created{reason="cooldown_after_exit",symbol="BTC/USDT"} 1.7669966423098621e+09
+# HELP trading_risk_clipped_total Orders clipped (size reduced) by runtime risk checks.
+# TYPE trading_risk_clipped_total counter
+trading_risk_clipped_total{clip_reason="exchange_qty_step",symbol="SOL/USDT"} 41.0
+trading_risk_clipped_total{clip_reason="exchange_qty_step",symbol="BTC/USDT"} 56.0
+trading_risk_clipped_total{clip_reason="exchange_qty_step",symbol="ETH/USDT"} 48.0
+# HELP trading_risk_clipped_created Orders clipped (size reduced) by runtime risk checks.
+# TYPE trading_risk_clipped_created gauge
+trading_risk_clipped_created{clip_reason="exchange_qty_step",symbol="SOL/USDT"} 1.766976604357029e+09
+trading_risk_clipped_created{clip_reason="exchange_qty_step",symbol="BTC/USDT"} 1.7669766060189161e+09
+trading_risk_clipped_created{clip_reason="exchange_qty_step",symbol="ETH/USDT"} 1.766978041950917e+09
+# HELP trading_portfolio_turnover_estimate Estimated turnover fraction of capital over the trailing window.
+# TYPE trading_portfolio_turnover_estimate gauge
+trading_portfolio_turnover_estimate{window="1d"} 21.84785163
+# HELP trading_portfolio_drawdown_pct Portfolio drawdown as a fraction of peak equity.
+# TYPE trading_portfolio_drawdown_pct gauge
+trading_portfolio_drawdown_pct 0.0052515836969115595
+# HELP trading_portfolio_daily_pnl_pct Realized daily P&L as a fraction of reference capital.
+# TYPE trading_portfolio_daily_pnl_pct gauge
+trading_portfolio_daily_pnl_pct -0.0028078350000000957
+# HELP trading_orders_per_hour Order submissions observed in the trailing 1h window.
+# TYPE trading_orders_per_hour gauge
+trading_orders_per_hour{symbol="*"} 10.0
+# HELP trading_concurrent_positions Number of concurrent open positions across symbols.
+# TYPE trading_concurrent_positions gauge
+trading_concurrent_positions 2.0
+# HELP trading_deadlock_coverage_ratio Rolling coverage ratio within the deadlock detector window.
+# TYPE trading_deadlock_coverage_ratio gauge
+trading_deadlock_coverage_ratio{model="xgb_primary",symbol="SOL/USDT",window="30m"} 0.4074074074074074
+trading_deadlock_coverage_ratio{model="xgb_primary",symbol="ETH/USDT",window="30m"} 0.52
+trading_deadlock_coverage_ratio{model="xgb_primary",symbol="BTC/USDT",window="30m"} 0.36
+# HELP trading_deadlock_prob_gate_ratio Rolling fraction of probabilities above the prob_gate_min threshold.
+# TYPE trading_deadlock_prob_gate_ratio gauge
+trading_deadlock_prob_gate_ratio{model="xgb_primary",symbol="SOL/USDT",window="30m"} 0.48148148148148145
+trading_deadlock_prob_gate_ratio{model="xgb_primary",symbol="ETH/USDT",window="30m"} 0.52
+trading_deadlock_prob_gate_ratio{model="xgb_primary",symbol="BTC/USDT",window="30m"} 0.36
+# HELP trading_deadlock_trade_count_window Trade attempts observed in the rolling deadlock window.
+# TYPE trading_deadlock_trade_count_window gauge
+trading_deadlock_trade_count_window{model="xgb_primary",symbol="SOL/USDT",window="30m"} 2.0
+trading_deadlock_trade_count_window{model="xgb_primary",symbol="ETH/USDT",window="30m"} 1.0
+trading_deadlock_trade_count_window{model="xgb_primary",symbol="BTC/USDT",window="30m"} 1.0
+# HELP trading_deadlock_portfolio_trades_window Portfolio-level trade attempts observed in the rolling window.
+# TYPE trading_deadlock_portfolio_trades_window gauge
+trading_deadlock_portfolio_trades_window{window="30m"} 4.0
+# HELP trading_deadlock_portfolio_coverage_ratio Average coverage ratio across symbols in the rolling window.
+# TYPE trading_deadlock_portfolio_coverage_ratio gauge
+trading_deadlock_portfolio_coverage_ratio{window="30m"} 0.4291358024691358
+# HELP trading_deadlock_blocked_by_reason_total Counts of blocked order attempts tracked by the deadlock detector.
+# TYPE trading_deadlock_blocked_by_reason_total counter
+trading_deadlock_blocked_by_reason_total{model="xgb_primary",reason="cooldown_after_loss",symbol="BTC/USDT"} 29.0
+trading_deadlock_blocked_by_reason_total{model="xgb_primary",reason="cooldown_after_exit",symbol="ETH/USDT"} 4.0
+trading_deadlock_blocked_by_reason_total{model="xgb_primary",reason="spread_too_wide",symbol="BTC/USDT"} 1.0
+trading_deadlock_blocked_by_reason_total{model="xgb_primary",reason="spread_too_wide",symbol="ETH/USDT"} 1.0
+trading_deadlock_blocked_by_reason_total{model="xgb_primary",reason="cooldown_after_loss",symbol="SOL/USDT"} 30.0
+trading_deadlock_blocked_by_reason_total{model="xgb_primary",reason="spread_threshold",symbol="BTC/USDT"} 2.0
+trading_deadlock_blocked_by_reason_total{model="xgb_primary",reason="cooldown_after_exit",symbol="SOL/USDT"} 7.0
+trading_deadlock_blocked_by_reason_total{model="xgb_primary",reason="cooldown_after_loss",symbol="ETH/USDT"} 10.0
+trading_deadlock_blocked_by_reason_total{model="xgb_primary",reason="spread_threshold",symbol="ETH/USDT"} 2.0
+trading_deadlock_blocked_by_reason_total{model="xgb_primary",reason="cooldown_after_exit",symbol="BTC/USDT"} 2.0
+# HELP trading_deadlock_blocked_by_reason_created Counts of blocked order attempts tracked by the deadlock detector.
+# TYPE trading_deadlock_blocked_by_reason_created gauge
+trading_deadlock_blocked_by_reason_created{model="xgb_primary",reason="cooldown_after_loss",symbol="BTC/USDT"} 1.7669786428465784e+09
+trading_deadlock_blocked_by_reason_created{model="xgb_primary",reason="cooldown_after_exit",symbol="ETH/USDT"} 1.766979421737754e+09
+trading_deadlock_blocked_by_reason_created{model="xgb_primary",reason="spread_too_wide",symbol="BTC/USDT"} 1.766979663195994e+09
+trading_deadlock_blocked_by_reason_created{model="xgb_primary",reason="spread_too_wide",symbol="ETH/USDT"} 1.766979721875822e+09
+trading_deadlock_blocked_by_reason_created{model="xgb_primary",reason="cooldown_after_loss",symbol="SOL/USDT"} 1.766980201656113e+09
+trading_deadlock_blocked_by_reason_created{model="xgb_primary",reason="spread_threshold",symbol="BTC/USDT"} 1.7669814631588879e+09
+trading_deadlock_blocked_by_reason_created{model="xgb_primary",reason="cooldown_after_exit",symbol="SOL/USDT"} 1.7669893215562277e+09
+trading_deadlock_blocked_by_reason_created{model="xgb_primary",reason="cooldown_after_loss",symbol="ETH/USDT"} 1.7669895617613146e+09
+trading_deadlock_blocked_by_reason_created{model="xgb_primary",reason="spread_threshold",symbol="ETH/USDT"} 1.766992201982335e+09
+trading_deadlock_blocked_by_reason_created{model="xgb_primary",reason="cooldown_after_exit",symbol="BTC/USDT"} 1.7669966423099244e+09
+# HELP trading_deadlock_action_taken_total Deadlock mitigation actions executed by the trading service.
+# TYPE trading_deadlock_action_taken_total counter

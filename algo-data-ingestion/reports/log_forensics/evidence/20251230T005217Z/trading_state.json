@@ -1,0 +1,59 @@
+{
+  "positions": {
+    "binance:xgb_primary:BTC/USDT": {
+      "bars_in_position": 0,
+      "entry_ts": null,
+      "hold_until": null,
+      "in_position": false,
+      "last_exit_ts": null,
+      "last_gate": true,
+      "last_probability": 0.5088735888221048,
+      "last_timestamp": "2025-12-30T00:51:00+00:00",
+      "metadata": {
+        "entry_filter_blocked_at": "2025-12-30T00:40:00+00:00",
+        "last_entry_reason": "entry_filter_macd",
+        "last_entry_trigger": "entry_filter_macd"
+      }
+    },
+    "binance:xgb_primary:ETH/USDT": {
+      "bars_in_position": 7,
+      "entry_ts": "2025-12-30T00:44:00+00:00",
+      "hold_until": "2025-12-30T00:59:00+00:00",
+      "in_position": true,
+      "last_exit_ts": null,
+      "last_gate": true,
+      "last_probability": 0.7577704186827607,
+      "last_timestamp": "2025-12-30T00:51:00+00:00",
+      "metadata": {
+        "entry_filter_blocked_at": "2025-12-30T00:43:00+00:00",
+        "last_entry_reason": "dry_run",
+        "last_entry_spread_bps": "0.0341",
+        "last_entry_trigger": "entry_filter_rsi",
+        "open_amount": "0.0100000000",
+        "open_entry_prob": "0.7705444093",
+        "open_peak_price": "2937.6900000000",
+        "open_price": "2935.9400000000",
+        "open_side": "long"
+      }
+    },
+    "binance:xgb_primary:SOL/USDT": {
+      "bars_in_position": 12,
+      "entry_ts": "2025-12-30T00:38:00+00:00",
+      "hold_until": "2025-12-30T00:53:00+00:00",
+      "in_position": true,
+      "last_exit_ts": null,
+      "last_gate": true,
+      "last_probability": 0.7865885730177826,
+      "last_timestamp": "2025-12-30T00:51:00+00:00",
+      "metadata": {
+        "last_entry_reason": "dry_run",
+        "last_entry_spread_bps": "0.8129",
+        "open_amount": "0.1600000000",
+        "open_entry_prob": "0.7496490713",
+        "open_peak_price": "123.0900000000",
+        "open_price": "123.0200000000",
+        "open_side": "long"
+      }
+    }
+  }
+}

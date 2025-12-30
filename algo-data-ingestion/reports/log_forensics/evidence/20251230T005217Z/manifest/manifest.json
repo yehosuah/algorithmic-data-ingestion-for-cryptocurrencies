@@ -1,0 +1,29 @@
+{
+  "model_path": "model.json",
+  "calibrator_path": "calibrator.joblib",
+  "feature_list_path": "feature_list.json",
+  "apply_calibration": true,
+  "threshold": {
+    "value": 0.47,
+    "path": "threshold.json"
+  },
+  "report_path": "report.json",
+  "gates": {
+    "prob_column": "base_prob",
+    "inference": {
+      "prob_gate_min": {
+        "default": 0.48,
+        "BTC/USDT": 0.56
+      },
+      "long_only": true,
+      "min_hold_bars": 3,
+      "rvol20_max": 0.002
+    }
+  },
+  "metadata": {
+    "model_type": "xgboost_classifier",
+    "calibrated": true,
+    "apply_calibration": true,
+    "exit_prob_drop": 0.1
+  }
+}

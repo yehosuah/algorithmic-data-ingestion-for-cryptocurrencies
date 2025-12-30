@@ -1,0 +1,36 @@
+primary:
+  entry_threshold: 0.48
+  exit_threshold: 0.46
+  exit_prob_drop: 0.07
+  min_hold_bars: 4
+  max_hold_minutes: 90
+  stop_loss_pct: 0.006
+  take_profit_pct: 0.002
+  max_spread_bps: 10
+conservative:
+  entry_threshold: 0.48
+  exit_threshold: 0.46
+  exit_prob_drop: 0.07
+  min_hold_bars: 4
+  max_hold_minutes: 90
+  stop_loss_pct: 0.006
+  take_profit_pct: 0.002
+  max_spread_bps: 10
+aggressive:
+  entry_threshold: 0.47
+  exit_threshold: 0.45
+  exit_prob_drop: 0.07
+  min_hold_bars: 4
+  max_hold_minutes: 90
+  stop_loss_pct: 0.006
+  take_profit_pct: 0.002
+  max_spread_bps: 10
+meta:
+  generated_from: experiments/trigger_sweeps/eth_live/results.csv
+  symbol: ETH/USDT
+  timeframe: 1m
+  constraints:
+    min_trades: 100
+    fraction_time_in_position_min: 0.01
+    max_drawdown_limit: 3000
+  active_policy: primary

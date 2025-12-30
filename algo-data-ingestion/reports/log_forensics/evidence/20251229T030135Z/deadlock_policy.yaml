@@ -1,0 +1,15 @@
+enabled: true
+window_minutes: 30
+min_trades_window: 1
+min_coverage_ratio_window: 0.02
+cooldown_minutes: 45
+max_actions_per_day: 2
+audit_every_action: true
+adjust_prob_gate_min:
+  step: 0.02
+  floor: 0.5
+actions:
+- adjust_prob_gate_min:
+    step: 0.02
+    floor: 0.5
+- enter_safe_mode: true

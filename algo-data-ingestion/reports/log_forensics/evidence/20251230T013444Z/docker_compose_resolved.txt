@@ -1,0 +1,411 @@
+name: algo-data-ingestion
+services:
+  grafana:
+    build:
+      context: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion
+      dockerfile: Dockerfile.grafana
+    depends_on:
+      prometheus:
+        condition: service_started
+        required: true
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 3000
+        published: "3000"
+        protocol: tcp
+    restart: unless-stopped
+  ingestion-api:
+    build:
+      context: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion
+      dockerfile: Dockerfile
+      args:
+        INSTALL_ML: "1"
+    command:
+      - uvicorn
+      - app.ingestion_service.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --workers
+      - "1"
+    depends_on:
+      redis:
+        condition: service_healthy
+        required: true
+    environment:
+      ADMIN_TOKEN: supersecret
+      BACKFILL_ENABLED: "true"
+      BACKFILL_EXCHANGE: binance
+      BACKFILL_INTERVAL_SEC: "300"
+      BACKFILL_LOOKBACK_MIN: "120"
+      BACKFILL_SYMBOLS: BTC/USDT,ETH/USDT
+      BACKFILL_TIMEFRAMES: 1m
+      CORS_ORIGINS: '["*"]'
+      COVALENT_API_KEY: cqt_rQXC7JtWFmdTPTMHmb4mtM78fgXV
+      DATA_LAKE_PATH: ./data_lake
+      DECISION_QUEUE_KEY: trading:decisions
+      DECISION_QUEUE_URL: redis://redis:6379/0
+      EXCHANGE_API_KEY: ""
+      EXCHANGE_API_SECRET: ""
+      EXCHANGE_NAME: binance
+      EXCHANGE_SANDBOX_MODE: "0"
+      FEATURE_NAMESPACE: features
+      FEATURE_TTL_SEC: "3600"
+      GLASSNODE_API_KEY: your_glassnode_key_here
+      HF_HOME: /app/.cache/huggingface
+      INGEST_HOST: 0.0.0.0
+      INGEST_PORT: "8000"
+      LOG_LEVEL: INFO
+      MARKET_PATH: data_lake/market
+      METRICS_PATH: /metrics
+      ML_MAX_WORKERS: "4"
+      ML_SENTIMENT_ENABLED: "1"
+      NEWS_API_KEY: your_crypto_news_api_key_here
+      NEWS_PATH: data_lake/news
+      ONCHAIN_PATH: data_lake/onchain
+      REDDIT_CLIENT_ID: MrrsuHZBgyc1b3SlBBd3yQ
+      REDDIT_CLIENT_SECRET: HHzynTCRMLrj88enVP0YGI9o_kfGDw
+      REDDIT_USER_AGENT: AlgoDataIngestion/0.1
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_URL: redis://redis:6379/0
+      SENTIMENT_MODEL_ID: distilbert/distilbert-base-uncased-finetuned-sst-2-english
+      SOCIAL_PATH: data_lake/social
+      SOCIAL_SENTIMENT_ENRICH: "0"
+      TRADING_AUDIT_BACKEND: redis
+      TRADING_AUDIT_HMAC_KEY: 2d998acf5c92606d8b2067d18336cce844dca2de380c4eb926da75c72195e4e8
+      TRADING_AUDIT_MAXLEN: "50000"
+      TRADING_AUDIT_REDIS_URL: redis://redis:6379/0
+      TRADING_AUDIT_STREAM: trading:audit
+      TRADING_DRY_RUN: "1"
+      TRADING_METRICS_PORT: "9010"
+      TRADING_MODELS: '[{"model":"base_xgb_cost_spread","symbol":"BTC/USDT","order_notional":100.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"base_xgb_cost_spread","symbol":"ETH/USDT","order_notional":100.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"base_xgb_cost_spread","symbol":"SOL/USDT","order_notional":100.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"tcn_h120_calmon_relaxed","symbol":"BTC/USDT","order_notional":100.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"tcn_h120_calmon_relaxed","symbol":"ETH/USDT","order_notional":100.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"tcn_h120_calmon_relaxed","symbol":"SOL/USDT","order_notional":100.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"blender_h120_v6","symbol":"BTC/USDT","order_notional":50.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"blender_h120_v6","symbol":"ETH/USDT","order_notional":50.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"blender_h120_v6","symbol":"SOL/USDT","order_notional":50.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007}]'
+      TRADING_STATE_BACKEND: redis
+      TRADING_STATE_REDIS_HASH: trading:positions
+      TRADING_STATE_REDIS_URL: redis://redis:6379/0
+      TTL_SWEEP_ENABLED: "true"
+      TTL_SWEEP_INTERVAL_SEC: "600"
+      TWITTER_API_KEY: your_key_here
+      TWITTER_API_SECRET: your_secret_here
+      TWITTER_BEARER: your_bearer_here
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8000
+        published: "8000"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/data_lake
+        target: /app/data_lake
+        bind:
+          create_host_path: true
+      - type: volume
+        source: hf-cache
+        target: /app/.cache/huggingface
+        volume: {}
+  prometheus:
+    build:
+      context: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion
+      dockerfile: Dockerfile.prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    depends_on:
+      ingestion-api:
+        condition: service_started
+        required: true
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9090
+        published: "9090"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: prometheus-data
+        target: /prometheus
+        volume: {}
+  redis:
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      timeout: 5s
+      interval: 10s
+      retries: 5
+    image: redis:7
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 6379
+        published: "6379"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: redis-data
+        target: /data
+        volume: {}
+  redis-exporter:
+    command:
+      - --redis.addr=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+        required: true
+    image: oliver006/redis_exporter:v1.62.0
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9121
+        published: "9121"
+        protocol: tcp
+    restart: unless-stopped
+  scheduler:
+    build:
+      context: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion
+      dockerfile: Dockerfile
+      args:
+        INSTALL_ML: "1"
+    command:
+      - python
+      - -m
+      - app.scheduler.main
+    depends_on:
+      ingestion-api:
+        condition: service_started
+        required: true
+    environment:
+      ADMIN_TOKEN: supersecret
+      API_BASE_URL: http://ingestion-api:8000
+      BACKFILL_ENABLED: "true"
+      BACKFILL_EXCHANGE: binance
+      BACKFILL_INTERVAL_SEC: "300"
+      BACKFILL_LOOKBACK_MIN: "120"
+      BACKFILL_SYMBOLS: BTC/USDT,ETH/USDT
+      BACKFILL_TIMEFRAMES: 1m
+      CORS_ORIGINS: '["*"]'
+      COVALENT_API_KEY: cqt_rQXC7JtWFmdTPTMHmb4mtM78fgXV
+      DATA_LAKE_PATH: ./data_lake
+      DATA_LAKE_ROOT: /app/data_lake/market
+      DECISION_QUEUE_KEY: trading:decisions
+      DECISION_QUEUE_URL: redis://redis:6379/0
+      EXCHANGE_API_KEY: yP494l3XW9Okjh6qiRUKVvetDPlY6YPDDaMOV8cDq7vujH7xsTpoAH6FsYQBDG7i
+      EXCHANGE_API_SECRET: aUiUjIREJkQWwM7sitE1ca5xxTDPUnQY7malfU1kkpLIGOh2Dxu3KsMSJJjpbpn2
+      EXCHANGE_NAME: binance
+      EXCHANGE_SANDBOX_MODE: "0"
+      GLASSNODE_API_KEY: your_glassnode_key_here
+      INFER_APPLY_CALIBRATION: "1"
+      INFER_DEFAULT_STRIDE: "1"
+      INFER_HISTORY_MARGIN_MIN: "30"
+      INFER_JOBS: '[ {"job_id":"portfolio_policy_primary","exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":60,"history_minutes":120,"base_model":"xgb_primary","base_path":"base_xgb_h120_calmon_spread0","stride":1,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *","policy_id":"primary","shadow_mode":false,"max_decision_items":1}, {"job_id":"portfolio_policy_primary_btc","exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":60,"history_minutes":120,"base_model":"xgb_primary","base_path":"base_xgb_h120_calmon_spread0","stride":1,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *","policy_id":"conservative","shadow_mode":false,"max_decision_items":1}, {"job_id":"portfolio_policy_primary_sol","exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":60,"history_minutes":120,"base_model":"xgb_primary","base_path":"base_xgb_h120_calmon_spread0","stride":1,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *","policy_id":"conservative","shadow_mode":false,"max_decision_items":1} ]'
+      INGEST_HOST: 0.0.0.0
+      INGEST_PORT: "8000"
+      LOG_LEVEL: INFO
+      MARKET_INGEST_JOBS: '[ {"exchange":"binance","symbol":"BTC/USDT","granularity":"1m","limit":360,"cron":"*/1 * * * *"}, {"exchange":"binance","symbol":"ETH/USDT","granularity":"1m","limit":360,"cron":"*/1 * * * *"}, {"exchange":"binance","symbol":"SOL/USDT","granularity":"1m","limit":360,"cron":"*/1 * * * *"} ]'
+      MARKET_JOBS: '[ {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":240,"cron":"*/5 * * * *"}, {"exchange":"binance","symbol":"BTC/USDT","timeframe":"5m","lookback_minutes":360,"cron":"*/15 * * * *"}, {"exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":240,"cron":"*/5 * * * *"}, {"exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":240,"cron":"*/5 * * * *"} ]'
+      MARKET_PATH: data_lake/market
+      METRICS_PATH: /metrics
+      MODELS_ROOT: /opt/models
+      NEWS_API_KEY: your_crypto_news_api_key_here
+      NEWS_PATH: data_lake/news
+      ONCHAIN_PATH: data_lake/onchain
+      REDDIT_CLIENT_ID: MrrsuHZBgyc1b3SlBBd3yQ
+      REDDIT_CLIENT_SECRET: HHzynTCRMLrj88enVP0YGI9o_kfGDw
+      REDDIT_USER_AGENT: AlgoDataIngestion/0.1
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      RUN_ON_START: "1"
+      SCHED_METRICS_PORT: "9002"
+      SCHED_TZ: UTC
+      SOCIAL_PATH: data_lake/social
+      TRADING_AUDIT_BACKEND: redis
+      TRADING_AUDIT_HMAC_KEY: 2d998acf5c92606d8b2067d18336cce844dca2de380c4eb926da75c72195e4e8
+      TRADING_AUDIT_MAXLEN: "50000"
+      TRADING_AUDIT_REDIS_URL: redis://redis:6379/0
+      TRADING_AUDIT_STREAM: trading:audit
+      TRADING_DRY_RUN: "1"
+      TRADING_METRICS_PORT: "9010"
+      TRADING_MODELS: '[{"model":"base_xgb_cost_spread","symbol":"BTC/USDT","order_notional":100.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"base_xgb_cost_spread","symbol":"ETH/USDT","order_notional":100.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"base_xgb_cost_spread","symbol":"SOL/USDT","order_notional":100.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"tcn_h120_calmon_relaxed","symbol":"BTC/USDT","order_notional":100.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"tcn_h120_calmon_relaxed","symbol":"ETH/USDT","order_notional":100.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"tcn_h120_calmon_relaxed","symbol":"SOL/USDT","order_notional":100.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"blender_h120_v6","symbol":"BTC/USDT","order_notional":50.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"blender_h120_v6","symbol":"ETH/USDT","order_notional":50.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007},{"model":"blender_h120_v6","symbol":"SOL/USDT","order_notional":50.0,"max_spread_bps":15.0,"max_hold_minutes":10,"take_profit_pct":0.007}]'
+      TRADING_STATE_BACKEND: redis
+      TRADING_STATE_REDIS_HASH: trading:positions
+      TRADING_STATE_REDIS_URL: redis://redis:6379/0
+      TTL_SWEEP_CRON: '*/15 * * * *'
+      TTL_SWEEP_ENABLED: "true"
+      TTL_SWEEP_INTERVAL_SEC: "600"
+      TTL_SWEEP_PATTERN: features:market:*
+      TTL_SWEEP_TTL: "3600"
+      TWITTER_API_KEY: your_key_here
+      TWITTER_API_SECRET: your_secret_here
+      TWITTER_BEARER: your_bearer_here
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS http://localhost:9002/metrics >/dev/null
+      timeout: 5s
+      interval: 30s
+      retries: 5
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9002
+        published: "9002"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/data_lake
+        target: /app/data_lake
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/experiments/perf_sweeps
+        target: /opt/models/perf_sweeps
+        bind:
+          create_host_path: true
+  trading:
+    build:
+      context: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion
+      dockerfile: Dockerfile
+      args:
+        INSTALL_ML: "1"
+    command:
+      - python
+      - -m
+      - app.trading.main
+    depends_on:
+      redis:
+        condition: service_healthy
+        required: true
+    environment:
+      ADMIN_TOKEN: supersecret
+      BACKFILL_ENABLED: "true"
+      BACKFILL_EXCHANGE: binance
+      BACKFILL_INTERVAL_SEC: "300"
+      BACKFILL_LOOKBACK_MIN: "120"
+      BACKFILL_SYMBOLS: BTC/USDT,ETH/USDT
+      BACKFILL_TIMEFRAMES: 1m
+      CORS_ORIGINS: '["*"]'
+      COVALENT_API_KEY: cqt_rQXC7JtWFmdTPTMHmb4mtM78fgXV
+      DATA_LAKE_PATH: ./data_lake
+      DECISION_QUEUE_KEY: trading:decisions
+      DECISION_QUEUE_URL: redis://redis:6379/0
+      EXCHANGE_API_KEY: ""
+      EXCHANGE_API_SECRET: ""
+      EXCHANGE_NAME: binance
+      EXCHANGE_SANDBOX_MODE: "0"
+      GLASSNODE_API_KEY: your_glassnode_key_here
+      INGEST_HOST: 0.0.0.0
+      INGEST_PORT: "8000"
+      LOG_LEVEL: INFO
+      MARKET_PATH: data_lake/market
+      METRICS_PATH: /metrics
+      MODELS_ROOT: /opt/models
+      NEWS_API_KEY: your_crypto_news_api_key_here
+      NEWS_PATH: data_lake/news
+      ONCHAIN_PATH: data_lake/onchain
+      REDDIT_CLIENT_ID: MrrsuHZBgyc1b3SlBBd3yQ
+      REDDIT_CLIENT_SECRET: HHzynTCRMLrj88enVP0YGI9o_kfGDw
+      REDDIT_USER_AGENT: AlgoDataIngestion/0.1
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SOCIAL_PATH: data_lake/social
+      TRADING_AUDIT_BACKEND: file
+      TRADING_AUDIT_HMAC_KEY: 2d998acf5c92606d8b2067d18336cce844dca2de380c4eb926da75c72195e4e8
+      TRADING_AUDIT_LOG_PATH: /app/data_lake/trading/audit.log
+      TRADING_AUDIT_MAXLEN: "50000"
+      TRADING_AUDIT_REDIS_URL: redis://redis:6379/0
+      TRADING_AUDIT_STREAM: trading:audit
+      TRADING_DEADLOCK_POLICY_PATH: configs/runtime_overrides/deadlock_policy_stage_0.yaml
+      TRADING_DECISION_MAX_AGE_SECONDS: "240"
+      TRADING_DRY_RUN: "true"
+      TRADING_INTENT_LEDGER_BACKEND: redis
+      TRADING_INTENT_LEDGER_REDIS_URL: redis://redis:6379/0
+      TRADING_LAST_TS_GRACE_BARS: "10"
+      TRADING_LOG_LEVEL: DEBUG
+      TRADING_METRICS_PORT: "9010"
+      TRADING_MODELS: '[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":25.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":240,"shadow_mode":false,"policy_id":"primary","min_hold_bars_override":15,"disable_prob_exits":true,"entry_rsi_min":50.0},{"model":"xgb_primary","symbol":"BTC/USDT","exchange":"binance","timeframe":"1m","order_notional":25.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":15,"disable_prob_exits":true,"entry_macd_min":0.0},{"model":"xgb_primary","symbol":"SOL/USDT","exchange":"binance","timeframe":"1m","order_notional":30.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":15,"disable_prob_exits":true,"entry_rsi_min":45.0}]'
+      TRADING_PRICE_MONITOR_INTERVAL_SECONDS: "10"
+      TRADING_RISK_LIMITS_PATH: configs/runtime_overrides/risk_limits_stage_0.yaml
+      TRADING_SHADOW_SYMBOLS: '[]'
+      TRADING_STATE_BACKEND: file
+      TRADING_STATE_PATH: /app/trading_state/state.json
+      TRADING_STATE_REDIS_HASH: trading:positions
+      TRADING_STATE_REDIS_URL: redis://redis:6379/0
+      TTL_SWEEP_ENABLED: "true"
+      TTL_SWEEP_INTERVAL_SEC: "600"
+      TWITTER_API_KEY: your_key_here
+      TWITTER_API_SECRET: your_secret_here
+      TWITTER_BEARER: your_bearer_here
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS http://localhost:9010/metrics >/dev/null
+      timeout: 5s
+      interval: 30s
+      retries: 5
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 9010
+        published: "9010"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/data_lake
+        target: /app/data_lake
+        bind:
+          create_host_path: true
+      - type: volume
+        source: trading-state
+        target: /app/trading_state
+        volume: {}
+      - type: bind
+        source: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/logs/trading
+        target: /app/logs
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/experiments/perf_sweeps
+        target: /opt/models/perf_sweeps
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/configs/runtime_overrides
+        target: /app/configs/runtime_overrides
+        bind:
+          create_host_path: true
+networks:
+  default:
+    name: algo-data-ingestion_default
+volumes:
+  hf-cache:
+    name: algo-data-ingestion_hf-cache
+  prometheus-data:
+    name: algo-data-ingestion_prometheus-data
+  redis-data:
+    name: algo-data-ingestion_redis-data
+  trading-state:
+    name: algo-data-ingestion_trading-state

@@ -1,0 +1,332 @@
+# HELP python_gc_objects_collected_total Objects collected during gc
+# TYPE python_gc_objects_collected_total counter
+python_gc_objects_collected_total{generation="0"} 901462.0
+python_gc_objects_collected_total{generation="1"} 182491.0
+python_gc_objects_collected_total{generation="2"} 42057.0
+# HELP python_gc_objects_uncollectable_total Uncollectable objects found during GC
+# TYPE python_gc_objects_uncollectable_total counter
+python_gc_objects_uncollectable_total{generation="0"} 0.0
+python_gc_objects_uncollectable_total{generation="1"} 0.0
+python_gc_objects_uncollectable_total{generation="2"} 0.0
+# HELP python_gc_collections_total Number of times this generation was collected
+# TYPE python_gc_collections_total counter
+python_gc_collections_total{generation="0"} 50016.0
+python_gc_collections_total{generation="1"} 4546.0
+python_gc_collections_total{generation="2"} 174.0
+# HELP python_info Python platform information
+# TYPE python_info gauge
+python_info{implementation="CPython",major="3",minor="11",patchlevel="14",version="3.11.14"} 1.0
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 7.83415296e+09
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 6.10881536e+08
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.76660842193e+09
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 1470.21
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 11.0
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1.048576e+06
+# HELP model_gate_coverage_ratio Fraction of rows in the latest batch that passed the manifest gate.
+# TYPE model_gate_coverage_ratio gauge
+model_gate_coverage_ratio{mode="inference",model="xgb_primary:SOL/USDT"} 0.28378378378378377
+model_gate_coverage_ratio{mode="inference_rolling24h",model="xgb_primary:SOL/USDT"} 0.3637920298879203
+model_gate_coverage_ratio{mode="inference_rolling24h",model="xgb_primary"} 0.3158525626523892
+model_gate_coverage_ratio{mode="inference",model="xgb_primary"} 0.2695295967108048
+model_gate_coverage_ratio{mode="inference",model="xgb_primary:ETH/USDT"} 0.3288590604026846
+model_gate_coverage_ratio{mode="inference_rolling24h",model="xgb_primary:ETH/USDT"} 0.39324289375308585
+model_gate_coverage_ratio{mode="inference",model="xgb_primary:BTC/USDT"} 0.19594594594594594
+model_gate_coverage_ratio{mode="inference_rolling24h",model="xgb_primary:BTC/USDT"} 0.19037354966512593
+# HELP model_rss_minute_spike_share Share of rows with RSS minute spike indicator > 0 in the latest batch.
+# TYPE model_rss_minute_spike_share gauge
+# HELP model_rss_minute_spike_threshold Configured minimum RSS minute spike share for the model before triggering fallbacks.
+# TYPE model_rss_minute_spike_threshold gauge
+# HELP model_probability_sigma Minimum monthly standard deviation of inference probabilities across the latest batch.
+# TYPE model_probability_sigma gauge
+# HELP model_probability_sigma_threshold Configured probability sigma guardrail for the model.
+# TYPE model_probability_sigma_threshold gauge
+# HELP scheduler_job_runs_total Total number of scheduler job invocations
+# TYPE scheduler_job_runs_total counter
+scheduler_job_runs_total{job_id="ingest:binance:ETH/USDT:1m"} 1556.0
+scheduler_job_runs_total{job_id="backfill:binance:ETH/USDT:1m"} 312.0
+scheduler_job_runs_total{job_id="ingest:binance:BTC/USDT:1m"} 1559.0
+scheduler_job_runs_total{job_id="backfill:binance:BTC/USDT:1m"} 315.0
+scheduler_job_runs_total{job_id="ingest:binance:SOL/USDT:1m"} 1556.0
+scheduler_job_runs_total{job_id="backfill:binance:SOL/USDT:1m"} 312.0
+scheduler_job_runs_total{job_id="portfolio_policy_primary"} 1555.0
+scheduler_job_runs_total{job_id="portfolio_policy_primary_btc"} 1555.0
+scheduler_job_runs_total{job_id="portfolio_policy_primary_sol"} 1554.0
+scheduler_job_runs_total{job_id="backfill:binance:BTC/USDT:5m"} 105.0
+scheduler_job_runs_total{job_id="ttl_sweep"} 104.0
+# HELP scheduler_job_runs_created Total number of scheduler job invocations
+# TYPE scheduler_job_runs_created gauge
+scheduler_job_runs_created{job_id="ingest:binance:ETH/USDT:1m"} 1.7666084425087528e+09
+scheduler_job_runs_created{job_id="backfill:binance:ETH/USDT:1m"} 1.7666084445810287e+09
+scheduler_job_runs_created{job_id="ingest:binance:BTC/USDT:1m"} 1.766608446315873e+09
+scheduler_job_runs_created{job_id="backfill:binance:BTC/USDT:1m"} 1.7666084482481275e+09
+scheduler_job_runs_created{job_id="ingest:binance:SOL/USDT:1m"} 1.7666084482971272e+09
+scheduler_job_runs_created{job_id="backfill:binance:SOL/USDT:1m"} 1.7666084501137629e+09
+scheduler_job_runs_created{job_id="portfolio_policy_primary"} 1.7666084501727345e+09
+scheduler_job_runs_created{job_id="portfolio_policy_primary_btc"} 1.7666084501728551e+09
+scheduler_job_runs_created{job_id="portfolio_policy_primary_sol"} 1.7666084501796885e+09
+scheduler_job_runs_created{job_id="backfill:binance:BTC/USDT:5m"} 1.7666084502018242e+09
+scheduler_job_runs_created{job_id="ttl_sweep"} 1.766608450680397e+09
+# HELP scheduler_job_success_total Total successful job completions
+# TYPE scheduler_job_success_total counter
+scheduler_job_success_total{job_id="ingest:binance:ETH/USDT:1m"} 1556.0
+scheduler_job_success_total{job_id="backfill:binance:ETH/USDT:1m"} 312.0
+scheduler_job_success_total{job_id="ingest:binance:BTC/USDT:1m"} 1559.0
+scheduler_job_success_total{job_id="backfill:binance:BTC/USDT:1m"} 315.0
+scheduler_job_success_total{job_id="ingest:binance:SOL/USDT:1m"} 1556.0
+scheduler_job_success_total{job_id="backfill:binance:SOL/USDT:1m"} 312.0
+scheduler_job_success_total{job_id="ttl_sweep"} 104.0
+scheduler_job_success_total{job_id="portfolio_policy_primary_sol"} 1554.0
+scheduler_job_success_total{job_id="portfolio_policy_primary"} 1555.0
+scheduler_job_success_total{job_id="portfolio_policy_primary_btc"} 1555.0
+scheduler_job_success_total{job_id="backfill:binance:BTC/USDT:5m"} 105.0
+# HELP scheduler_job_success_created Total successful job completions
+# TYPE scheduler_job_success_created gauge
+scheduler_job_success_created{job_id="ingest:binance:ETH/USDT:1m"} 1.7666084445808332e+09
+scheduler_job_success_created{job_id="backfill:binance:ETH/USDT:1m"} 1.766608446314761e+09
+scheduler_job_success_created{job_id="ingest:binance:BTC/USDT:1m"} 1.7666084482475958e+09
+scheduler_job_success_created{job_id="backfill:binance:BTC/USDT:1m"} 1.766608448296806e+09
+scheduler_job_success_created{job_id="ingest:binance:SOL/USDT:1m"} 1.7666084501135957e+09
+scheduler_job_success_created{job_id="backfill:binance:SOL/USDT:1m"} 1.7666084501630418e+09
+scheduler_job_success_created{job_id="ttl_sweep"} 1.7666084514571264e+09
+scheduler_job_success_created{job_id="portfolio_policy_primary_sol"} 1.7666084518944635e+09
+scheduler_job_success_created{job_id="portfolio_policy_primary"} 1.7666084523203e+09
+scheduler_job_success_created{job_id="portfolio_policy_primary_btc"} 1.7666084532106423e+09
+scheduler_job_success_created{job_id="backfill:binance:BTC/USDT:5m"} 1.7666084577277608e+09
+# HELP scheduler_job_failure_total Total failed job completions
+# TYPE scheduler_job_failure_total counter
+# HELP scheduler_job_duration_seconds Duration of scheduler jobs in seconds
+# TYPE scheduler_job_duration_seconds histogram
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="0.05"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="0.1"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="0.25"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="0.5"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="1.0"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="2.0"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="5.0"} 1521.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="10.0"} 1547.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="30.0"} 1556.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="60.0"} 1556.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="120.0"} 1556.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="300.0"} 1556.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:ETH/USDT:1m",le="+Inf"} 1556.0
+scheduler_job_duration_seconds_count{job_id="ingest:binance:ETH/USDT:1m"} 1556.0
+scheduler_job_duration_seconds_sum{job_id="ingest:binance:ETH/USDT:1m"} 5085.785011963686
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="0.05"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="0.1"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="0.25"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="0.5"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="1.0"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="2.0"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="5.0"} 289.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="10.0"} 312.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="30.0"} 312.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="60.0"} 312.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="120.0"} 312.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="300.0"} 312.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:ETH/USDT:1m",le="+Inf"} 312.0
+scheduler_job_duration_seconds_count{job_id="backfill:binance:ETH/USDT:1m"} 312.0
+scheduler_job_duration_seconds_sum{job_id="backfill:binance:ETH/USDT:1m"} 1315.561682640342
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="0.05"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="0.1"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="0.25"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="0.5"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="1.0"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="2.0"} 4.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="5.0"} 1518.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="10.0"} 1548.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="30.0"} 1559.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="60.0"} 1559.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="120.0"} 1559.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="300.0"} 1559.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:BTC/USDT:1m",le="+Inf"} 1559.0
+scheduler_job_duration_seconds_count{job_id="ingest:binance:BTC/USDT:1m"} 1559.0
+scheduler_job_duration_seconds_sum{job_id="ingest:binance:BTC/USDT:1m"} 5205.759018561337
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="0.05"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="0.1"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="0.25"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="0.5"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="1.0"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="2.0"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="5.0"} 289.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="10.0"} 313.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="30.0"} 315.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="60.0"} 315.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="120.0"} 315.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="300.0"} 315.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:1m",le="+Inf"} 315.0
+scheduler_job_duration_seconds_count{job_id="backfill:binance:BTC/USDT:1m"} 315.0
+scheduler_job_duration_seconds_sum{job_id="backfill:binance:BTC/USDT:1m"} 1354.9004104044288
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="0.05"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="0.1"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="0.25"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="0.5"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="1.0"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="2.0"} 6.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="5.0"} 1521.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="10.0"} 1547.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="30.0"} 1556.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="60.0"} 1556.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="120.0"} 1556.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="300.0"} 1556.0
+scheduler_job_duration_seconds_bucket{job_id="ingest:binance:SOL/USDT:1m",le="+Inf"} 1556.0
+scheduler_job_duration_seconds_count{job_id="ingest:binance:SOL/USDT:1m"} 1556.0
+scheduler_job_duration_seconds_sum{job_id="ingest:binance:SOL/USDT:1m"} 5029.897801620769
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="0.05"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="0.1"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="0.25"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="0.5"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="1.0"} 2.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="2.0"} 2.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="5.0"} 292.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="10.0"} 311.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="30.0"} 312.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="60.0"} 312.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="120.0"} 312.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="300.0"} 312.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:SOL/USDT:1m",le="+Inf"} 312.0
+scheduler_job_duration_seconds_count{job_id="backfill:binance:SOL/USDT:1m"} 312.0
+scheduler_job_duration_seconds_sum{job_id="backfill:binance:SOL/USDT:1m"} 1299.965893002227
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="0.05"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="0.1"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="0.25"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="0.5"} 76.0
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="1.0"} 103.0
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="2.0"} 104.0
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="5.0"} 104.0
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="10.0"} 104.0
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="30.0"} 104.0
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="60.0"} 104.0
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="120.0"} 104.0
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="300.0"} 104.0
+scheduler_job_duration_seconds_bucket{job_id="ttl_sweep",le="+Inf"} 104.0
+scheduler_job_duration_seconds_count{job_id="ttl_sweep"} 104.0
+scheduler_job_duration_seconds_sum{job_id="ttl_sweep"} 50.737803183845244
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="0.05"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="0.1"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="0.25"} 1.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="0.5"} 1296.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="1.0"} 1481.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="2.0"} 1544.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="5.0"} 1551.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="10.0"} 1554.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="30.0"} 1554.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="60.0"} 1554.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="120.0"} 1554.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="300.0"} 1554.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_sol",le="+Inf"} 1554.0
+scheduler_job_duration_seconds_count{job_id="portfolio_policy_primary_sol"} 1554.0
+scheduler_job_duration_seconds_sum{job_id="portfolio_policy_primary_sol"} 763.3341977848904
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="0.05"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="0.1"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="0.25"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="0.5"} 42.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="1.0"} 1417.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="2.0"} 1537.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="5.0"} 1552.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="10.0"} 1555.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="30.0"} 1555.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="60.0"} 1555.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="120.0"} 1555.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="300.0"} 1555.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary",le="+Inf"} 1555.0
+scheduler_job_duration_seconds_count{job_id="portfolio_policy_primary"} 1555.0
+scheduler_job_duration_seconds_sum{job_id="portfolio_policy_primary"} 1172.303558875923
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="0.05"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="0.1"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="0.25"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="0.5"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="1.0"} 727.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="2.0"} 1492.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="5.0"} 1547.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="10.0"} 1555.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="30.0"} 1555.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="60.0"} 1555.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="120.0"} 1555.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="300.0"} 1555.0
+scheduler_job_duration_seconds_bucket{job_id="portfolio_policy_primary_btc",le="+Inf"} 1555.0
+scheduler_job_duration_seconds_count{job_id="portfolio_policy_primary_btc"} 1555.0
+scheduler_job_duration_seconds_sum{job_id="portfolio_policy_primary_btc"} 1701.1208962231176
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="0.05"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="0.1"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="0.25"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="0.5"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="1.0"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="2.0"} 0.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="5.0"} 87.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="10.0"} 105.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="30.0"} 105.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="60.0"} 105.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="120.0"} 105.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="300.0"} 105.0
+scheduler_job_duration_seconds_bucket{job_id="backfill:binance:BTC/USDT:5m",le="+Inf"} 105.0
+scheduler_job_duration_seconds_count{job_id="backfill:binance:BTC/USDT:5m"} 105.0
+scheduler_job_duration_seconds_sum{job_id="backfill:binance:BTC/USDT:5m"} 485.20488172292244
+# HELP scheduler_job_duration_seconds_created Duration of scheduler jobs in seconds
+# TYPE scheduler_job_duration_seconds_created gauge
+scheduler_job_duration_seconds_created{job_id="ingest:binance:ETH/USDT:1m"} 1.7666084445807357e+09
+scheduler_job_duration_seconds_created{job_id="backfill:binance:ETH/USDT:1m"} 1.7666084463140535e+09
+scheduler_job_duration_seconds_created{job_id="ingest:binance:BTC/USDT:1m"} 1.7666084482472305e+09
+scheduler_job_duration_seconds_created{job_id="backfill:binance:BTC/USDT:1m"} 1.7666084482964642e+09
+scheduler_job_duration_seconds_created{job_id="ingest:binance:SOL/USDT:1m"} 1.7666084501134708e+09
+scheduler_job_duration_seconds_created{job_id="backfill:binance:SOL/USDT:1m"} 1.766608450163014e+09
+scheduler_job_duration_seconds_created{job_id="ttl_sweep"} 1.7666084514570541e+09
+scheduler_job_duration_seconds_created{job_id="portfolio_policy_primary_sol"} 1.7666084518943977e+09
+scheduler_job_duration_seconds_created{job_id="portfolio_policy_primary"} 1.7666084523202062e+09
+scheduler_job_duration_seconds_created{job_id="portfolio_policy_primary_btc"} 1.766608453210557e+09
+scheduler_job_duration_seconds_created{job_id="backfill:binance:BTC/USDT:5m"} 1.7666084577276132e+09
+# HELP scheduler_job_last_run_timestamp Unix timestamp of the last time the job started
+# TYPE scheduler_job_last_run_timestamp gauge
+scheduler_job_last_run_timestamp{job_id="ingest:binance:ETH/USDT:1m"} 1.7667021001587207e+09
+scheduler_job_last_run_timestamp{job_id="backfill:binance:ETH/USDT:1m"} 1.7667021001110039e+09
+scheduler_job_last_run_timestamp{job_id="ingest:binance:BTC/USDT:1m"} 1.7667021001430447e+09
+scheduler_job_last_run_timestamp{job_id="backfill:binance:BTC/USDT:1m"} 1.7667021000529468e+09
+scheduler_job_last_run_timestamp{job_id="ingest:binance:SOL/USDT:1m"} 1.7667021001736627e+09
+scheduler_job_last_run_timestamp{job_id="backfill:binance:SOL/USDT:1m"} 1.7667021001283069e+09
+scheduler_job_last_run_timestamp{job_id="portfolio_policy_primary"} 1.766702100187315e+09
+scheduler_job_last_run_timestamp{job_id="portfolio_policy_primary_btc"} 1.766702100187856e+09
+scheduler_job_last_run_timestamp{job_id="portfolio_policy_primary_sol"} 1.766702100187997e+09
+scheduler_job_last_run_timestamp{job_id="backfill:binance:BTC/USDT:5m"} 1.7667018000912395e+09
+scheduler_job_last_run_timestamp{job_id="ttl_sweep"} 1.7667018001909947e+09
+# HELP scheduler_job_last_success_timestamp Unix timestamp of the last time the job succeeded
+# TYPE scheduler_job_last_success_timestamp gauge
+scheduler_job_last_success_timestamp{job_id="ingest:binance:ETH/USDT:1m"} 1.7667021048010092e+09
+scheduler_job_last_success_timestamp{job_id="backfill:binance:ETH/USDT:1m"} 1.7667021048798351e+09
+scheduler_job_last_success_timestamp{job_id="ingest:binance:BTC/USDT:1m"} 1.766702104801236e+09
+scheduler_job_last_success_timestamp{job_id="backfill:binance:BTC/USDT:1m"} 1.7667021048803842e+09
+scheduler_job_last_success_timestamp{job_id="ingest:binance:SOL/USDT:1m"} 1.766702104798631e+09
+scheduler_job_last_success_timestamp{job_id="backfill:binance:SOL/USDT:1m"} 1.7667021048215413e+09
+scheduler_job_last_success_timestamp{job_id="ttl_sweep"} 1.7667018006760392e+09
+scheduler_job_last_success_timestamp{job_id="portfolio_policy_primary_sol"} 1.766702100701739e+09
+scheduler_job_last_success_timestamp{job_id="portfolio_policy_primary"} 1.7667021009318907e+09
+scheduler_job_last_success_timestamp{job_id="portfolio_policy_primary_btc"} 1.7667021012930415e+09
+scheduler_job_last_success_timestamp{job_id="backfill:binance:BTC/USDT:5m"} 1.7667018058825784e+09
+# HELP scheduler_decision_messages_enqueued_total Number of decision messages emitted to downstream queue
+# TYPE scheduler_decision_messages_enqueued_total counter
+scheduler_decision_messages_enqueued_total{job_id="portfolio_policy_primary_sol",model="xgb_primary"} 1494.0
+scheduler_decision_messages_enqueued_total{job_id="portfolio_policy_primary",model="xgb_primary"} 1245.0
+scheduler_decision_messages_enqueued_total{job_id="portfolio_policy_primary_btc",model="xgb_primary"} 1481.0
+# HELP scheduler_decision_messages_enqueued_created Number of decision messages emitted to downstream queue
+# TYPE scheduler_decision_messages_enqueued_created gauge
+scheduler_decision_messages_enqueued_created{job_id="portfolio_policy_primary_sol",model="xgb_primary"} 1.7666084518939478e+09
+scheduler_decision_messages_enqueued_created{job_id="portfolio_policy_primary",model="xgb_primary"} 1.7666084523198905e+09
+scheduler_decision_messages_enqueued_created{job_id="portfolio_policy_primary_btc",model="xgb_primary"} 1.7666084532103808e+09
+# HELP scheduler_decision_last_timestamp Unix timestamp of the latest decision published per job/model
+# TYPE scheduler_decision_last_timestamp gauge
+scheduler_decision_last_timestamp{job_id="portfolio_policy_primary_sol",model="xgb_primary"} 1.76670198e+09
+scheduler_decision_last_timestamp{job_id="portfolio_policy_primary",model="xgb_primary"} 1.76670204e+09
+scheduler_decision_last_timestamp{job_id="portfolio_policy_primary_btc",model="xgb_primary"} 1.76670198e+09
+# HELP scheduler_api_up Whether the ingestion API health endpoint responded OK (1) or not (0)
+# TYPE scheduler_api_up gauge
+scheduler_api_up 1.0
