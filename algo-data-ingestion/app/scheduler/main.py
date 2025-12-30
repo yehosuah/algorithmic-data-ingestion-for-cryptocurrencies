@@ -831,6 +831,9 @@ def _build_feature_frame(job: InferenceJob, ohlcv: pd.DataFrame) -> pd.DataFrame
             ts = pd.to_datetime(features["timestamp"], utc=True)
             features["close"] = ts.map(close_series)
             features["price"] = features["close"]
+            if "volume" in dedup.columns:
+                volume_series = dedup.set_index("timestamp")["volume"].astype(float)
+                features["volume"] = ts.map(volume_series)
         except Exception:
             log.debug("Failed to attach close price to feature frame for job %s", job.job_id, exc_info=True)
     features = features.sort_values("timestamp").reset_index(drop=True)

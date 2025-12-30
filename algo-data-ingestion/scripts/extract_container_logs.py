@@ -75,7 +75,9 @@ def _fetch_metrics(url: str, dest: Path) -> None:
         with urlopen(url, timeout=5) as resp:
             body = resp.read().decode("utf-8", errors="replace")
             _write_text(dest, body)
-    except URLError as exc:
+    except (URLError, OSError, ValueError) as exc:
+        _write_text(dest, f"# failed to fetch metrics from {url}: {exc}\n")
+    except Exception as exc:  # pragma: no cover - defensive
         _write_text(dest, f"# failed to fetch metrics from {url}: {exc}\n")
 
 

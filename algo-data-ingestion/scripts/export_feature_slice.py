@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 from app.features.factory.market_factory import build_market_features  # noqa: E402
 from training.feature_eng import augment_market_features  # noqa: E402
 from training.infer import score_base_with_manifest  # noqa: E402
+from app.scheduler.main import _ensure_required_features  # noqa: E402
 
 
 def _parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
@@ -55,19 +56,101 @@ def _load_recent_ohlcv(
     cutoff = now - timedelta(minutes=history_minutes)
     earliest_dt = (cutoff - timedelta(days=1)).date()
     frames: List[pd.DataFrame] = []
-    for dt_dir in sorted(p for p in data_dir.glob("dt=*") if p.is_dir()):
+    # Avoid an unbounded filesystem walk by probing for dt partitions we actually need.
+    # Supported layouts:
+    # - exchange=.../symbol=.../dt=YYYY-MM-DD/*.parquet
+    # - exchange=.../symbol=.../year=YYYY/month=MM/day=D/dt=YYYY-MM-DD/*.parquet
+    dt_values = []
+    day = earliest_dt
+    while day <= now.date():
+        dt_values.append(day)
+        day += timedelta(days=1)
+
+    def _candidate_dt_dirs(dt_value) -> List[Path]:
+        date_str = dt_value.isoformat()
+        # Some historical dumps used non-zero-padded month folders (month=8 vs month=08).
+        month_variants = {str(dt_value.month), f"{dt_value.month:02d}"}
+        dirs = [data_dir / f"dt={date_str}"]
+        for month in month_variants:
+            dirs.append(
+                data_dir
+                / f"year={dt_value.year}"
+                / f"month={month}"
+                / f"day={dt_value.day}"
+                / f"dt={date_str}"
+            )
+        return dirs
+
+    required_columns = ["timestamp", "open", "high", "low", "close", "volume", "symbol", "exchange", "timeframe"]
+
+    def _file_time(path: Path) -> datetime:
+        """
+        Prefer the `part-<epoch_ms>.parquet` convention used by our market ingesters.
+        Falls back to filesystem mtime when parsing fails.
+        """
+        stem = path.name
+        if stem.startswith("part-") and stem.endswith(".parquet"):
+            raw = stem[len("part-") : -len(".parquet")]
+            try:
+                ms = int(raw)
+            except Exception:
+                ms = None
+            if ms:
+                try:
+                    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
+                except Exception:
+                    pass
         try:
-            dt_value = datetime.strptime(dt_dir.name.split("=", 1)[1], "%Y-%m-%d").date()
+            return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
         except Exception:
+            return now
+
+    # The ingesters write many overlapping snapshots (e.g., limit=360 bars). To cover a
+    # multi-day window efficiently, sample snapshot files at a coarse cadence so the
+    # union of their 360-bar windows tiles the requested history.
+    spacing_minutes = 360
+    if history_minutes < spacing_minutes:
+        spacing_minutes = max(60, int(history_minutes))
+
+    candidates: List[Path] = []
+    for dt_value in sorted(dt_values, reverse=True):
+        for dt_dir in _candidate_dt_dirs(dt_value):
+            if not dt_dir.exists() or not dt_dir.is_dir():
+                continue
+            candidates.extend(dt_dir.glob("*.parquet"))
+
+    if not candidates:
+        return pd.DataFrame()
+
+    candidates = sorted(candidates, key=_file_time, reverse=True)
+    selected: List[Path] = []
+    next_cutoff = now
+    for pq_path in candidates:
+        ts_file = _file_time(pq_path)
+        if ts_file > next_cutoff:
             continue
-        if dt_value < earliest_dt or dt_value > now.date():
-            continue
-        for pq_path in sorted(dt_dir.glob("*.parquet")):
+        selected.append(pq_path)
+        next_cutoff = ts_file - timedelta(minutes=spacing_minutes)
+        if next_cutoff <= cutoff:
+            break
+
+    for pq_path in selected:
+        try:
+            df = pd.read_parquet(pq_path, columns=required_columns)
+        except Exception:
             try:
                 df = pd.read_parquet(pq_path)
             except Exception:
                 continue
-            frames.append(df)
+        if df is None or df.empty or "timestamp" not in df.columns:
+            continue
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True, errors="coerce")
+        df = df.dropna(subset=["timestamp"])
+        if "timeframe" in df.columns:
+            df = df[df["timeframe"] == timeframe]
+        if df.empty:
+            continue
+        frames.append(df)
     if not frames:
         return pd.DataFrame()
     df = pd.concat(frames, ignore_index=True)
@@ -86,6 +169,12 @@ def _build_feature_frame(ohlcv: pd.DataFrame) -> pd.DataFrame:
     if ohlcv.empty:
         return pd.DataFrame()
     feats = build_market_features(ohlcv)
+    # Keep raw columns needed by FEATURE_REGISTRY + label/regime helpers (scheduler parity).
+    raw_cols = [c for c in ("timestamp", "open", "high", "low", "close", "volume") if c in ohlcv.columns]
+    if raw_cols:
+        raw = ohlcv[raw_cols].copy()
+        raw["timestamp"] = pd.to_datetime(raw["timestamp"], utc=True, errors="coerce")
+        feats = feats.merge(raw, on="timestamp", how="left")
     feats = augment_market_features(feats, inplace=False)
     return feats.sort_values("timestamp").reset_index(drop=True)
 
@@ -107,6 +196,14 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     if not manifest_dir.exists():
         raise SystemExit(f"Manifest directory not found: {manifest_dir}")
 
+    required_features: List[str] = []
+    feature_list_path = manifest_dir / "feature_list.json"
+    if feature_list_path.exists():
+        try:
+            required_features = json.loads(feature_list_path.read_text()) or []
+        except Exception:
+            required_features = []
+
     frames: List[pd.DataFrame] = []
     for symbol in symbols:
         ohlcv = _load_recent_ohlcv(
@@ -122,32 +219,41 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         features = _build_feature_frame(ohlcv)
         if features.empty:
             continue
-        scored = score_base_with_manifest(
-            features,
-            manifest_dir,
-            mode="inference",
-            model_label=args.base_manifest,
-            update_metrics=False,
-        )
-        scored["symbol"] = symbol
-        frames.append(scored)
+        features["symbol"] = symbol
+        frames.append(features)
 
     if not frames:
         raise SystemExit("No feature rows were produced; verify data lake contents.")
 
     combined = pd.concat(frames, ignore_index=True)
+    combined = combined.sort_values("timestamp").reset_index(drop=True)
+    if required_features:
+        combined = _ensure_required_features(
+            combined,
+            required_features,
+            job_id="export_feature_slice",
+            timeframe=args.timeframe,
+        )
+
+    scored = score_base_with_manifest(
+        combined,
+        manifest_dir,
+        mode="inference",
+        model_label=args.base_manifest,
+        update_metrics=False,
+    )
     cutoff = now - timedelta(minutes=args.lookback_minutes)
-    if "timestamp" in combined.columns:
-        combined = combined[combined["timestamp"] >= cutoff].reset_index(drop=True)
+    if "timestamp" in scored.columns:
+        scored = scored[scored["timestamp"] >= cutoff].reset_index(drop=True)
     out_path = Path(args.output).expanduser().resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    combined.to_parquet(out_path, index=False)
+    scored.to_parquet(out_path, index=False)
     print(
         json.dumps(
             {
                 "output": str(out_path),
-                "rows": int(len(combined)),
-                "symbols": sorted({sym for sym in combined["symbol"].dropna().unique()}),
+                "rows": int(len(scored)),
+                "symbols": sorted({sym for sym in scored["symbol"].dropna().unique()}),
             },
             indent=2,
         )
