@@ -26,6 +26,9 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_URL=redis://redis:6379/0
+      - EXCHANGE_SANDBOX_MODE=0
+      - EXCHANGE_API_KEY=
+      - EXCHANGE_API_SECRET=
       - FEATURE_NAMESPACE=features
       - FEATURE_TTL_SEC=3600
       - ML_SENTIMENT_ENABLED=1
@@ -111,13 +114,14 @@ services:
       - DATA_LAKE_ROOT=/app/data_lake/market
       - DECISION_QUEUE_URL=redis://redis:6379/0
       - DECISION_QUEUE_KEY=trading:decisions
+      - EXCHANGE_SANDBOX_MODE=0
       - INFER_DEFAULT_STRIDE=1
       - INFER_HISTORY_MARGIN_MIN=30
       - INFER_APPLY_CALIBRATION=1
       - INFER_JOBS=[
-          {"job_id":"portfolio_policy_primary","exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":60,"history_minutes":120,"base_model":"xgb_primary","base_path":"perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary","stride":1,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *","policy_id":"primary","shadow_mode":false,"max_decision_items":1},
-          {"job_id":"portfolio_policy_primary_btc","exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":60,"history_minutes":120,"base_model":"xgb_primary","base_path":"perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary","stride":1,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *","policy_id":"conservative","shadow_mode":false,"max_decision_items":1},
-          {"job_id":"portfolio_policy_primary_sol","exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":60,"history_minutes":120,"base_model":"xgb_primary","base_path":"perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary","stride":1,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *","policy_id":"conservative","shadow_mode":false,"max_decision_items":1}
+          {"job_id":"portfolio_policy_primary","exchange":"binance","symbol":"ETH/USDT","timeframe":"1m","lookback_minutes":60,"history_minutes":120,"base_model":"xgb_primary","base_path":"base_xgb_h120_calmon_spread0","stride":1,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *","policy_id":"primary","shadow_mode":false,"max_decision_items":1},
+          {"job_id":"portfolio_policy_primary_btc","exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":60,"history_minutes":120,"base_model":"xgb_primary","base_path":"base_xgb_h120_calmon_spread0","stride":1,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *","policy_id":"conservative","shadow_mode":false,"max_decision_items":1},
+          {"job_id":"portfolio_policy_primary_sol","exchange":"binance","symbol":"SOL/USDT","timeframe":"1m","lookback_minutes":60,"history_minutes":120,"base_model":"xgb_primary","base_path":"base_xgb_h120_calmon_spread0","stride":1,"include_features":true,"queue_key":"trading:decisions","cron":"*/1 * * * *","policy_id":"conservative","shadow_mode":false,"max_decision_items":1}
         ]
       - MARKET_JOBS=[
           {"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":240,"cron":"*/5 * * * *"},
@@ -160,7 +164,10 @@ services:
       - DECISION_QUEUE_URL=redis://redis:6379/0
       - DECISION_QUEUE_KEY=trading:decisions
       - MODELS_ROOT=/opt/models
-      - TRADING_MODELS=[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":20.0,"max_spread_bps":15,"stop_loss_pct":0.0,"take_profit_pct":0.001,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"primary","min_hold_bars_override":6},{"model":"xgb_primary","symbol":"BTC/USDT","exchange":"binance","timeframe":"1m","order_notional":15.0,"max_spread_bps":20,"stop_loss_pct":0.0,"take_profit_pct":0.001,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":5},{"model":"xgb_primary","symbol":"SOL/USDT","exchange":"binance","timeframe":"1m","order_notional":12.0,"max_spread_bps":22,"stop_loss_pct":0.0,"take_profit_pct":0.001,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":5}]
+      - EXCHANGE_SANDBOX_MODE=0
+      - EXCHANGE_API_KEY=
+      - EXCHANGE_API_SECRET=
+      - TRADING_MODELS=[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":25.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":240,"shadow_mode":false,"policy_id":"primary","min_hold_bars_override":15,"disable_prob_exits":true,"entry_rsi_min":50.0},{"model":"xgb_primary","symbol":"BTC/USDT","exchange":"binance","timeframe":"1m","order_notional":25.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":15,"disable_prob_exits":true,"entry_macd_min":0.0},{"model":"xgb_primary","symbol":"SOL/USDT","exchange":"binance","timeframe":"1m","order_notional":30.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":15,"disable_prob_exits":true,"entry_rsi_min":45.0}]
       - TRADING_SHADOW_SYMBOLS=[]
       - TRADING_DRY_RUN=true
       - TRADING_RISK_LIMITS_PATH=configs/runtime_overrides/risk_limits_stage_0.yaml
@@ -174,6 +181,7 @@ services:
       - TRADING_STATE_REDIS_URL=redis://redis:6379/0
       - TRADING_AUDIT_BACKEND=file
       - TRADING_AUDIT_LOG_PATH=/app/data_lake/trading/audit.log
+      - TRADING_PRICE_MONITOR_INTERVAL_SECONDS=10
       - TRADING_AUDIT_REDIS_URL=redis://redis:6379/0
       - TRADING_LAST_TS_GRACE_BARS=10
       - TRADING_DECISION_MAX_AGE_SECONDS=240

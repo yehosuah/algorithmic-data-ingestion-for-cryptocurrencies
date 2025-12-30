@@ -1,12 +1,12 @@
-capital: 100
-initial_capital_usd: 100
+capital: 200
+initial_capital_usd: 200
 sizing_mode: equity_fraction
-equity_fraction: 0.2
-max_equity_fraction: 0.3
+equity_fraction: 0.33
+max_equity_fraction: 0.35
 compounding_step_usd: 5.0
 max_gross_leverage: 2.0
 max_net_exposure: 1.0
-max_turnover_per_day: 12.0
+max_turnover_per_day: 0.0
 max_orders_per_hour: 180
 max_concurrent_positions: 3
 max_symbol_weight: 0.5
@@ -25,6 +25,9 @@ halt_if_spread_bps_gt: 35.0
 halt_if_vol_zscore_gt: 5.0
 halt_if_missing_price_bars: false
 halt_if_data_stale_seconds: 180
+min_stop_loss_pct: 0.005
+hard_stop_loss_pct: 0.012
+vol_stop_rvol_mult: 3.0
 min_trade_notional: 0.0001
 transaction_cost_bps: 1.0
 slippage_bps: 0.0
@@ -35,8 +38,9 @@ long_only: false
 model_weights: {}
 ensemble_mode: weighted_sum
 trigger_overrides:
-  exit_threshold: 0.45
-  exit_prob_drop: 0.1
+  entry_threshold: 0.74
+  exit_threshold: 0.69
+  exit_prob_drop: 0.15
 gate_config:
   spread_column: hl_spread
   prob_column: base_prob
@@ -65,8 +69,9 @@ symbols:
     max_entry_slippage_bps: 25
     max_position_age_minutes: 360
     trigger_overrides:
-      exit_threshold: 0.45
-      exit_prob_drop: 0.1
+      entry_threshold: 0.64
+      exit_threshold: 0.59
+      exit_prob_drop: 0.15
   ETH/USDT:
     max_symbol_notional: 45
     max_symbol_weight: 0.4
@@ -77,8 +82,9 @@ symbols:
     max_entry_slippage_bps: 25
     max_position_age_minutes: 360
     trigger_overrides:
-      exit_threshold: 0.43
-      exit_prob_drop: 0.12
+      entry_threshold: 0.7
+      exit_threshold: 0.65
+      exit_prob_drop: 0.15
   SOL/USDT:
     max_symbol_notional: 30
     max_symbol_weight: 0.4
@@ -89,8 +95,9 @@ symbols:
     max_entry_slippage_bps: 30
     max_position_age_minutes: 360
     trigger_overrides:
-      exit_threshold: 0.44
-      exit_prob_drop: 0.11
+      entry_threshold: 0.78
+      exit_threshold: 0.73
+      exit_prob_drop: 0.15
 loss_guard:
   enabled: true
   max_consecutive_losses: 3
