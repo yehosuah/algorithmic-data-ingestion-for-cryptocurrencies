@@ -484,6 +484,119 @@ def test_trading_service_stop_loss_exit(tmp_path: Path, monkeypatch):
     _run(_test())
 
 
+def test_trading_service_stop_loss_bypasses_min_hold(tmp_path: Path, monkeypatch):
+    async def _test():
+        monkeypatch.setenv(
+            "TRADING_MODELS",
+            json.dumps(
+                [
+                    {
+                        "model": "tcn_h120_calmon_relaxed",
+                        "exchange": "binance",
+                        "symbol": "ETH/USDT",
+                        "timeframe": "1m",
+                        "order_amount": 0.01,
+                        "max_spread_bps": 15.0,
+                        "stop_loss_pct": 0.005,
+                        "take_profit_pct": None,
+                        "min_hold_bars_override": 10,
+                    }
+                ]
+            ),
+        )
+        _set_file_backends(monkeypatch)
+        models_root = Path("models").resolve()
+        manifest_dir = models_root / "tcn_h120_calmon_relaxed"
+        cfg = TradingConfig(
+            decision_queue_url="redis://example:6379/0",
+            decision_queue_key="queue",
+            state_path=tmp_path / "state.json",
+            models_root=models_root,
+            dry_run=True,
+            state_backend="file",
+        )
+        service = TradingService(cfg)
+        fake_executor = FakeExecutor()
+        service.executor = fake_executor
+        state_key = service.config.trading_models[0].state_key
+        _reset_state(service, state_key)
+
+        payload = json.dumps(
+            {
+                "model": "tcn_h120_calmon_relaxed",
+                "artifact_dir": str(manifest_dir),
+                "items": [
+                    {"timestamp": "2025-10-01T00:00:00+00:00", "probability": 0.90, "gate_pass": True, "close": 1.0},
+                    # Stop-loss would trigger on this bar, but min-hold is 10 bars.
+                    {"timestamp": "2025-10-01T00:01:00+00:00", "probability": 0.92, "gate_pass": True, "close": 0.994},
+                ],
+            }
+        )
+
+        await service._handle_payload(payload)
+
+        assert [call["side"] for call in fake_executor.calls] == ["buy", "sell"]
+        state = service.state_store.get(state_key)
+        assert state.metadata.get("last_exit_trigger") == "stop_loss"
+
+    _run(_test())
+
+
+def test_trading_service_exit_uses_relaxed_spread_limit(tmp_path: Path, monkeypatch):
+    async def _test():
+        monkeypatch.setenv(
+            "TRADING_MODELS",
+            json.dumps(
+                [
+                    {
+                        "model": "tcn_h120_calmon_relaxed",
+                        "exchange": "binance",
+                        "symbol": "ETH/USDT",
+                        "timeframe": "1m",
+                        "order_amount": 0.01,
+                        "max_spread_bps": 5.0,
+                        "stop_loss_pct": 0.005,
+                        "take_profit_pct": None,
+                        "min_hold_bars_override": 1,
+                    }
+                ]
+            ),
+        )
+        _set_file_backends(monkeypatch)
+        cfg = TradingConfig(
+            decision_queue_url="redis://example:6379/0",
+            decision_queue_key="queue",
+            state_path=tmp_path / "state.json",
+            models_root=Path("models").resolve(),
+            dry_run=True,
+            state_backend="file",
+        )
+        service = TradingService(cfg)
+        fake_executor = FakeExecutor()
+        service.executor = fake_executor
+        state_key = service.config.trading_models[0].state_key
+        _reset_state(service, state_key)
+
+        payload = json.dumps(
+            {
+                "model": "tcn_h120_calmon_relaxed",
+                "artifact_dir": str(Path("models").resolve() / "tcn_h120_calmon_relaxed"),
+                "items": [
+                    {"timestamp": "2025-10-01T00:00:00+00:00", "probability": 0.90, "gate_pass": True, "close": 1.0},
+                    {"timestamp": "2025-10-01T00:01:00+00:00", "probability": 0.92, "gate_pass": True, "close": 0.994},
+                ],
+            }
+        )
+
+        await service._handle_payload(payload)
+
+        assert [call["side"] for call in fake_executor.calls] == ["buy", "sell"]
+        assert fake_executor.calls[0]["max_spread_bps"] == pytest.approx(5.0)
+        assert fake_executor.calls[1]["max_spread_bps"] == pytest.approx(35.0)
+
+    _run(_test())
+
+
 def test_trading_service_take_profit_exit(tmp_path: Path, monkeypatch):
     async def _test():
         monkeypatch.setenv(

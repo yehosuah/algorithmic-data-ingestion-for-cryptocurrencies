@@ -44,6 +44,22 @@ class TradingModelConfig(BaseModel):
     max_hold_minutes: Optional[int] = Field(default=None, ge=1)
     stop_loss_pct: Optional[float] = Field(default=0.005, ge=0.0)
     take_profit_pct: Optional[float] = Field(default=None, ge=0.0)
+    profit_trailing_start_pct: Optional[float] = Field(default=None, ge=0.0)
+    profit_trailing_stop_pct: Optional[float] = Field(default=None, ge=0.0)
+    disable_prob_exits: bool = Field(
+        default=False,
+        description="When true, disable probability/gate-driven exits; rely on stop/take-profit/trailing/time exits.",
+    )
+    entry_rsi_min: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=100.0,
+        description="Optional entry filter requiring features.rsi_14 to exceed this threshold.",
+    )
+    entry_macd_min: Optional[float] = Field(
+        default=None,
+        description="Optional entry filter requiring features.macd to exceed this threshold.",
+    )
     shadow_mode: Optional[bool] = Field(default=None)
 
     @model_validator(mode="after")
@@ -70,6 +86,12 @@ class TradingConfig(BaseSettings):
     decision_queue_key: str = Field("trading:decisions", alias="DECISION_QUEUE_KEY")
     last_timestamp_hash: str = Field("trading:last_processed_ts", alias="TRADING_LAST_TS_HASH")
     redis_poll_timeout: int = Field(1, alias="TRADING_QUEUE_POLL_TIMEOUT")
+    price_monitor_interval_seconds: int = Field(
+        0,
+        alias="TRADING_PRICE_MONITOR_INTERVAL_SECONDS",
+        ge=0,
+        description="Optional interval (seconds) to check price-based exits (stop/take-profit/trailing) even when no new decision arrives; 0 disables.",
+    )
     decision_max_age_seconds: Optional[int] = Field(
         None,
         alias="TRADING_DECISION_MAX_AGE_SECONDS",

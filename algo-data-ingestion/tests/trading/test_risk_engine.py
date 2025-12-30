@@ -137,6 +137,27 @@ def test_entry_blocked_when_clipped_below_min_notional():
     assert result["block_reason"] == "risk_clip_to_zero"
 
 
+def test_entry_qty_step_floor_bump_prevents_clip_to_zero():
+    risk_cfg = _risk_cfg()
+    risk_cfg["symbols"]["BTC/USDT"]["qty_step"] = 0.0001
+    result = assess_and_adjust_order(
+        symbol="BTC/USDT",
+        action="ENTER_LONG",
+        desired_notional=7.5,
+        desired_qty=None,
+        price=100_000.0,
+        spread_bps=1.0,
+        now_ts=_now_ts(),
+        portfolio_state=_portfolio_state(),
+        symbol_state=_symbol_state(qty_step=0.0001),
+        risk_cfg=risk_cfg,
+    )
+    assert result["allowed"] is True
+    assert result["final_qty"] == pytest.approx(0.0001)
+    assert result["final_notional"] == pytest.approx(10.0)
+    assert "exchange_qty_step_floor" in result["clip_reasons"]
+
+
 def test_exit_allowed_during_safe_mode():
     risk_cfg = _risk_cfg()
     portfolio_state = _portfolio_state(safe_mode=True)

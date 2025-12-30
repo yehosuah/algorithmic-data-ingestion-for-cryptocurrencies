@@ -20,6 +20,7 @@ from app.monitoring.trading_metrics import (
     record_decision_coverage,
     record_gate_toggle,
     record_realized_pnl,
+    init_realized_pnl,
     record_reconcile_run,
     record_safe_mode,
     record_dedup_blocked,
@@ -106,6 +107,73 @@ def _extract_spread_from_item(item: Dict[str, object]) -> Optional[float]:
         if key == "hl_spread":
             spread *= 1e4
         return spread
+    return None
+
+
+def _safe_float(value: Any, default: Optional[float] = None) -> Optional[float]:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _extract_volatility_from_item(item: Dict[str, object]) -> Optional[float]:
+    """
+    Pull a realized volatility proxy from the feature payload to scale stops.
+    """
+    if not isinstance(item, dict):
+        return None
+    features = item.get("features") or {}
+    if not isinstance(features, dict):
+        return None
+    for key in ("feat_realized_vol_1h", "rvol_20", "rvol20", "ret_std_20"):
+        if key in features:
+            try:
+                vol = abs(float(features[key]))
+                if math.isfinite(vol) and vol > 0:
+                    return vol
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def _entry_filter_block_reason(model_cfg: TradingModelConfig, item: Dict[str, object]) -> Optional[str]:
+    """
+    Optional per-model entry filters that block entries even when the model gate passes.
+
+    These are intended to prevent trading during regime/trend conditions where the
+    underlying probability signal is known to degrade.
+    """
+    if not isinstance(item, dict):
+        return None
+    features = item.get("features") or {}
+    if not isinstance(features, dict):
+        features = {}
+
+    rsi_min = getattr(model_cfg, "entry_rsi_min", None)
+    if rsi_min is not None:
+        raw = features.get("rsi_14")
+        try:
+            rsi = float(raw) if raw is not None else None
+        except (TypeError, ValueError):
+            rsi = None
+        if rsi is None or not math.isfinite(rsi):
+            return "entry_filter_rsi_missing"
+        if rsi <= float(rsi_min):
+            return "entry_filter_rsi"
+
+    macd_min = getattr(model_cfg, "entry_macd_min", None)
+    if macd_min is not None:
+        raw = features.get("macd")
+        try:
+            macd = float(raw) if raw is not None else None
+        except (TypeError, ValueError):
+            macd = None
+        if macd is None or not math.isfinite(macd):
+            return "entry_filter_macd_missing"
+        if macd <= float(macd_min):
+            return "entry_filter_macd"
+
     return None
 
 
@@ -271,6 +339,7 @@ class TradingService:
         self._reconcile_healthy_streak = 0
         self._safe_mode_reason: Optional[str] = None
         self._telemetry_samples: Dict[Tuple[str, Optional[str], str], int] = defaultdict(int)
+        self._last_price_monitor_ts: Optional[datetime] = None
         self.deadlock_policy = self._load_deadlock_policy()
         self.deadlock_monitor = DeadlockMonitor(self.deadlock_policy.window_minutes)
         self._deadlock_action_state: Dict[str, object] = {
@@ -281,6 +350,12 @@ class TradingService:
         }
         self._prob_gate_overrides: Dict[str, float] = {}
         self._policy_overrides: Dict[str, str] = {}
+        # Initialize per-symbol gauges so Prometheus exports stable time series
+        # even before the first decision payload is processed.
+        for model_cfg in config.trading_models:
+            state = self.state_store.get(model_cfg.state_key)
+            init_realized_pnl(model_cfg.model, model_cfg.symbol)
+            set_position_active(model_cfg.model, model_cfg.symbol, state.in_position)
 
     def _create_queue_client(self) -> aioredis.Redis:
         return aioredis.from_url(
@@ -970,6 +1045,48 @@ class TradingService:
             pass
         return target
 
+    def _compute_stop_loss_pct(self, *, base_stop_loss: Optional[float], item: Dict[str, object]) -> Optional[float]:
+        """
+        Compute a bar-aware stop-loss using optional volatility scaling and a hard cap.
+        """
+        hard_cap = _safe_float(self.risk_limits.get("hard_stop_loss_pct"))
+        min_stop = _safe_float(self.risk_limits.get("min_stop_loss_pct"))
+        vol_mult = _safe_float(self.risk_limits.get("vol_stop_rvol_mult"))
+        vol_value = _extract_volatility_from_item(item)
+
+        stop = base_stop_loss
+        if stop is None or stop <= 0:
+            stop = min_stop
+        if vol_value is not None and vol_mult is not None and vol_mult > 0:
+            try:
+                vol_stop = float(vol_value) * float(vol_mult)
+                if stop is None or vol_stop > stop:
+                    stop = vol_stop
+            except Exception:
+                pass
+        if hard_cap is not None and hard_cap > 0 and stop is not None:
+            stop = min(stop, hard_cap)
+        if stop is not None and stop > 0:
+            return float(stop)
+        return None
+
+    def _exit_max_spread_bps(self, model_cfg: "TradingModelConfig") -> float:
+        base = _safe_float(getattr(model_cfg, "max_spread_bps", None), 0.0) or 0.0
+        limit = float(base)
+        symbol = getattr(model_cfg, "symbol", None)
+        if symbol:
+            try:
+                sym_cfg = (self.risk_limits.get("symbols") or {}).get(symbol, {}) or {}
+                sym_limit = _safe_float(sym_cfg.get("max_spread_bps"))
+                if sym_limit is not None and sym_limit > limit:
+                    limit = float(sym_limit)
+            except Exception:
+                pass
+        global_limit = _safe_float(self.risk_limits.get("halt_if_spread_bps_gt"))
+        if global_limit is not None and global_limit > limit:
+            limit = float(global_limit)
+        return float(limit) if limit > 0 else float(base)
+
     def _prune_order_times(self, now: datetime) -> None:
         cutoff = now - timedelta(hours=1)
         while self._risk_order_times and self._risk_order_times[0] < cutoff:
@@ -1335,24 +1452,14 @@ class TradingService:
         if cutoff is None and max_age_seconds is None:
             return items
         fresh: List[Tuple[datetime, Dict[str, object]]] = []
-        grace_bars = max(0, int(self.config.last_timestamp_grace_bars))
-        grace_seconds = grace_bars * max(1, model_cfg.bar_seconds)
         aged_out = 0
         for ts, payload in items:
             if max_age_seconds and ts < (now_ts - timedelta(seconds=max_age_seconds)):
                 aged_out += 1
                 continue
-            if cutoff is None or ts > cutoff:
-                fresh.append((ts, payload))
+            if cutoff is not None and ts <= cutoff:
                 continue
-            if grace_seconds and cutoff > ts:
-                try:
-                    if (cutoff - ts).total_seconds() <= grace_seconds:
-                        fresh.append((ts, payload))
-                        continue
-                except Exception:
-                    pass
-                fresh.append((ts, payload))
+            fresh.append((ts, payload))
         dropped = len(items) - len(fresh)
         if dropped or aged_out:
             logger.info(
@@ -1371,6 +1478,7 @@ class TradingService:
         iteration = 0
         while self._running:
             iteration += 1
+            await self._maybe_price_monitor(datetime.now(timezone.utc))
             if self._redis is None:
                 try:
                     await self._reconnect_redis()
@@ -1407,6 +1515,340 @@ class TradingService:
                 await self._handle_payload(payload)
             except Exception as exc:
                 logger.exception("Failed to process decision payload: %s", exc)
+
+    async def _maybe_price_monitor(self, now: datetime) -> None:
+        interval = 0
+        try:
+            interval = int(getattr(self.config, "price_monitor_interval_seconds", 0) or 0)
+        except Exception:
+            interval = 0
+        if interval <= 0:
+            return
+        last = self._last_price_monitor_ts
+        if last is not None and (now - last).total_seconds() < float(interval):
+            return
+        self._last_price_monitor_ts = now
+        await self._price_monitor(now)
+
+    async def _price_monitor(self, now: datetime) -> None:
+        """
+        Periodically enforce price-based exits even if no new decision payload arrives.
+
+        This is deliberately conservative:
+        - Only ever attempts exits (never opens new positions).
+        - Disables probability-based exits (stale prob/gate), but still honors stop-loss,
+          take-profit, profit-trailing, and max-hold.
+        """
+        quote_fetch = getattr(self.executor, "fetch_quote", None)
+        if not callable(quote_fetch):
+            return
+
+        for model_cfg in self.config.trading_models:
+            state = self.state_store.get(model_cfg.state_key)
+            if not state.in_position:
+                continue
+            if state.metadata.get("pending_exit_intent_id"):
+                continue
+
+            manifest = self._resolve_manifest({}, model_cfg.model, symbol_hint=model_cfg.symbol)
+            if manifest is None:
+                continue
+
+            policy_id = self._policy_overrides.get(model_cfg.symbol, model_cfg.policy_id or model_cfg.model)
+            timeframe = model_cfg.timeframe
+            decision_namespace = f"{model_cfg.symbol}:{timeframe}:{policy_id}:{model_cfg.model}"
+
+            entry_price = _safe_float(state.metadata.get("open_price"))
+            entry_amount = _safe_float(state.metadata.get("open_amount"))
+            if entry_price is None or entry_price <= 0 or entry_amount is None or entry_amount <= 0:
+                continue
+
+            quote: Optional[Dict[str, float]] = None
+            try:
+                quote = await quote_fetch(exchange=model_cfg.exchange, symbol=model_cfg.symbol)
+            except Exception:
+                quote = None
+            if not isinstance(quote, dict):
+                continue
+            quote_bid = quote.get("bid")
+            if quote_bid is None or not math.isfinite(float(quote_bid)) or float(quote_bid) <= 0:
+                continue
+            current_price = float(quote_bid)
+            spread_bps = None
+            try:
+                spread_val = quote.get("spread_bps")
+                spread_bps = float(spread_val) if spread_val is not None else None
+            except Exception:
+                spread_bps = None
+
+            # Update peak price metadata so profit-trailing stays accurate between decision bars.
+            try:
+                peak = _safe_float(state.metadata.get("open_peak_price"))
+                if peak is None or peak <= 0:
+                    peak = entry_price
+                peak = max(float(peak), current_price)
+                state.metadata["open_peak_price"] = f"{float(peak):.10f}"
+            except Exception:
+                pass
+
+            min_hold_bars = model_cfg.min_hold_bars_override or manifest.min_hold_bars
+            min_hold_seconds = max(1, int(min_hold_bars)) * max(1, int(model_cfg.bar_seconds))
+            max_hold_seconds = None
+            if model_cfg.max_hold_minutes is not None:
+                try:
+                    max_hold_seconds = max(1, int(model_cfg.max_hold_minutes) * 60)
+                except Exception:
+                    max_hold_seconds = None
+            if max_hold_seconds is not None and max_hold_seconds < min_hold_seconds:
+                max_hold_seconds = min_hold_seconds
+
+            # Use a looser "hard" stop for the price monitor to avoid exiting on transient intrabar wicks.
+            base_stop_loss_pct = _safe_float(self.risk_limits.get("hard_stop_loss_pct"))
+            if base_stop_loss_pct is None or base_stop_loss_pct <= 0:
+                base_stop_loss_pct = _safe_float(getattr(model_cfg, "stop_loss_pct", None))
+            if base_stop_loss_pct is None or base_stop_loss_pct <= 0:
+                base_stop_loss_pct = _safe_float(self.risk_limits.get("min_stop_loss_pct"), 0.008) or 0.008
+
+            take_profit_pct = _safe_float(getattr(model_cfg, "take_profit_pct", None))
+            if take_profit_pct is not None and take_profit_pct <= 0:
+                take_profit_pct = None
+
+            profit_trailing_start_pct = _safe_float(getattr(model_cfg, "profit_trailing_start_pct", None))
+            if profit_trailing_start_pct is not None and profit_trailing_start_pct <= 0:
+                profit_trailing_start_pct = None
+            profit_trailing_stop_pct = _safe_float(getattr(model_cfg, "profit_trailing_stop_pct", None))
+            if profit_trailing_stop_pct is not None and profit_trailing_stop_pct <= 0:
+                profit_trailing_stop_pct = None
+
+            trigger_cfg = TriggerConfig(
+                entry_threshold=manifest.entry_threshold,
+                exit_threshold=manifest.exit_threshold,
+                exit_prob_drop=manifest.exit_prob_drop,
+                min_hold_bars=min_hold_bars,
+                bar_seconds=model_cfg.bar_seconds,
+                long_only=manifest.long_only,
+                max_hold_seconds=max_hold_seconds,
+                stop_loss_pct=base_stop_loss_pct,
+                take_profit_pct=take_profit_pct,
+                profit_trailing_start_pct=profit_trailing_start_pct,
+                profit_trailing_stop_pct=profit_trailing_stop_pct,
+                max_spread_bps=model_cfg.max_spread_bps,
+            )
+
+            fee_estimate_bps = _safe_float(self.risk_limits.get("transaction_cost_bps"))
+            slippage_estimate_bps = _safe_float(self.risk_limits.get("slippage_bps"))
+
+            active_stop_loss_pct = self._compute_stop_loss_pct(base_stop_loss=base_stop_loss_pct, item={})
+            outcome = decide_bar(
+                ts=now,
+                probability=float(state.last_probability or manifest.entry_threshold),
+                gate_pass=bool(state.last_gate) if state.last_gate is not None else True,
+                state=state,
+                cfg=trigger_cfg,
+                current_price=current_price,
+                entry_price=entry_price,
+                entry_amount=entry_amount,
+                spread_bps=spread_bps,
+                include_spread_cost=False,
+                safe_mode_active=self._is_safe_mode_active(),
+                fee_estimate_bps=fee_estimate_bps,
+                slippage_estimate_bps=slippage_estimate_bps,
+                stop_loss_override=active_stop_loss_pct,
+                disable_prob_exits=True,
+            )
+            try:
+                outcome.exit_context["decision_price_source"] = "price_monitor_quote_bid"
+                outcome.exit_context["quote_bid"] = quote.get("bid")
+                outcome.exit_context["quote_ask"] = quote.get("ask")
+                outcome.exit_context["quote_mid"] = quote.get("mid")
+                outcome.exit_context["quote_spread_bps"] = quote.get("spread_bps")
+            except Exception:
+                pass
+
+            if not outcome.should_exit:
+                continue
+
+            # Execute exit using the same risk/audit paths as decision-driven exits.
+            threshold_for_audit = (
+                manifest.exit_threshold
+                if outcome.exit_trigger in {"prob_floor", "prob_trailing"}
+                else manifest.entry_threshold
+            )
+            intent_id = _build_order_intent_id(model_cfg, now, "sell")
+            portfolio_state = self._build_portfolio_state(ts=now, price_hints={model_cfg.symbol: current_price})
+            portfolio_state["orders_last_hour"] = int(portfolio_state.get("orders_last_hour", 0)) + 1
+            symbol_state = await self._build_symbol_state(
+                model_cfg,
+                state,
+                ts=now,
+                price=current_price,
+                item=None,
+            )
+            desired_qty = entry_amount
+            desired_notional = entry_price * entry_amount
+            risk_result = assess_and_adjust_order(
+                symbol=model_cfg.symbol,
+                action="EXIT_LONG",
+                desired_notional=desired_notional,
+                desired_qty=desired_qty,
+                price=current_price,
+                spread_bps=spread_bps,
+                now_ts=int(now.timestamp()),
+                portfolio_state=portfolio_state,
+                symbol_state=symbol_state,
+                risk_cfg=self.risk_limits,
+            )
+            if not risk_result.get("allowed"):
+                reason = risk_result.get("block_reason") or "risk_blocked"
+                record_risk_blocked(model_cfg.symbol, reason)
+                record_skip_reason(model_cfg.model, model_cfg.symbol, reason)
+                state.metadata["last_exit_reason"] = reason
+                state.metadata["last_exit_trigger"] = outcome.exit_trigger or ""
+                await self.audit_logger.log_trade(
+                    model=model_cfg.model,
+                    symbol=model_cfg.symbol,
+                    timeframe=timeframe,
+                    timestamp=now,
+                    side="sell",
+                    gate_pass=bool(state.last_gate) if state.last_gate is not None else True,
+                    probability=float(state.last_probability or 0.0),
+                    threshold=threshold_for_audit,
+                    decision=OrderDecision(
+                        executed=False,
+                        price_used=current_price,
+                        amount=desired_qty,
+                        reason=reason,
+                        blocked_reason=reason,
+                        order_intent_id=intent_id,
+                        notional=risk_result.get("final_notional"),
+                    ),
+                    policy_id=policy_id,
+                    risk_payload=risk_result,
+                    decision_namespace=decision_namespace,
+                    extra=self._build_exit_audit_payload(
+                        outcome=outcome,
+                        entry_price=entry_price,
+                        entry_amount=entry_amount,
+                        decision=None,
+                        current_price=current_price,
+                        spread_bps=spread_bps,
+                        fee_estimate_bps=fee_estimate_bps,
+                        slippage_estimate_bps=slippage_estimate_bps,
+                    ),
+                )
+                continue
+
+            final_notional = risk_result.get("final_notional", desired_notional)
+            final_qty = risk_result.get("final_qty", desired_qty)
+            for clip_reason in risk_result.get("clip_reasons", []):
+                record_risk_clipped(model_cfg.symbol, clip_reason)
+            self._record_turnover(now, final_notional)
+            self._record_order_timestamp(now)
+            decision = await self.executor.submit(
+                exchange=model_cfg.exchange,
+                symbol=model_cfg.symbol,
+                side="sell",
+                order_amount=final_qty,
+                order_notional=final_notional,
+                max_spread_bps=self._exit_max_spread_bps(model_cfg),
+                shadow_mode=bool(model_cfg.shadow_mode),
+                order_intent_id=intent_id,
+            )
+            if decision.order_intent_id is None:
+                decision.order_intent_id = intent_id
+            if decision.dedup_blocked:
+                record_dedup_blocked(model_cfg.model, model_cfg.symbol, decision.reason or "duplicate_intent")
+                record_skip_reason(model_cfg.model, model_cfg.symbol, decision.reason or "duplicate_intent")
+                state.metadata["last_exit_reason"] = decision.reason or "duplicate_intent"
+                state.metadata["last_exit_trigger"] = outcome.exit_trigger or ""
+                await self.audit_logger.log_trade(
+                    model=model_cfg.model,
+                    symbol=model_cfg.symbol,
+                    timeframe=timeframe,
+                    timestamp=now,
+                    side="sell",
+                    gate_pass=bool(state.last_gate) if state.last_gate is not None else True,
+                    probability=float(state.last_probability or 0.0),
+                    threshold=threshold_for_audit,
+                    decision=decision,
+                    policy_id=policy_id,
+                    risk_payload=risk_result,
+                    decision_namespace=decision_namespace,
+                    extra=self._build_exit_audit_payload(
+                        outcome=outcome,
+                        entry_price=entry_price,
+                        entry_amount=entry_amount,
+                        decision=decision,
+                        current_price=current_price,
+                        spread_bps=spread_bps,
+                        fee_estimate_bps=fee_estimate_bps,
+                        slippage_estimate_bps=slippage_estimate_bps,
+                    ),
+                )
+                continue
+
+            fill_confirmed = self.config.dry_run or decision.intent_status in {IntentStatus.FILLED.value}
+            exit_payload = self._build_exit_audit_payload(
+                outcome=outcome,
+                entry_price=entry_price,
+                entry_amount=entry_amount,
+                decision=decision,
+                current_price=current_price,
+                spread_bps=spread_bps,
+                fee_estimate_bps=fee_estimate_bps,
+                slippage_estimate_bps=slippage_estimate_bps,
+            )
+            await self.audit_logger.log_trade(
+                model=model_cfg.model,
+                symbol=model_cfg.symbol,
+                timeframe=timeframe,
+                timestamp=now,
+                side="sell",
+                gate_pass=bool(state.last_gate) if state.last_gate is not None else True,
+                probability=float(state.last_probability or 0.0),
+                threshold=threshold_for_audit,
+                decision=decision,
+                policy_id=policy_id,
+                risk_payload=risk_result,
+                decision_namespace=decision_namespace,
+                extra=exit_payload,
+            )
+            if decision.executed and fill_confirmed:
+                pnl_value = 0.0
+                exit_price = float(decision.price_used or 0.0)
+                exit_amount = float(decision.amount or entry_amount or 0.0)
+                if entry_price > 0.0 and entry_amount > 0.0 and exit_price > 0.0:
+                    qty = min(entry_amount, exit_amount if exit_amount > 0.0 else entry_amount)
+                    pnl_value = (exit_price - entry_price) * qty
+                    record_realized_pnl(model_cfg.model, model_cfg.symbol, pnl_value)
+                    self._update_risk_pnl(now, pnl_value)
+                    self._update_loss_streak_after_exit(state, now, pnl_value, self._get_loss_guard_cfg(model_cfg.symbol))
+                    state.metadata["last_realized_pnl"] = f"{pnl_value:.10f}"
+                state.metadata.pop("open_price", None)
+                state.metadata.pop("open_amount", None)
+                state.metadata.pop("open_side", None)
+                state.metadata.pop("open_entry_prob", None)
+                state.metadata.pop("open_peak_price", None)
+                state.mark_exit(now)
+                state.metadata["last_exit_reason"] = decision.reason or ""
+                state.metadata["last_exit_spread_bps"] = (
+                    f"{decision.spread_bps:.4f}" if decision.spread_bps is not None else ""
+                )
+                state.metadata["last_exit_trigger"] = outcome.exit_trigger or ""
+                set_position_active(model_cfg.model, model_cfg.symbol, False)
+                await self.state_store.flush()
+            elif decision.executed:
+                self._mark_pending_exit(
+                    state,
+                    intent_id=intent_id,
+                    probability=float(state.last_probability or 0.0),
+                    price=decision.price_used,
+                    amount=decision.amount,
+                    reason=decision.reason,
+                    spread_bps=decision.spread_bps,
+                    trigger=outcome.exit_trigger,
+                )
+                await self.state_store.flush()
 
     async def _handle_payload(self, raw: str) -> None:
         try:
@@ -1542,14 +1984,16 @@ class TradingService:
         exit_prob_drop = float(manifest.exit_prob_drop)
         dirty = False
         try:
-            stop_loss_pct = (
+            base_stop_loss_pct = (
                 float(model_cfg.stop_loss_pct) if getattr(model_cfg, "stop_loss_pct", None) is not None else None
             )
         except (TypeError, ValueError):
-            stop_loss_pct = None
+            base_stop_loss_pct = None
         # Fail-safe: apply a small stop-loss if none configured or it was disabled (<=0).
-        if stop_loss_pct is None or stop_loss_pct <= 0.0:
-            stop_loss_pct = 0.01 if not self.config.dry_run else None
+        if base_stop_loss_pct is None or base_stop_loss_pct <= 0.0:
+            base_stop_loss_pct = _safe_float(self.risk_limits.get("min_stop_loss_pct"), 0.008)
+            if base_stop_loss_pct is None or base_stop_loss_pct <= 0.0:
+                base_stop_loss_pct = 0.008
         try:
             take_profit_pct = (
                 float(model_cfg.take_profit_pct)
@@ -1560,6 +2004,26 @@ class TradingService:
             take_profit_pct = None
         if take_profit_pct is not None and take_profit_pct <= 0.0:
             take_profit_pct = None
+        try:
+            profit_trailing_start_pct = (
+                float(model_cfg.profit_trailing_start_pct)
+                if getattr(model_cfg, "profit_trailing_start_pct", None) is not None
+                else None
+            )
+        except (TypeError, ValueError):
+            profit_trailing_start_pct = None
+        if profit_trailing_start_pct is not None and profit_trailing_start_pct <= 0.0:
+            profit_trailing_start_pct = None
+        try:
+            profit_trailing_stop_pct = (
+                float(model_cfg.profit_trailing_stop_pct)
+                if getattr(model_cfg, "profit_trailing_stop_pct", None) is not None
+                else None
+            )
+        except (TypeError, ValueError):
+            profit_trailing_stop_pct = None
+        if profit_trailing_stop_pct is not None and profit_trailing_stop_pct <= 0.0:
+            profit_trailing_stop_pct = None
 
         trigger_cfg = TriggerConfig(
             entry_threshold=entry_threshold,
@@ -1569,8 +2033,10 @@ class TradingService:
             bar_seconds=model_cfg.bar_seconds,
             long_only=manifest.long_only,
             max_hold_seconds=max_hold_seconds,
-            stop_loss_pct=stop_loss_pct,
+            stop_loss_pct=base_stop_loss_pct,
             take_profit_pct=take_profit_pct,
+            profit_trailing_start_pct=profit_trailing_start_pct,
+            profit_trailing_stop_pct=profit_trailing_stop_pct,
             max_spread_bps=model_cfg.max_spread_bps,
         )
 
@@ -1665,6 +2131,16 @@ class TradingService:
                     decision_price_source = "quote_ask"
                 if quote_spread is not None and math.isfinite(float(quote_spread)):
                     spread_bps = float(quote_spread)
+
+            if state.in_position and current_price is not None and current_price > 0:
+                try:
+                    peak_val = _safe_float(state.metadata.get("open_peak_price"))
+                    if peak_val is None or peak_val <= 0:
+                        peak_val = entry_price if entry_price is not None and entry_price > 0 else current_price
+                    peak_val = max(float(peak_val), float(current_price))
+                    state.metadata["open_peak_price"] = f"{float(peak_val):.10f}"
+                except Exception:
+                    pass
             fee_estimate_bps = None
             try:
                 fee_estimate_bps = float(self.risk_limits.get("transaction_cost_bps"))
@@ -1675,6 +2151,10 @@ class TradingService:
                 slippage_estimate_bps = float(self.risk_limits.get("slippage_bps"))
             except Exception:
                 slippage_estimate_bps = None
+            active_stop_loss_pct = self._compute_stop_loss_pct(
+                base_stop_loss=base_stop_loss_pct,
+                item=item,
+            )
 
             outcome = decide_bar(
                 ts=ts,
@@ -1690,6 +2170,8 @@ class TradingService:
                 safe_mode_active=self._is_safe_mode_active(),
                 fee_estimate_bps=fee_estimate_bps,
                 slippage_estimate_bps=slippage_estimate_bps,
+                stop_loss_override=active_stop_loss_pct,
+                disable_prob_exits=bool(getattr(model_cfg, "disable_prob_exits", False)),
             )
             try:
                 outcome.exit_context["decision_price_source"] = decision_price_source
@@ -1718,6 +2200,44 @@ class TradingService:
 
             if outcome.should_enter:
                 record_would_trade(model_cfg.model, model_cfg.symbol, "buy")
+                entry_filter_reason = _entry_filter_block_reason(model_cfg, item)
+                if entry_filter_reason:
+                    record_skip_reason(model_cfg.model, model_cfg.symbol, entry_filter_reason)
+                    state.metadata["last_entry_reason"] = entry_filter_reason
+                    state.metadata["last_entry_trigger"] = entry_filter_reason
+                    state.metadata["entry_filter_blocked_at"] = ts.isoformat()
+                    dirty = True
+                    blocked_decision = OrderDecision(
+                        executed=False,
+                        price_used=current_price,
+                        amount=None,
+                        reason=entry_filter_reason,
+                        blocked_reason=entry_filter_reason,
+                    )
+                    await self.audit_logger.log_trade(
+                        model=model_cfg.model,
+                        symbol=model_cfg.symbol,
+                        timeframe=timeframe,
+                        timestamp=ts,
+                        side="buy",
+                        gate_pass=gate_pass,
+                        probability=probability,
+                        threshold=entry_threshold,
+                        decision=blocked_decision,
+                        policy_id=policy_id,
+                        decision_namespace=decision_namespace,
+                        extra={
+                            "entry_filter_rsi_min": getattr(model_cfg, "entry_rsi_min", None),
+                            "entry_filter_macd_min": getattr(model_cfg, "entry_macd_min", None),
+                        },
+                    )
+                    self._record_deadlock_trade_event(
+                        model_cfg,
+                        ts,
+                        executed=False,
+                        reason=entry_filter_reason,
+                    )
+                    continue
                 guard_active, required_prob, notional_scale, loss_count = self._loss_guard_entry_params(
                     state=state,
                     ts=ts,
@@ -1891,6 +2411,7 @@ class TradingService:
                 if decision.executed and fill_confirmed:
                     if decision.price_used is not None:
                         state.metadata["open_price"] = f"{float(decision.price_used):.10f}"
+                        state.metadata["open_peak_price"] = f"{float(decision.price_used):.10f}"
                     if decision.amount is not None:
                         state.metadata["open_amount"] = f"{float(decision.amount):.10f}"
                     state.metadata["open_side"] = "long"
@@ -1932,6 +2453,7 @@ class TradingService:
                         f"{decision.spread_bps:.4f}" if decision.spread_bps is not None else ""
                     )
                     state.metadata.pop("open_entry_prob", None)
+                    state.metadata.pop("open_peak_price", None)
                     dirty = True
                     if decision.exchange_order_id:
                         self._spawn_task(
@@ -1958,6 +2480,7 @@ class TradingService:
                     )
                     record_skip_reason(model_cfg.model, model_cfg.symbol, decision.reason or "unknown")
                     state.metadata.pop("open_entry_prob", None)
+                    state.metadata.pop("open_peak_price", None)
                     state.metadata["last_entry_reason"] = decision.reason or ""
                     state.metadata["last_entry_spread_bps"] = (
                         f"{decision.spread_bps:.4f}" if decision.spread_bps is not None else ""
@@ -2021,7 +2544,7 @@ class TradingService:
                         model_cfg.symbol,
                         (current_price or 0.0),
                         (entry_price or 0.0),
-                        (stop_loss_pct or 0.0) * 100.0,
+                        (active_stop_loss_pct or 0.0) * 100.0,
                     )
                 elif outcome.exit_trigger == "take_profit":
                     logger.info(
@@ -2158,78 +2681,6 @@ class TradingService:
                             pass
                     if expected_net is not None and notional_hint is not None and total_cost_bps:
                         expected_net = expected_net - (notional_hint * total_cost_bps / 1e4)
-                    loss_frac = None
-                    if expected_net is not None and notional_hint:
-                        try:
-                            loss_frac = abs(expected_net) / float(notional_hint)
-                        except Exception:
-                            loss_frac = None
-                    block_on_net = (
-                        expected_net is not None
-                        and expected_net <= 0
-                        and outcome.exit_trigger in {"prob_floor", "prob_trailing", "gate_close", "take_profit"}
-                    )
-                    if block_on_net and loss_frac is not None and stop_loss_pct:
-                        try:
-                            if float(loss_frac) >= float(stop_loss_pct):
-                                block_on_net = False
-                        except Exception:
-                            pass
-                    if block_on_net and max_hold_seconds and state.entry_ts:
-                        try:
-                            age_seconds = (ts - state.entry_ts).total_seconds()
-                            if age_seconds >= max_hold_seconds:
-                                block_on_net = False
-                        except Exception:
-                            pass
-                    if block_on_net:
-                        pnl_blocked = True
-                        reason = "pnl_block"
-                        record_skip_reason(model_cfg.model, model_cfg.symbol, reason)
-                        state.metadata["last_exit_reason"] = reason
-                        self._record_deadlock_trade_event(model_cfg, ts, executed=False, reason=reason)
-                        blocked_decision = OrderDecision(
-                            executed=False,
-                            price_used=current_price,
-                            amount=final_exit_qty,
-                            reason=reason,
-                            blocked_reason=reason,
-                            order_intent_id=intent_id,
-                            notional=final_exit_notional,
-                        )
-                        exit_payload = self._build_exit_audit_payload(
-                            outcome=outcome,
-                            entry_price=entry_price,
-                            entry_amount=entry_amount,
-                            decision=blocked_decision,
-                            current_price=current_price,
-                            spread_bps=spread_bps,
-                            fee_estimate_bps=fee_estimate_bps,
-                            slippage_estimate_bps=slippage_estimate_bps,
-                        )
-                        if expected_pnl is not None:
-                            exit_payload["pnl_expected"] = expected_pnl
-                            exit_payload["pnl_expected_net"] = expected_net
-                            exit_payload["pnl_blocked"] = pnl_blocked
-                        await self.audit_logger.log_trade(
-                            model=model_cfg.model,
-                            symbol=model_cfg.symbol,
-                            timeframe=timeframe,
-                            timestamp=ts,
-                            side="sell",
-                            gate_pass=gate_pass,
-                            probability=probability,
-                            threshold=exit_threshold
-                            if outcome.exit_trigger in {"prob_floor", "prob_trailing"}
-                            else entry_threshold,
-                            decision=blocked_decision,
-                            policy_id=policy_id,
-                            risk_payload=risk_result,
-                            decision_namespace=decision_namespace,
-                            extra=exit_payload,
-                        )
-                        dirty = True
-                        continue
 
                 self._record_turnover(ts, final_exit_notional)
                 self._record_order_timestamp(ts)
@@ -2239,7 +2690,7 @@ class TradingService:
                     side="sell",
                     order_amount=final_exit_qty,
                     order_notional=final_exit_notional,
-                    max_spread_bps=model_cfg.max_spread_bps,
+                    max_spread_bps=self._exit_max_spread_bps(model_cfg),
                     shadow_mode=shadow_mode_flag,
                     order_intent_id=intent_id,
                 )
@@ -2366,6 +2817,7 @@ class TradingService:
                     )
                     state.metadata["last_exit_trigger"] = outcome.exit_trigger or ""
                     state.metadata.pop("open_entry_prob", None)
+                    state.metadata.pop("open_peak_price", None)
                     set_position_active(model_cfg.model, model_cfg.symbol, False)
                     dirty = True
                     market_price = current_price if current_price is not None else decision.price_used
@@ -2437,7 +2889,9 @@ class TradingService:
                         reason=decision.reason or "skipped",
                     )
             elif outcome.exit_armed:
-                if outcome.exit_blocked_by_hold:
+                if outcome.skip_execution and outcome.skip_reason:
+                    skip_reason = outcome.skip_reason
+                elif outcome.exit_blocked_by_hold:
                     skip_reason = "min_hold"
                 elif getattr(outcome, "exit_blocked_by_pnl", False):
                     skip_reason = "pnl_block"

@@ -362,6 +362,48 @@ def assess_and_adjust_order(
         if rounded_qty != final_qty:
             clip_reasons.append("exchange_qty_step")
         final_qty = rounded_qty
+
+    # If exchange step rounding would clip an entry to zero, attempt a small bump to the minimum
+    # quantity step (subject to risk caps). This prevents deadlocks where loss-scaling pushes
+    # orders below exchange precision.
+    if is_entry and (final_qty is None or final_qty <= 0) and qty_step and price and float(price) > 0 and requested_notional > 0:
+        try:
+            step_qty = float(qty_step)
+        except (TypeError, ValueError):
+            step_qty = 0.0
+        if step_qty > 0:
+            min_notional_for_step = step_qty * float(price)
+            required_notional = max(min_notional_for_step, float(min_trade_notional or 0.0))
+            bump_ratio = required_notional / float(requested_notional) if requested_notional else float("inf")
+            if bump_ratio <= 2.0:
+                # Enforce the strictest cap across symbol + portfolio exposure limits.
+                max_allowed = float("inf")
+                if symbol_cap is not None:
+                    max_allowed = min(max_allowed, max(0.0, symbol_cap - current_symbol_notional))
+                weight = symbol_cfg.get("max_symbol_weight", risk_cfg.get("max_symbol_weight"))
+                if capital > 0 and weight is not None:
+                    try:
+                        weight_f = float(weight)
+                    except (TypeError, ValueError):
+                        weight_f = 0.0
+                    if weight_f > 0:
+                        max_allowed = min(max_allowed, max(0.0, capital * weight_f - current_symbol_notional))
+                gross_cap = capital * max_gross_leverage if capital and max_gross_leverage else None
+                if gross_cap is not None:
+                    max_allowed = min(max_allowed, max(0.0, gross_cap - gross_exposure))
+                net_cap = capital * max_net_exposure if capital and max_net_exposure else None
+                if net_cap is not None:
+                    max_allowed = min(max_allowed, max(0.0, net_cap - net_exposure))
+
+                if required_notional > 0 and required_notional <= max_allowed:
+                    required_qty = required_notional / float(price)
+                    steps = math.ceil(required_qty / step_qty)
+                    bumped_qty = steps * step_qty
+                    bumped_notional = bumped_qty * float(price)
+                    if bumped_qty > 0 and bumped_notional <= max_allowed:
+                        final_qty = bumped_qty
+                        final_notional = bumped_notional
+                        clip_reasons.append("exchange_qty_step_floor")
     if price_tick and price and price_tick > 0:
         rounded_price = _round_down(float(price), price_tick)
         if rounded_price > 0:

@@ -24,6 +24,8 @@ class TriggerConfig:
     max_hold_seconds: Optional[int] = None
     stop_loss_pct: Optional[float] = None
     take_profit_pct: Optional[float] = None
+    profit_trailing_start_pct: Optional[float] = None
+    profit_trailing_stop_pct: Optional[float] = None
     max_spread_bps: Optional[float] = None
 
 
@@ -62,6 +64,9 @@ def decide_bar(
     entry_amount: Optional[float] = None,
     spread_bps: Optional[float] = None,
     include_spread_cost: bool = True,
+    stop_loss_override: Optional[float] = None,
+    take_profit_override: Optional[float] = None,
+    disable_prob_exits: bool = False,
     safe_mode_active: bool = False,
     fee_estimate_bps: Optional[float] = None,
     slippage_estimate_bps: Optional[float] = None,
@@ -88,14 +93,16 @@ def decide_bar(
     skip_reason: Optional[str] = None
     entry_block_reason: Optional[str] = None
 
-    # Execution guard (spread) – informational for offline; live executor enforces too.
+    spread_too_wide = False
     if _is_finite(spread_bps) and cfg.max_spread_bps is not None:
         try:
-            if float(spread_bps) > float(cfg.max_spread_bps):
-                skip_execution = True
-                skip_reason = "spread_threshold"
+            spread_too_wide = float(spread_bps) > float(cfg.max_spread_bps)
         except Exception:
             pass
+
+    if (not state.in_position) and spread_too_wide:
+        skip_execution = True
+        skip_reason = "spread_threshold"
 
     if not state.in_position:
         safe_mode_flag = safe_mode_active or os.getenv(SAFE_MODE_ENV, "").strip().lower() in _FLAG_TRUE_VALUES
@@ -118,14 +125,16 @@ def decide_bar(
         should_enter = True
 
     # Exit conditions
-    exit_due_to_prob_floor = probability < cfg.exit_threshold
+    exit_due_to_prob_floor = (probability < cfg.exit_threshold) if not disable_prob_exits else False
     # Gate closure should only force an exit when the probability gate still passes but another
     # non-probability predicate fails (e.g. volatility/spread filters). This preserves hysteresis
     # between `entry_threshold` and `exit_threshold` instead of exiting on minor probability jitter.
-    exit_due_to_gate_close = (not gate_pass) and probability >= cfg.entry_threshold
+    exit_due_to_gate_close = (
+        ((not gate_pass) and probability >= cfg.entry_threshold) if not disable_prob_exits else False
+    )
     exit_due_to_gate = exit_due_to_prob_floor or exit_due_to_gate_close
     exit_due_to_trailing = False
-    if state.in_position and _is_finite(state.metadata.get("open_entry_prob")):
+    if (not disable_prob_exits) and state.in_position and _is_finite(state.metadata.get("open_entry_prob")):
         try:
             stored_entry_prob = float(state.metadata.get("open_entry_prob") or 0.0)
             exit_due_to_trailing = (stored_entry_prob - probability) >= cfg.exit_prob_drop
@@ -133,6 +142,10 @@ def decide_bar(
             exit_due_to_trailing = False
     exit_due_to_stop = False
     exit_due_to_take_profit = False
+    exit_due_to_profit_trailing = False
+    profit_trailing_armed = False
+    profit_trailing_stop_price: Optional[float] = None
+    peak_price_val: Optional[float] = None
     if (
         state.in_position
         and _is_finite(entry_price)
@@ -140,17 +153,38 @@ def decide_bar(
     ):
         ep = float(entry_price)  # type: ignore[arg-type]
         cp = float(current_price)  # type: ignore[arg-type]
-        if cfg.stop_loss_pct is not None and cfg.stop_loss_pct > 0 and cp <= ep * (1.0 - cfg.stop_loss_pct):
+        stop_loss_pct = stop_loss_override if stop_loss_override is not None else cfg.stop_loss_pct
+        take_profit_pct = take_profit_override if take_profit_override is not None else cfg.take_profit_pct
+        if stop_loss_pct is not None and stop_loss_pct > 0 and cp <= ep * (1.0 - stop_loss_pct):
             exit_due_to_stop = True
-        if cfg.take_profit_pct is not None and cfg.take_profit_pct > 0 and cp >= ep * (1.0 + cfg.take_profit_pct):
+        if take_profit_pct is not None and take_profit_pct > 0 and cp >= ep * (1.0 + take_profit_pct):
             exit_due_to_take_profit = True
+        # Profit trailing: once price has moved in our favor by `profit_trailing_start_pct`,
+        # exit if it retraces by `profit_trailing_stop_pct` from the peak.
+        start_pct = cfg.profit_trailing_start_pct
+        trail_pct = cfg.profit_trailing_stop_pct
+        if start_pct is not None and trail_pct is not None and start_pct > 0 and trail_pct > 0:
+            try:
+                peak_raw = state.metadata.get("open_peak_price")
+                peak_price = float(peak_raw) if peak_raw is not None else ep
+            except Exception:
+                peak_price = ep
+            if not math.isfinite(peak_price) or peak_price <= 0:
+                peak_price = ep
+            peak_price = max(peak_price, cp)
+            peak_price_val = peak_price
+            profit_trailing_armed = peak_price >= ep * (1.0 + float(start_pct))
+            if profit_trailing_armed:
+                profit_trailing_stop_price = peak_price * (1.0 - float(trail_pct))
+                if cp <= profit_trailing_stop_price:
+                    exit_due_to_profit_trailing = True
 
     force_time_exit = False
     if state.in_position and max_hold_seconds is not None and state.entry_ts is not None:
         force_time_exit = (ts - state.entry_ts).total_seconds() >= max_hold_seconds
 
     ready_for_exit = state.ready_for_exit(ts)
-    if (exit_due_to_stop or exit_due_to_take_profit or force_time_exit) and not ready_for_exit:
+    if (exit_due_to_stop or exit_due_to_take_profit or exit_due_to_profit_trailing or force_time_exit) and not ready_for_exit:
         ready_for_exit = True
 
     exit_reasons: List[str] = []
@@ -159,6 +193,8 @@ def decide_bar(
             exit_reasons.append("stop_loss")
         if exit_due_to_take_profit:
             exit_reasons.append("take_profit")
+        if exit_due_to_profit_trailing:
+            exit_reasons.append("profit_trailing")
         if force_time_exit:
             exit_reasons.append("time_exit")
         if exit_due_to_prob_floor:
@@ -179,6 +215,8 @@ def decide_bar(
             exit_trigger = "stop_loss"
         elif exit_due_to_take_profit:
             exit_trigger = "take_profit"
+        elif exit_due_to_profit_trailing:
+            exit_trigger = "profit_trailing"
         elif exit_due_to_prob_floor:
             exit_trigger = "prob_floor"
         elif exit_due_to_gate_close:
@@ -192,15 +230,30 @@ def decide_bar(
             or force_time_exit
             or exit_due_to_stop
             or exit_due_to_take_profit
+            or exit_due_to_profit_trailing
         )
 
+    if (
+        state.in_position
+        and spread_too_wide
+        and should_exit
+        and not exit_due_to_stop
+        and not force_time_exit
+    ):
+        skip_execution = True
+        skip_reason = "spread_threshold"
+        should_exit = False
+        exit_trigger = None
+
     # Honor min-hold: if state says hold_until is in future, we cannot exit yet.
+    # Exception: stop-loss exits are risk controls and must be allowed even during the hold window.
     if state.in_position and state.hold_until is not None and ts < state.hold_until:
-        if should_exit:
+        hold_blocks_exit = not (exit_due_to_stop or exit_due_to_take_profit or exit_due_to_profit_trailing or force_time_exit)
+        if should_exit and hold_blocks_exit:
             # Defer exit until hold expires.
             should_exit = False
             exit_trigger = None
-        if exit_armed:
+        if exit_armed and hold_blocks_exit:
             exit_blocked_by_hold = True
 
     prob_entry: Optional[float] = None
@@ -248,16 +301,8 @@ def decide_bar(
             pnl_net_estimate = pnl_gross - (pnl_notional * total_cost_bps / 1e4)
 
     pnl_for_exit = pnl_net_estimate if pnl_net_estimate is not None else pnl_gross
-    if pnl_for_exit is not None and pnl_for_exit < 0:
-        exit_blocked_by_pnl = True
-
-    if (
-        exit_blocked_by_pnl
-        and should_exit
-        and exit_trigger in {"prob_floor", "gate_close", "prob_trailing", "take_profit"}
-    ):
-        should_exit = False
-        exit_trigger = None
+    # We no longer block exits solely because the position is at a small loss; rely on explicit stops/holds instead.
+    exit_blocked_by_pnl = False
 
     exit_reason_primary = exit_trigger or (exit_reasons[0] if exit_reasons else None)
 
@@ -276,6 +321,13 @@ def decide_bar(
         "spread_bps_now": float(spread_bps) if _is_finite(spread_bps) else None,
         "fee_estimate_bps": float(fee_estimate_bps) if _is_finite(fee_estimate_bps) else None,
         "slippage_estimate_bps": float(slippage_estimate_bps) if _is_finite(slippage_estimate_bps) else None,
+        "stop_loss_pct": stop_loss_override if stop_loss_override is not None else cfg.stop_loss_pct,
+        "take_profit_pct": take_profit_override if take_profit_override is not None else cfg.take_profit_pct,
+        "profit_trailing_start_pct": cfg.profit_trailing_start_pct,
+        "profit_trailing_stop_pct": cfg.profit_trailing_stop_pct,
+        "profit_trailing_armed": bool(profit_trailing_armed),
+        "profit_trailing_stop_price": profit_trailing_stop_price,
+        "open_peak_price": peak_price_val,
         "pnl_gross": pnl_gross,
         "pnl_net_estimate": pnl_net_estimate,
         "pnl_notional": pnl_notional,
