@@ -8,6 +8,38 @@ from typing import Dict, List, Optional, Sequence
 import pandas as pd
 
 
+def _sanitize_ohlc(df: pd.DataFrame, *, max_dev_frac: float = 0.30) -> pd.DataFrame:
+    """
+    Clamp obviously-bad OHLC spikes (e.g., low far below open/close) that corrupt MFE/MAE.
+
+    This is intentionally conservative: it only clamps extremes relative to the candle open/close,
+    which are the most reliable fields in the dataset.
+    """
+    if df is None or df.empty:
+        return df
+    if not 0 < max_dev_frac < 1:
+        max_dev_frac = 0.30
+    required = {"open", "high", "low", "close"}
+    if not required.issubset(set(df.columns)):
+        return df
+    working = df.copy()
+    for col in ("open", "high", "low", "close"):
+        working[col] = pd.to_numeric(working[col], errors="coerce")
+
+    oc_min = working[["open", "close"]].min(axis=1)
+    oc_max = working[["open", "close"]].max(axis=1)
+    low_bad = working["low"] < (oc_min * (1.0 - max_dev_frac))
+    high_bad = working["high"] > (oc_max * (1.0 + max_dev_frac))
+    if low_bad.any():
+        working.loc[low_bad, "low"] = oc_min[low_bad]
+    if high_bad.any():
+        working.loc[high_bad, "high"] = oc_max[high_bad]
+    # Ensure OHLC consistency after clamping.
+    working["low"] = working[["low", "open", "close"]].min(axis=1)
+    working["high"] = working[["high", "open", "close"]].max(axis=1)
+    return working
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Align trades with market moves (MFE/MAE/regret).")
     parser.add_argument("--trades-csv", required=True, help="per_symbol_trades.csv from forensics output")
@@ -55,7 +87,9 @@ def _load_market(root: Path, symbol: str, start: pd.Timestamp, end: pd.Timestamp
     df_all["timestamp"] = pd.to_datetime(df_all["timestamp"], utc=True, errors="coerce")
     df_all = df_all[(df_all["timestamp"] >= start - pd.Timedelta(minutes=5)) & (df_all["timestamp"] <= end + pd.Timedelta(minutes=5))]
     df_all = df_all.sort_values("timestamp").drop_duplicates(subset=["timestamp"])
-    return df_all[["timestamp", "open", "high", "low", "close"]]
+    df_all = df_all[["timestamp", "open", "high", "low", "close"]]
+    df_all = _sanitize_ohlc(df_all)
+    return df_all
 
 
 def _price_at(df: pd.DataFrame, ts: pd.Timestamp) -> Optional[float]:
@@ -139,7 +173,9 @@ def _align_trades(trades: pd.DataFrame, market_root: Path, window_min: int) -> p
                     "symbol": symbol,
                     "entry_ts": entry_ts,
                     "exit_ts": exit_ts,
-                    "exit_reason": row.get("exit_reason_primary"),
+                    "exit_reason": row.get("exit_reason")
+                    or row.get("exit_reason_primary")
+                    or row.get("exit_trigger"),
                     "pnl": row.get("pnl"),
                     "hold_minutes": row.get("hold_minutes"),
                     "entry_price": entry_price,
@@ -168,6 +204,13 @@ def _summaries(aligned: pd.DataFrame) -> Dict[str, object]:
     recs: List[str] = []
     for symbol in aligned["symbol"].dropna().unique():
         df = aligned[aligned["symbol"] == symbol]
+        regret_mask = None
+        try:
+            regret_mask = (df["mfe_pct"] - df["exit_return_pct"]) > 0.002
+        except Exception:
+            regret_mask = None
+        regret_frac = float(regret_mask.mean()) if regret_mask is not None else None
+        short_hold_frac = float((df["hold_minutes"] < 5).mean()) if "hold_minutes" in df.columns else None
         sym_stats = {
             "trades_aligned": int(len(df)),
             "mfe_mean": _safe_mean(df["mfe_pct"]),
@@ -175,6 +218,8 @@ def _summaries(aligned: pd.DataFrame) -> Dict[str, object]:
             "exit_return_mean": _safe_mean(df["exit_return_pct"]),
             "post_exit_max_return_mean": _safe_mean(df["post_exit_max_return_pct"]),
             "post_exit_min_return_mean": _safe_mean(df["post_exit_min_return_pct"]),
+            "regret_fraction": regret_frac,
+            "short_hold_fraction": short_hold_frac,
         }
         exit_reason_stats = (
             df.groupby("exit_reason")[["exit_return_pct", "post_exit_max_return_pct", "post_exit_min_return_pct"]]
@@ -213,6 +258,9 @@ def _render_markdown(aligned: pd.DataFrame, summary: Dict[str, object], output_d
         )
         lines.append(
             f"- Post-exit drift: max {fmt(stats['post_exit_max_return_mean'])} | min {fmt(stats['post_exit_min_return_mean'])}"
+        )
+        lines.append(
+            f"- Regret share (MFE >> exit): {fmt(stats.get('regret_fraction'))} | Short holds (<5m): {fmt(stats.get('short_hold_fraction'))}"
         )
         lines.append("- Exit reason effects:")
         for rec in stats["exit_reason_stats"][:5]:

@@ -30,6 +30,7 @@ def main() -> int:
     parser.add_argument("--contract", type=Path, required=True)
     parser.add_argument("--policy", type=Path, default=Path("configs/final_trigger_policy.yaml"))
     parser.add_argument("--model-dir", type=Path, required=True)
+    parser.add_argument("--symbol", type=str, default=None, help="Optional symbol filter (e.g., ETH/USDT)")
     parser.add_argument("--max-rows", type=int, default=5000)
     parser.add_argument("--prob-column", type=str, default="base_prob")
     parser.add_argument("--gate-column", type=str, default="gate_pass")
@@ -55,7 +56,8 @@ def main() -> int:
         max_spread_bps=active.get("max_spread_bps"),
     )
 
-    df = load_dataset(args.contract, max_rows=args.max_rows)
+    symbol_filter = args.symbol or pol.get("meta", {}).get("symbol")
+    df = load_dataset(args.contract, max_rows=args.max_rows, symbol=symbol_filter)
     df = ensure_probabilities(df, args.prob_column, args.gate_column, args.model_dir)
     res = simulate_trades(
         df,

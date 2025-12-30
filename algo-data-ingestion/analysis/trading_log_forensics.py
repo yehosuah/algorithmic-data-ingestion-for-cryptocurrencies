@@ -100,6 +100,30 @@ def _build_trade_rows(events: List[dict]) -> pd.DataFrame:
     return df
 
 
+def _tail_stats(pnl_series: pd.Series) -> Dict[str, Optional[float]]:
+    losses = pnl_series[pnl_series < 0]
+    wins = pnl_series[pnl_series > 0]
+    out: Dict[str, Optional[float]] = {
+        "p95_loss": None,
+        "p99_loss": None,
+        "cvar_95": None,
+        "max_loss": float(losses.min()) if not losses.empty else None,
+        "max_win": float(wins.max()) if not wins.empty else None,
+    }
+    if losses.empty:
+        return out
+    try:
+        p95 = losses.quantile(0.95)
+        out["p95_loss"] = float(p95)
+        p99 = losses.quantile(0.99)
+        out["p99_loss"] = float(p99)
+        cvar = losses[losses <= p95].mean()
+        out["cvar_95"] = float(cvar) if pd.notna(cvar) else None
+    except Exception:
+        pass
+    return out
+
+
 def _summarize_symbol(df: pd.DataFrame) -> Dict[str, object]:
     if df.empty:
         return {
@@ -111,27 +135,37 @@ def _summarize_symbol(df: pd.DataFrame) -> Dict[str, object]:
             "median_hold_min": None,
             "exit_reasons": {},
             "skip_reasons": {},
-            "gate_failures": 0,
-        }
+        "gate_failures": 0,
+    }
     pnl_series = pd.to_numeric(df["pnl"], errors="coerce").fillna(0.0)
     wins = pnl_series[pnl_series > 0]
     losses = pnl_series[pnl_series < 0]
     profit_factor = None
     if not losses.empty:
         profit_factor = wins.sum() / abs(losses.sum()) if wins.sum() != 0 else 0.0
-    return {
+    tail = _tail_stats(pnl_series)
+    avg_win = float(wins.mean()) if not wins.empty else None
+    avg_loss = float(losses.mean()) if not losses.empty else None
+    payoff_ratio = None
+    if avg_win is not None and avg_loss is not None and avg_loss != 0:
+        payoff_ratio = avg_win / abs(avg_loss)
+    summary = {
         "trades": int(len(df)),
         "executed": int(df["executed"].fillna(False).sum()),
         "pnl": float(pnl_series.sum()),
         "win_rate": float((pnl_series > 0).mean()) if len(pnl_series) else 0.0,
-        "avg_win": float(wins.mean()) if not wins.empty else None,
-        "avg_loss": float(losses.mean()) if not losses.empty else None,
+        "avg_win": avg_win,
+        "avg_loss": avg_loss,
+        "payoff_ratio": payoff_ratio,
         "profit_factor": profit_factor,
         "median_hold_min": float(df["hold_minutes"].median()) if df["hold_minutes"].notna().any() else None,
+        "mean_hold_min": float(df["hold_minutes"].mean()) if df["hold_minutes"].notna().any() else None,
         "exit_reasons": Counter(df["exit_reason_primary"].fillna("<none>")).most_common(),
         "skip_reasons": Counter(df["skip_reason"].fillna("<none>")).most_common(),
         "gate_failures": int((df["gate_pass"] == False).sum()),  # noqa: E712
     }
+    summary.update(tail)
+    return summary
 
 
 def _equity_curve(df: pd.DataFrame) -> Tuple[List[Dict[str, object]], float]:
@@ -167,13 +201,23 @@ def _render_markdown(summary: Dict[str, object], output_dir: Path) -> None:
     portfolio = summary["portfolio"]
     lines.append(f"- Symbols: {', '.join(summary['symbols'])}")
     lines.append(f"- Trades: {portfolio['trades']} (executed: {portfolio['executed']})")
-    lines.append(f"- PnL: {portfolio['pnl']:.6f} | Win rate: {portfolio['win_rate']:.2%} | Profit factor: {portfolio.get('profit_factor')}")
-    lines.append(f"- Max drawdown (pnl units): {portfolio.get('max_drawdown')}")
+    lines.append(
+        f"- PnL: {portfolio['pnl']:.6f} | Win rate: {portfolio['win_rate']:.2%} | Profit factor: {portfolio.get('profit_factor')} | Payoff: {portfolio.get('payoff_ratio')}"
+    )
+    lines.append(
+        f"- Avg win: {portfolio.get('avg_win')} | Avg loss: {portfolio.get('avg_loss')} | P95 loss: {portfolio.get('p95_loss')} | CVaR95: {portfolio.get('cvar_95')}"
+    )
+    lines.append(f"- Max drawdown (pnl units): {portfolio.get('max_drawdown')} | Max loss: {portfolio.get('max_loss')} | Max win: {portfolio.get('max_win')}")
     lines.append("")
     for sym, data in summary["per_symbol"].items():
         lines.append(f"## {sym}")
         lines.append(f"- Trades: {data['trades']} (executed: {data['executed']})")
-        lines.append(f"- PnL: {data['pnl']:.6f} | Win rate: {data['win_rate']:.2%} | Profit factor: {data.get('profit_factor')}")
+        lines.append(
+            f"- PnL: {data['pnl']:.6f} | Win rate: {data['win_rate']:.2%} | Profit factor: {data.get('profit_factor')} | Payoff: {data.get('payoff_ratio')}"
+        )
+        lines.append(
+            f"- Avg win: {data.get('avg_win')} | Avg loss: {data.get('avg_loss')} | P95 loss: {data.get('p95_loss')} | CVaR95: {data.get('cvar_95')}"
+        )
         lines.append(f"- Median hold (min): {data.get('median_hold_min')}")
         top_exit = ", ".join(f"{k} ({v})" for k, v in data["exit_reasons"][:5])
         top_skip = ", ".join(f"{k} ({v})" for k, v in data["skip_reasons"][:5])
@@ -212,11 +256,31 @@ def main() -> None:
     portfolio_summary = _summarize_symbol(trades_df)
     portfolio_summary["max_drawdown"] = portfolio_max_dd
 
+    headline = []
+    for sym in symbols:
+        data = per_symbol_summary.get(sym, {})
+        headline.append(
+            {
+                "symbol": sym,
+                "trades": data.get("trades"),
+                "win_rate": data.get("win_rate"),
+                "avg_win": data.get("avg_win"),
+                "avg_loss": data.get("avg_loss"),
+                "payoff_ratio": data.get("payoff_ratio"),
+                "profit_factor": data.get("profit_factor"),
+                "cvar_95": data.get("cvar_95"),
+                "p95_loss": data.get("p95_loss"),
+                "max_loss": data.get("max_loss"),
+                "pnl": data.get("pnl"),
+            }
+        )
+
     summary = {
         "symbols": symbols,
         "per_symbol": per_symbol_summary,
         "portfolio": portfolio_summary,
         "equity_curve": portfolio_curve,
+        "headline": headline,
     }
 
     trades_df.sort_values(by="exit_ts").to_csv(output_dir / "per_symbol_trades.csv", index=False)

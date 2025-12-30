@@ -42,7 +42,12 @@ def load_search_space(path: Path) -> Dict[str, Any]:
     return yaml.safe_load(path.read_text())
 
 
-def load_dataset(contract_path: Path, dataset_override: Optional[Path] = None, max_rows: Optional[int] = None) -> pd.DataFrame:
+def load_dataset(
+    contract_path: Path,
+    dataset_override: Optional[Path] = None,
+    max_rows: Optional[int] = None,
+    symbol: Optional[str] = None,
+) -> pd.DataFrame:
     if dataset_override:
         path = dataset_override
     else:
@@ -55,6 +60,8 @@ def load_dataset(contract_path: Path, dataset_override: Optional[Path] = None, m
     if "timestamp" not in df.columns:
         raise ValueError("Dataset must contain timestamp")
     df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+    if symbol and "symbol" in df.columns:
+        df = df[df["symbol"] == symbol].copy()
     df = df.sort_values("timestamp").reset_index(drop=True)
     if max_rows is not None and max_rows > 0 and len(df) > max_rows:
         df = df.tail(max_rows).reset_index(drop=True)
@@ -122,6 +129,8 @@ def simulate_trades(
     price_column: str = "close",
     spread_column: Optional[str] = None,
     order_notional: float = 100.0,
+    transaction_cost_bps: float = 0.0,
+    slippage_bps: float = 0.0,
 ) -> SweepResult:
     state = PositionState()
     equity = 0.0
@@ -158,6 +167,21 @@ def simulate_trades(
         if gate_pass and probability >= cfg.entry_threshold:
             coverage_hits += 1
 
+        if state.in_position and price is not None and price > 0:
+            try:
+                peak = float(state.metadata.get("open_peak_price") or 0.0)
+            except (TypeError, ValueError):
+                peak = 0.0
+            if peak <= 0:
+                try:
+                    peak = float(state.metadata.get("open_price") or 0.0)
+                except (TypeError, ValueError):
+                    peak = 0.0
+            if peak <= 0:
+                peak = price
+            peak = max(peak, price)
+            state.metadata["open_peak_price"] = f"{peak:.10f}"
+
         outcome = decide_bar(
             ts=ts.to_pydatetime(),
             probability=probability,
@@ -166,7 +190,10 @@ def simulate_trades(
             cfg=cfg,
             current_price=price,
             entry_price=float(state.metadata.get("open_price")) if state.metadata.get("open_price") else None,
+            entry_amount=float(state.metadata.get("open_amount")) if state.metadata.get("open_amount") else None,
             spread_bps=spread_bps,
+            fee_estimate_bps=transaction_cost_bps,
+            slippage_estimate_bps=slippage_bps,
         )
 
         if state.in_position:
@@ -187,6 +214,7 @@ def simulate_trades(
             state.metadata["open_price"] = f"{price:.10f}"
             state.metadata["open_amount"] = f"{amount:.10f}"
             state.metadata["open_entry_prob"] = f"{probability:.10f}"
+            state.metadata["open_peak_price"] = f"{price:.10f}"
             state.mark_entry(ts.to_pydatetime(), cfg.min_hold_bars * cfg.bar_seconds)
         elif outcome.should_exit and state.in_position:
             reason = outcome.exit_trigger or "unknown"
@@ -201,12 +229,21 @@ def simulate_trades(
                 state.mark_exit(ts.to_pydatetime())
                 state.metadata.clear()
                 continue
-            pnl = (price - entry_price) * entry_amount
+            pnl_gross = (price - entry_price) * entry_amount
+            pnl = pnl_gross
+            pnl_net = outcome.exit_context.get("pnl_net_estimate")
+            if pnl_net is not None:
+                try:
+                    pnl = float(pnl_net)
+                except (TypeError, ValueError):
+                    pnl = pnl_gross
             trades += 1
             if pnl > 0:
                 wins += 1
             pnl_values.append(pnl)
-            returns.append(pnl / (entry_price * entry_amount))
+            notional = entry_price * entry_amount
+            if notional > 0:
+                returns.append(pnl / notional)
             equity += pnl
             equity_curve.append(equity)
             state.mark_exit(ts.to_pydatetime())
@@ -233,6 +270,8 @@ def simulate_trades(
             "max_hold_seconds": cfg.max_hold_seconds,
             "stop_loss_pct": cfg.stop_loss_pct,
             "take_profit_pct": cfg.take_profit_pct,
+            "profit_trailing_start_pct": cfg.profit_trailing_start_pct,
+            "profit_trailing_stop_pct": cfg.profit_trailing_stop_pct,
             "max_spread_bps": cfg.max_spread_bps,
         },
         trades=trades,
@@ -265,19 +304,23 @@ def build_configs(space: Dict[str, Any]) -> List[Dict[str, Any]]:
                     for max_hold in space.get("max_hold_minutes", [None]):
                         for sl in space.get("stop_loss_pct", [None]):
                             for tp in space.get("take_profit_pct", [None]):
-                                for spread in space.get("max_spread_bps", [10]):
-                                    configs.append(
-                                        {
-                                            "entry_threshold": float(entry),
-                                            "exit_threshold": float(exit_thr),
-                                            "exit_prob_drop": float(drop),
-                                            "min_hold_bars": int(mh),
-                                            "max_hold_minutes": max_hold,
-                                            "stop_loss_pct": sl,
-                                            "take_profit_pct": tp,
-                                            "max_spread_bps": spread,
-                                        }
-                                    )
+                                for trail_start in space.get("profit_trailing_start_pct", [None]):
+                                    for trail_stop in space.get("profit_trailing_stop_pct", [None]):
+                                        for spread in space.get("max_spread_bps", [10]):
+                                            configs.append(
+                                                {
+                                                    "entry_threshold": float(entry),
+                                                    "exit_threshold": float(exit_thr),
+                                                    "exit_prob_drop": float(drop),
+                                                    "min_hold_bars": int(mh),
+                                                    "max_hold_minutes": max_hold,
+                                                    "stop_loss_pct": sl,
+                                                    "take_profit_pct": tp,
+                                                    "profit_trailing_start_pct": trail_start,
+                                                    "profit_trailing_stop_pct": trail_stop,
+                                                    "max_spread_bps": spread,
+                                                }
+                                            )
     return configs
 
 
@@ -298,18 +341,31 @@ def main() -> None:
     parser.add_argument("--dataset", type=Path, help="Override dataset path")
     parser.add_argument("--search-space", type=Path, default=Path("configs/trigger_search_space.yaml"))
     parser.add_argument("--output-dir", type=Path, default=Path("experiments/trigger_sweeps"))
+    parser.add_argument("--symbol", type=str, default=None, help="Optional symbol filter (e.g., ETH/USDT)")
     parser.add_argument("--prob-column", type=str, default="base_prob")
     parser.add_argument("--gate-column", type=str, default=None)
     parser.add_argument("--price-column", type=str, default="close")
     parser.add_argument("--spread-column", type=str, default=None)
     parser.add_argument("--order-notional", type=float, default=100.0)
+    parser.add_argument(
+        "--transaction-cost-bps",
+        type=float,
+        default=0.0,
+        help="Per-side fee estimate in bps (charged twice per round trip).",
+    )
+    parser.add_argument(
+        "--slippage-bps",
+        type=float,
+        default=0.0,
+        help="Round-trip slippage estimate in bps (applied once).",
+    )
     parser.add_argument("--max-rows", type=int, default=None)
     parser.add_argument("--model-dir", type=Path, help="Path to manifest/model bundle for scoring probabilities when absent")
     parser.add_argument("--promote-best", action="store_true")
     parser.add_argument("--final-policy-path", type=Path, default=Path("configs/final_trigger_policy.yaml"))
     args = parser.parse_args()
 
-    df = load_dataset(args.contract, args.dataset, max_rows=args.max_rows)
+    df = load_dataset(args.contract, args.dataset, max_rows=args.max_rows, symbol=args.symbol)
     df = ensure_probabilities(df, args.prob_column, args.gate_column, args.model_dir)
     space = load_search_space(args.search_space)
     configs = build_configs(space)
@@ -332,6 +388,8 @@ def main() -> None:
             max_hold_seconds=cfg_dict.get("max_hold_minutes") * 60 if cfg_dict.get("max_hold_minutes") else None,
             stop_loss_pct=cfg_dict.get("stop_loss_pct"),
             take_profit_pct=cfg_dict.get("take_profit_pct"),
+            profit_trailing_start_pct=cfg_dict.get("profit_trailing_start_pct"),
+            profit_trailing_stop_pct=cfg_dict.get("profit_trailing_stop_pct"),
             max_spread_bps=cfg_dict.get("max_spread_bps"),
         )
         res = simulate_trades(
@@ -342,6 +400,8 @@ def main() -> None:
             price_column=args.price_column,
             spread_column=args.spread_column,
             order_notional=args.order_notional,
+            transaction_cost_bps=args.transaction_cost_bps,
+            slippage_bps=args.slippage_bps,
         )
         # Apply hard filters
         if res.trades < min_trades or res.fraction_time_in_position < frac_min:
