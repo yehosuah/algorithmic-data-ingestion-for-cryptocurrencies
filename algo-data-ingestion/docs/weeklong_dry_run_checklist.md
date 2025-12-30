@@ -1,7 +1,8 @@
 # Week-Long Dry Run Checklist
 
-_Last updated: 2025-11-30 22:29 UTC_
+_Last updated: 2025-12-30 22:59 UTC_
 
+> Update 2025-12-30: Stage-0 sizing/risk limits bumped to capital 200 with vol-aware stop shaping and optional quote-based price monitoring (`TRADING_PRICE_MONITOR_INTERVAL_SECONDS`); the default compose also tightens spread guards (`max_spread_bps=8`) and may enable churn controls (`disable_prob_exits`, entry filters).
 > Update 2025-11-30 22:29 UTC: With the large parquet snapshots removed from git, rerun the dataset/backfill helpers before rehearsals, keep `TRADING_SHADOW_SYMBOLS=[]` so BTC/ETH/SOL operate as full primary entries (300 USDT notional, `max_spread_bps=10`), and verify the tightened runtime risk cooldowns (1 minute after exits, 5 minutes after losses) are loaded via the stage-0 overrides.
 > Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
@@ -13,8 +14,8 @@ Use this checklist to track the current paper-trading exercise from start to fin
 | Status | Item | Notes |
 | --- | --- | --- |
 | ☐ | Confirm Docker stack healthy (`scheduler`, `trading`, `ingestion-api`, `redis`, `prometheus`, `grafana`) |  |
-| ☐ | Confirm stage-0 env matches the ladder (`TRADING_MODELS` has BTC/ETH/SOL primary entries with `order_notional=300`, `max_spread_bps=10`, `shadow_mode=false`; `TRADING_SHADOW_SYMBOLS=[]`) |  |
-| ☐ | Validate runtime risk overrides (`configs/runtime_overrides/risk_limits_stage_0.yaml`) expose `cooldown_minutes_after_exit=1` and `cooldown_minutes_after_loss=5` |  |
+| ☐ | Confirm stage-0 env matches the ladder (BTC/ETH/SOL primary entries in `TRADING_MODELS`, `TRADING_SHADOW_SYMBOLS=[]`, spread guards in place) |  |
+| ☐ | Validate runtime risk overrides (`configs/runtime_overrides/risk_limits_stage_0.yaml`) expose `cooldown_minutes_after_exit=2` and `cooldown_minutes_after_loss=5` |  |
 | ☐ | Run trigger preflight (`scripts/trigger_preflight.py` with `configs/final_trigger_policy.yaml` + promoted model) before the day’s boot |  |
 | ☐ | Verify scheduler warm-started data (ingest + backfill rows > 0 for BTC/ETH/SOL) |  |
 | ☐ | Validate gate coverage per symbol/model ≥ expected baseline (Base ≈100%, TCN ≥40%) |  |

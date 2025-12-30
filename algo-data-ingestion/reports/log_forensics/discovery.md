@@ -1,11 +1,13 @@
 # Dry-run stack discovery
 
+_Last updated: 2025-12-30 22:59 UTC_
+
 - **Compose services**: `docker-compose.yml` defines `redis`, `ingestion-api`, `redis-exporter`, `prometheus`, `grafana`, `scheduler`, and `trading`. `.env` supplies secrets; stage overrides live in `configs/runtime_overrides/stage_0.yaml`.
-- **Deployment artifacts**: Contract `configs/deployment_portfolio_contract.yaml` (mode=dry_run, live symbols below) points to model root `/opt/models` with active manifest `experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary/manifest.json`. Ladder/stage config: `configs/runtime_overrides/stage_0.yaml`. Policies: `configs/final_portfolio_policies.yaml` and trigger policy `configs/final_trigger_policy.yaml`.
+- **Deployment artifacts**: Contract `configs/deployment_portfolio_contract.yaml` (mode=dry_run, live symbols below) points to model root `/opt/models` with active manifest `base_xgb_h120_calmon_spread0/manifest.json` (baked in via `Dockerfile`). Ladder/stage config: `configs/runtime_overrides/stage_0.yaml`. Policies: `configs/final_portfolio_policies.yaml` and trigger policy `configs/final_trigger_policy.yaml`.
 - **Volumes / mounts**:
   - `./data_lake:/app/data_lake` (includes `trading/audit.log`, trading state, market parquet).
   - `./logs/trading:/app/logs` (trading stdout/log files such as `trading_recent.log`).
-  - `./experiments/perf_sweeps:/opt/models/perf_sweeps` (model artifacts used in dry-run).
+  - `./experiments/perf_sweeps:/opt/models/perf_sweeps` (optional sweep artifacts; base models ship in `/opt/models`).
   - `trading-state:/app/trading_state` (persistent trading state), `hf-cache:/app/.cache/huggingface`, `prometheus-data:/prometheus`, `redis-data:/data`.
 - **Log and artifact paths (inside container)**:
   - Trading audit backend=file → `/app/data_lake/trading/audit.log` (backed by host `data_lake/trading/audit.log`; rotated backups present). Trading state file `/app/trading_state/state.json`.
@@ -18,9 +20,9 @@
   - `SOL/USDT` policy `conservative`, `shadow_mode: false`
 - **Model/policy/trigger details**:
   - Model key `xgb_primary` for all symbols; mapped in `configs/deployment_portfolio_contract.yaml` and `configs/dry_run/infer_jobs_portfolio_policy.yaml`.
-  - Order notionals (dry-run): ETH 80 USDT, BTC 50 USDT, SOL 40 USDT (1m timeframe, `TRADING_DRY_RUN=true`).
-  - Trigger thresholds (`configs/final_trigger_policy.yaml` & portfolio policies): primary/conservative entry=0.48, exit=0.47, exit_prob_drop=0.1, min_hold_bars=3, take_profit_pct=0.0006, max_spread_bps=10.
-  - Risk limits (`configs/runtime_overrides/risk_limits_stage_0.yaml`): capital=1,000,000; max_gross_leverage=3.0; max_net_exposure=1.5; max_turnover_per_day=1.0; max_orders_per_hour=120; max_concurrent_positions=5; per-symbol notional caps (ETH 20k, BTC 15k, SOL 8k) and spread caps (25/25/28 bps); loss guard enabled; daily_loss_limit_pct=0.03; halt_on_safe_mode=true.
+  - Order notionals (dry-run): see `configs/deployment_portfolio_contract.yaml` (`symbol_order_notional`) and/or the active `TRADING_MODELS` env in `docker-compose.yml`.
+  - Trigger thresholds (`configs/final_trigger_policy.yaml`): track the latest promoted policy; runtime entry/exit thresholds are ultimately sourced from manifest gates + stage risk limit overrides in `configs/runtime_overrides/risk_limits_stage_0.yaml`.
+  - Risk limits (`configs/runtime_overrides/risk_limits_stage_0.yaml`): capital=200; max_total_notional=80; max_gross_leverage=2.0; max_net_exposure=1.0; max_orders_per_hour=180; max_concurrent_positions=3; per-symbol notional caps (ETH 45, BTC 40, SOL 30) and spread caps (25/25/28 bps); cooldown_minutes_after_exit=2; cooldown_minutes_after_loss=5; stop shaping via min_stop_loss_pct/hard_stop_loss_pct/vol_stop_rvol_mult; loss_guard enabled; daily_loss_limit_pct=0.05; halt_on_safe_mode=true.
   - Gate config (in same risk file): inference `prob_gate_min=0.48`, `rvol20_max=0.002`, `min_hold_bars=3`, `long_only=true`; gate_mode=inference. Deadlock policy `configs/runtime_overrides/deadlock_policy_stage_0.yaml` enables adjustments/safe mode after coverage shortfalls.
 - **OHLCV / spread data for cross-reference**:
   - Market ingest jobs (env `MARKET_INGEST_JOBS`) fetch Binance BTC/USDT, ETH/USDT, SOL/USDT at 1m cadence; data lake root `/app/data_lake/market` (host `data_lake/market`).
@@ -28,4 +30,4 @@
   - Additional legacy shard: `data_lake/market/<SYMBOL>/date=.../*.parquet` also available for historical context.
   - Feature/label bundle for the 3-symbol 1m contract lives at `configs/data/features_labels_regimes_market_multi_3symbol_1m.parquet` (can be reused for offline alignment if needed).
 - **Evidence bundle targets for later extraction**:
-  - Trading audit log, scheduler stdout, metrics snapshot; resolved compose (`docker-compose.yml`), `configs/deployment_portfolio_contract.yaml`, `configs/runtime_overrides/risk_limits_stage_0.yaml`, `configs/runtime_overrides/deadlock_policy_stage_0.yaml`, `configs/final_trigger_policy.yaml`, active manifest `experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary/manifest.json`, env snapshot from `.env` (non-secret keys only).
+  - Trading audit log, scheduler stdout, metrics snapshot; resolved compose (`docker-compose.yml`), `configs/deployment_portfolio_contract.yaml`, `configs/runtime_overrides/risk_limits_stage_0.yaml`, `configs/runtime_overrides/deadlock_policy_stage_0.yaml`, `configs/final_trigger_policy.yaml`, active manifest `base_xgb_h120_calmon_spread0/manifest.json`, env snapshot from `.env` (non-secret keys only).

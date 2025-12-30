@@ -1,7 +1,8 @@
 # Live Launch Ladder Runbook (ETH → BTC → SOL)
 
-_Last updated: 2025-12-19 00:11 UTC_
+_Last updated: 2025-12-30 22:59 UTC_
 
+> Update 2025-12-30: Stage-0 now layers vol-aware stop shaping (`min_stop_loss_pct`/`hard_stop_loss_pct`/`vol_stop_rvol_mult`) plus optional quote-based price monitoring (`TRADING_PRICE_MONITOR_INTERVAL_SECONDS`) to enforce exits even when decision payloads stall.
 > Update 2025-12-19: Stage-0 bundle now uses equity-fraction sizing (capital 100, base notionals 20/15/12, compounding step 5, per-symbol trigger overrides with longer holds) and the dry-run profit forensics loop (`RUNBOOK_DRY_RUN_PROFIT.md`) is available for post-rehearsal signoff.
 > Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 

@@ -1,6 +1,6 @@
 # Deployability Runbook (TCN Suite Refresh – Oct 2025)
 
-_Last updated: 2025-11-30 18:55 UTC_
+_Last updated: 2025-12-30 22:59 UTC_
 
 > Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
@@ -15,7 +15,7 @@ _Last updated: 2025-11-30 18:55 UTC_
 - **Documentation touch-up** – Update `docs/oct_2025_forward_replay.md` and `TRAINING_STATUS.md` with the new TCN gate thresholds/coverage before circulating status reports.
 - **Monitoring baseline update** – Append Oct 2025 figures to `live_gate_coverage.csv` so alert thresholds reflect the relaxed yet deployable gates.
 - **Trading rehearsal plan** – Populate `INFER_JOBS`/`TRADING_MODELS`, review `docs/weeklong_dry_run_checklist.md`, and schedule a 7-day paper-trading run logging queue depth, trade attempts, and faux P&L.
-- **Trigger guard check** – Run `python scripts/trigger_preflight.py --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml --policy configs/final_trigger_policy.yaml --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary --max-rows 5000` ahead of each rehearsal to fail fast when coverage/trade-count proxy drops.
+- **Trigger guard check** – Run `python scripts/trigger_preflight.py --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml --policy configs/final_trigger_policy.yaml --model-dir models/base_xgb_h120_calmon_spread0 --max-rows 5000` ahead of each rehearsal to fail fast when coverage/trade-count proxy drops (add `--symbol ETH/USDT` to focus on one market).
 - **Feature parity proof** – At the end of each dry run, export a scheduler slice (`scripts/export_feature_slice.py`) and store the diff vs sanitized training data via `scripts/compare_feature_stats.py --train datasets/market_multi_3symbol_1m.parquet --live /tmp/features_debug.parquet --out release/calibration/latest/tcn_parity.json`; attach the JSON to deployment notes before widening gates.
 - **Live invariants check** – After applying a ladder stage, run `python -m analysis.validate_deployment_contract --contract configs/deployment_portfolio_contract.yaml` plus `analysis.shadow_readiness` to confirm kill/safe env wiring, audit fields/counters, risk limit coverage, symbol/policy/model parity, and deadlock readiness match the deployment contract. Archive `reports/launch_stage_eval_stage_N_*` alongside dry-run summaries.
 

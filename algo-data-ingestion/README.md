@@ -1,7 +1,8 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-12-19 00:11 UTC_
+_Last updated: 2025-12-30 22:59 UTC_
 
+> Update 2025-12-30: Added price-monitor exits (stop/take-profit/profit-trailing/max-hold) so positions can close even when decision payloads stall, introduced optional entry filters (`entry_rsi_min`/`entry_macd_min`) + `disable_prob_exits` to reduce churn, and refreshed stage-0 sizing/risk limits (capital 200, equity_fraction 0.33, vol-scaled stops with a hard cap).
 > Update 2025-12-19: Added a dry-run profit forensics loop (`scripts/extract_container_logs.py` → `analysis/trading_log_forensics.py` → `analysis/market_trade_alignment.py` with `RUNBOOK_DRY_RUN_PROFIT.md`), tightened stage-0 sizing to equity-fraction compounding (capital 100 USDT, base notionals 20/15/12, `max_total_notional=80`, compounding step 5) with per-symbol trigger overrides and longer holds, and refreshed compose/env defaults to mirror the new thresholds while keeping reports/logs out of Docker build context.
 > Update 2025-12-17: Added a single-command live-readiness check plus post-launch diagnostics (`analysis/live_readiness_check`, `analysis/acceptance_trade_proof`, `analysis/exit_attribution_report`, `analysis/project_stance_snapshot`) and hardened scheduler/trading with loss-guarding, queue-age pruning, quote-aware exits, and the `INFER_APPLY_CALIBRATION` override so experiments stay aligned with production.
 
@@ -60,7 +61,7 @@ docker compose up -d --build
    python3 -m analysis.trigger_optimizer \
      --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
      --search-space configs/trigger_search_space_quick.yaml \
-     --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary \
+     --model-dir models/base_xgb_h120_calmon_spread0 \
      --max-rows 20000 \
      --output-dir experiments/trigger_sweeps/eth_quick \
      --promote-best
@@ -70,12 +71,12 @@ docker compose up -d --build
    ```bash
    python3 scripts/trigger_preflight.py \
      --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
-     --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary \
+     --model-dir models/base_xgb_h120_calmon_spread0 \
      --max-rows 5000
    ```
    Exits non-zero if predicted coverage or trade-count proxy is near zero.
 3. Start services: `docker compose up -d`
-   - Model paths in the deployment contract now resolve relative to `MODELS_ROOT` (compose sets `/opt/models`); the mounted host bundle lives at `./experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary` → `/opt/models/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary` inside the containers.
+   - Model paths in the deployment contract resolve relative to `MODELS_ROOT` (compose sets `/opt/models`). Base artifacts are copied into the image from `models/` (see `Dockerfile`), and optional sweep bundles can still be mounted under `/opt/models/perf_sweeps`.
 
 > Notes
 > - La imagen se construye “lean” por defecto (sin instalar `torch`/`transformers`) para acelerar el build. Si necesitas ML dentro del contenedor, puedes construir con `--build-arg INSTALL_ML=1`.
@@ -121,7 +122,7 @@ Quote-aware exits: the executor now fetches live bid/ask quotes (with order-book
 
 Trading also clears stale dedupe timestamps after restarts when downtime exceeds `TRADING_LAST_TS_GRACE_BARS` bars (default 3) so fresh decisions are not dropped due to old state; increase the grace if using long bar intervals.
 
-The default dry-run compose now loads `configs/dry_run/infer_jobs_portfolio_policy.yaml`, which routes an ETH/USDT inference job through the promoted portfolio sweep artifact (`experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary`) defined in `configs/deployment_portfolio_contract.yaml`. Compose now mirrors the stage-0 bundle: BTC/ETH/SOL as primary entries in `TRADING_MODELS` (base notionals 20/15/12 USDT before equity scaling, `max_spread_bps=15/20/22`, `take_profit_pct=0.001`, longer holds) with `sizing_mode=equity_fraction` (`capital=100`, `equity_fraction=0.2`, `max_equity_fraction=0.3`, `compounding_step_usd=5`) from `configs/runtime_overrides/risk_limits_stage_0.yaml`, and keeps `TRADING_SHADOW_SYMBOLS=[]` so rehearsals match the launch ladder without flipping between shadow/live states mid-run. Keep `./experiments/perf_sweeps` mounted for scheduler/trading so the decision logic can load the artifact, and adjust `TRADING_MODELS` if you change the contract.
+The default dry-run compose now loads `configs/dry_run/infer_jobs_portfolio_policy.yaml` and scores the baked-in `xgb_primary` bundle (`models/base_xgb_h120_calmon_spread0` → `/opt/models/base_xgb_h120_calmon_spread0` inside containers). Trading runs BTC/ETH/SOL as primary entries with tight spreads (`max_spread_bps=8`), `stop_loss_pct=0.005`, and optional churn-reduction knobs (`disable_prob_exits`, `entry_rsi_min`/`entry_macd_min`). Stage-0 risk limits live in `configs/runtime_overrides/risk_limits_stage_0.yaml` (`capital=200`, `equity_fraction=0.33`, `max_total_notional=80`, cooldowns 2/5, vol-scaled stops), and compose keeps `TRADING_SHADOW_SYMBOLS=[]` for ladder parity.
 
 Trading trigger guards are centralized: `TRADING_MODELS` entries now accept `max_spread_bps`, `stop_loss_pct`, `take_profit_pct`, and `max_hold_minutes`, and the live loop shares `app/trading/decision.py::decide_bar` with the offline optimizer so spread/hold/SL/TP checks behave identically in sweeps and production.
 
@@ -142,7 +143,7 @@ Useful helpers:
 - **Multi-symbol rollout bundle** – `configs/deployment_portfolio_contract.yaml` and `configs/dry_run/infer_jobs_portfolio_policy.yaml` now encode the BTC/ETH/SOL ladder, per-symbol `policy_id` overrides, `shadow_mode` flags, and `model_key` routing so scheduler/trading stay in lockstep. Compose wires the overrides via `TRADING_MODELS`, `TRADING_SHADOW_SYMBOLS`, `TRADING_RISK_LIMITS_PATH`, and `TRADING_DEADLOCK_POLICY_PATH`; the stage ladder (`configs/live_launch_ladder.yaml`) emits env bundles under `configs/runtime_overrides/stage_*.yaml`, and the default dry-run env keeps `TRADING_SHADOW_SYMBOLS=[]` so every rehearsal runs these three symbols as primary instead of shadow.
 - **Signed audit & provenance** – Trading now requires `TRADING_AUDIT_HMAC_KEY` (plus optional `TRADING_AUDIT_RUN_ID`/`TRADING_AUDIT_HOST_ID`) and writes `audit_source`/`audit_run_id`/`audit_seq` metadata inside every event so `analysis.validate_deployment_contract` can assert observability requirements before go-live. Redis/Postgres/file backends all compute the HMAC digest.
 - **Intent ledger + reconciliation** – `TRADING_INTENT_LEDGER_BACKEND=redis`, `TRADING_INTENT_LEDGER_REDIS_URL`, and the new `IntentLedger` class dedupe order intents, track lifecycle status (`pending_submit`→`filled`/`canceled`/`error`), and feed metrics (`trading_intent_ledger_state_total`). A periodic reconcile loop compares internal state vs exchange truth and latches safe-mode until a healthy streak succeeds; emissions land in the audit stream under `reconciliation`.
-- **Runtime risk engine** – `app/trading/risk.py::assess_and_adjust_order` consumes `configs/portfolio_risk_limits.yaml` (or the stage overrides) to block/clip orders based on turnover, exposure, drawdown, order cadence, cooldowns, and per-symbol spread/notional/qty rules. Stage-0 overrides now run equity-fraction sizing (`capital=100`, `equity_fraction=0.2`, `max_equity_fraction=0.3`, `compounding_step_usd=5`) with base notionals 20/15/12 and caps (`max_total_notional=80`), and set `cooldown_minutes_after_exit: 2` / `cooldown_minutes_after_loss: 5` so reconciliations can resume trading faster while keeping the risk counters honest. Audit payloads include `risk_block_reason`/`risk_clip_reasons`, and Prometheus gets `trading_risk_blocked_total`/`trading_risk_clipped_total`.
+- **Runtime risk engine** – `app/trading/risk.py::assess_and_adjust_order` consumes `configs/portfolio_risk_limits.yaml` (or the stage overrides) to block/clip orders based on turnover, exposure, drawdown, order cadence, cooldowns, and per-symbol spread/notional/qty rules. Stage-0 overrides now run equity-fraction sizing (`capital=200`, `equity_fraction=0.33`, `max_equity_fraction=0.35`, `compounding_step_usd=5`, `max_total_notional=80`) and define stop-loss shaping (`min_stop_loss_pct`, `hard_stop_loss_pct`, `vol_stop_rvol_mult`) so tight stops scale with realized volatility but never exceed a hard cap. Audit payloads include `risk_block_reason`/`risk_clip_reasons`, and Prometheus gets `trading_risk_blocked_total`/`trading_risk_clipped_total`.
 - **Loss guard & aged decisions** – The stage risk limits ship a `loss_guard` block (3-loss cooldown with optional notional downscaling) plus `TRADING_LAST_TS_GRACE_BARS`/`TRADING_DECISION_MAX_AGE_SECONDS` so repeated losses raise `loss_guard` audits and stale queue items are silently skipped; `TRADING_STATE_BACKEND`/`TRADING_AUDIT_BACKEND` keep persistence consistent when stage bundles move between file/redis clients.
 - **Deadlock policy automation** – `app/trading/deadlock.py`, the new `analysis.*launch_stage*` CLIs, and the Prometheus suite (`trading_deadlock_*`, `deadlock_action_taken_total`) monitor per-symbol coverage windows, execute staged mitigations (prob gate adjustments, policy switches, safe-mode), and log actions/audits with policy hashes.
 - **Observability & controls** – Kill-/safe-mode env vars (`TRADING_KILL_SWITCH`, `TRADING_SAFE_MODE`) are enforced inside `app/trading/decision.py`; trading only enters when both are clear or we’re exiting safely. Metrics now include decision coverage, skip/dedup/risk block counters, orders-per-hour, turnover/drawdown gauges, safe-mode latch state, and reconciliation health. Grafana’s `trading-overview.json` dashboard plots the additional telemetry, and alert rules reference the same invariants listed in the deployment contract.
@@ -243,7 +244,7 @@ TWITTER_BEARER_TOKEN=
 NEWS_API_KEY=
 # Trading service
 TRADING_DRY_RUN=1
-TRADING_MODELS=[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":20.0,"max_spread_bps":15,"stop_loss_pct":0.0,"take_profit_pct":0.001,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"primary","min_hold_bars_override":6},{"model":"xgb_primary","symbol":"BTC/USDT","exchange":"binance","timeframe":"1m","order_notional":15.0,"max_spread_bps":20,"stop_loss_pct":0.0,"take_profit_pct":0.001,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":5},{"model":"xgb_primary","symbol":"SOL/USDT","exchange":"binance","timeframe":"1m","order_notional":12.0,"max_spread_bps":22,"stop_loss_pct":0.0,"take_profit_pct":0.001,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":5}]
+TRADING_MODELS=[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":25.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":240,"shadow_mode":false,"policy_id":"primary","min_hold_bars_override":15,"disable_prob_exits":true,"entry_rsi_min":50.0},{"model":"xgb_primary","symbol":"BTC/USDT","exchange":"binance","timeframe":"1m","order_notional":25.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":15,"disable_prob_exits":true,"entry_macd_min":0.0},{"model":"xgb_primary","symbol":"SOL/USDT","exchange":"binance","timeframe":"1m","order_notional":30.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":15,"disable_prob_exits":true,"entry_rsi_min":45.0}]
 TRADING_SHADOW_SYMBOLS=[]
 TRADING_AUDIT_HMAC_KEY=changeme_in_prod
 TRADING_INTENT_LEDGER_BACKEND=redis
@@ -251,6 +252,7 @@ TRADING_INTENT_LEDGER_REDIS_URL=redis://redis:6379/0
 TRADING_DEPLOYMENT_CONTRACT=configs/deployment_portfolio_contract.yaml
 TRADING_RISK_LIMITS_PATH=configs/runtime_overrides/risk_limits_stage_0.yaml
 TRADING_DEADLOCK_POLICY_PATH=configs/runtime_overrides/deadlock_policy_stage_0.yaml
+TRADING_PRICE_MONITOR_INTERVAL_SECONDS=10
 TRADING_KILL_SWITCH=1
 TRADING_SAFE_MODE=1
 TRADING_SAFE_MODE_ALLOW_EXITS=1

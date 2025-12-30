@@ -1,5 +1,7 @@
 ## Optimization plan (dry-run)
 
+_Last updated: 2025-12-30 22:59 UTC_
+
 **Evidence (20251217T015155Z forensics + alignment)**
 - Portfolio PnL -964 with win rate 12.4%; prob_floor/trailing/gate_close dominate exits.
 - Post-exit drift positive across exit reasons: ETH post-exit max ~0.105, BTC ~0.016, SOL ~0.006 while exit returns are negative, implying premature exits.
@@ -34,3 +36,8 @@
 
 **Validation status**
 - Post-restart forensics window (20251218T173921Z) shows 0 trades since 2025-12-18T17:22Z; awaiting gate_pass trades to evaluate PnL/exit_return.
+
+**Changes applied (2025-12-30)**
+1) **Expectancy fix exits** (`app/trading/decision.py` + `app/trading/service.py`): removed PnL-based exit blocking (`pnl_block`), allowed stops/TP/profit-trailing to bypass min-hold, and optionally disabled probability-driven exits (`disable_prob_exits=true`) to reduce churn.
+2) **Stop shaping + monitoring** (`configs/runtime_overrides/risk_limits_stage_0.yaml` + `TRADING_PRICE_MONITOR_INTERVAL_SECONDS`): added vol-aware stop scaling (`min_stop_loss_pct`, `hard_stop_loss_pct`, `vol_stop_rvol_mult`) and periodic quote-based checks so stop-loss exits fire even when no new decision payload arrives.
+3) **Entry filters** (`TRADING_MODELS`): optional RSI/MACD entry filters (`entry_rsi_min`, `entry_macd_min`) to block low-quality regimes before placing entries.

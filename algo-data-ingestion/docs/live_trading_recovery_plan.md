@@ -1,7 +1,8 @@
 # Live Trading Recovery Plan
 
-_Last updated: 2025-11-30 22:29 UTC_
+_Last updated: 2025-12-30 22:59 UTC_
 
+> Update 2025-12-30: Stage-0 now uses equity-fraction sizing with capital 200 and adds vol-aware stop shaping plus optional quote-based price monitoring (`TRADING_PRICE_MONITOR_INTERVAL_SECONDS`) so stop/take-profit/trailing exits can fire even when decision payloads stall.
 > Update 2025-11-30 22:29 UTC: Stage-0 runtime risk overrides now enforce a 1-minute cooldown after exits and 5 minutes after losses, the dry-run/live env keeps `TRADING_SHADOW_SYMBOLS=[]` with BTC/ETH/SOL running as the primary policies (300 USDT notional, `max_spread_bps=10`), and heavy parquet snapshots were removed from git so regenerate slices via the parity helpers when debugging.
 > Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
@@ -11,8 +12,8 @@ _Last updated: 2025-11-30 22:29 UTC_
 _Source of truth for reconciling training metrics with dry-run behaviour._
 
 ## 1. Verify Live Gating & Coverage
-- If coverage collapses or before restarting services after downtime, run `python scripts/trigger_preflight.py --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml --policy configs/final_trigger_policy.yaml --model-dir /opt/models/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary --max-rows 5000 --min-coverage 0.01 --min-trades 5` (adjust path if running outside Docker) to catch dead trigger configs early.
-- Confirm the exported env keeps BTC/ETH/SOL as primary entries (`TRADING_MODELS` lists all three symbols with `order_notional=300`, `max_spread_bps=10`, `shadow_mode=false`) and that `TRADING_SHADOW_SYMBOLS=[]`; re-run `analysis.apply_launch_stage` if the bundle drifted before opening gates.
+- If coverage collapses or before restarting services after downtime, run `python scripts/trigger_preflight.py --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml --policy configs/final_trigger_policy.yaml --model-dir /opt/models/base_xgb_h120_calmon_spread0 --max-rows 5000 --min-coverage 0.01 --min-trades 5` (adjust path if running outside Docker) to catch dead trigger configs early.
+- Confirm the exported env keeps BTC/ETH/SOL as primary entries (inspect `TRADING_MODELS` in the active stage bundle and ensure `TRADING_SHADOW_SYMBOLS=[]`); re-run `analysis.apply_launch_stage` if the bundle drifted before opening gates.
 - Ensure scheduler/trading containers have reloaded manifests (`docker compose exec scheduler cat /opt/models/<model>/manifest.json`).
 - Monitor `model_gate_coverage_ratio` for base + TCN via `curl -s localhost:9002/metrics | rg 'model_gate_coverage_ratio.*(base_xgb|tcn)_h120_calmon_relaxed'`.
 - Inspect recent Redis decision payloads/audit logs to confirm gate predicates embedded in the stream.
@@ -85,6 +86,6 @@ _Source of truth for reconciling training metrics with dry-run behaviour._
 
 ## 7. Runtime Controls & Launch Ladder
 - **Intent ledger health** – `trading_intent_ledger_state_total` should reflect state transitions (`pending_submit`, `submitted`, `filled`, etc.). If dedupe blocks legitimate orders, flush the Redis ledger keys (`${TRADING_INTENT_LEDGER_PREFIX}:*`) after ensuring no open intents remain, then restart trading with `TRADING_KILL_SWITCH=1` to resume exits only.
-- **Runtime risk limits** – Inspect audit `risk_block_reason`/`risk_clip_reasons` and Prometheus `trading_risk_blocked_total`/`trading_risk_clipped_total`. Stage-0 now enforces `cooldown_minutes_after_exit=1` and `cooldown_minutes_after_loss=5`; if you see longer gaps, diff `configs/runtime_overrides/risk_limits_stage_*.yaml` against `configs/portfolio_risk_limits.yaml` and re-run `analysis.apply_launch_stage` to restore overrides.
+- **Runtime risk limits** – Inspect audit `risk_block_reason`/`risk_clip_reasons` and Prometheus `trading_risk_blocked_total`/`trading_risk_clipped_total`. Stage-0 now enforces `cooldown_minutes_after_exit=2` and `cooldown_minutes_after_loss=5`; if you see longer gaps, diff `configs/runtime_overrides/risk_limits_stage_*.yaml` against `configs/portfolio_risk_limits.yaml` and re-run `analysis.apply_launch_stage` to restore overrides.
 - **Deadlock policy** – Use `analysis.shadow_readiness` to produce a coverage/deadlock report, review `trading_deadlock_*` gauges, and confirm `deadlock_policy.enabled`/`adjust_prob_gate_min` entries match the deployment contract. If policy actions misfire, run `analysis.evaluate_launch_stage` to regenerate overrides and audit logs.
 - **Launch ladder rollback** – To revert a problematic stage, set kill/safe env vars, run `python -m analysis.rollback_to_stage --stage stage_0 --ladder configs/live_launch_ladder.yaml --contract configs/deployment_portfolio_contract.yaml`, redeploy env bundle (`configs/runtime_overrides/stage_0.yaml`), and wait for reconciliation success before re-opening entries.

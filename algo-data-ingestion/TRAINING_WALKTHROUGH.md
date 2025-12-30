@@ -1,6 +1,6 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-11-30 18:55 UTC_
+_Last updated: 2025-12-30 22:59 UTC_
 
 > Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
@@ -77,7 +77,7 @@ This guide walks through the refreshed modeling stack: relaxed-gate retrains for
   python3 -m analysis.trigger_optimizer \
     --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
     --search-space configs/trigger_search_space.yaml \
-    --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary \
+    --model-dir models/base_xgb_h120_calmon_spread0 \
     --output-dir experiments/trigger_sweeps/eth_full \
     --max-rows 50000 \
     --promote-best
@@ -88,10 +88,10 @@ This guide walks through the refreshed modeling stack: relaxed-gate retrains for
   python3 scripts/trigger_preflight.py \
     --contract configs/canonical_training_contract_market_multi_3symbol_1m.yaml \
     --policy configs/final_trigger_policy.yaml \
-    --model-dir experiments/perf_sweeps/medium_xgb_low_cost/portfolio_final/models/final_xgb_primary \
+    --model-dir models/base_xgb_h120_calmon_spread0 \
     --max-rows 5000 --min-coverage 0.01 --min-trades 5
   ```
-  Paths resolve against `MODELS_ROOT` when running in Docker (`/opt/models` via the compose mount); keep `configs/deployment_portfolio_contract.yaml` and `configs/dry_run/infer_jobs_portfolio_policy.yaml` in sync with the promoted bundle.
+  Paths resolve against `MODELS_ROOT` when running in Docker (`/opt/models`; base artifacts are copied into the image from `models/` via `Dockerfile`, and optional sweep bundles can still be mounted under `/opt/models/perf_sweeps`). Keep `configs/deployment_portfolio_contract.yaml` and `configs/dry_run/infer_jobs_portfolio_policy.yaml` in sync with the promoted bundle.
 
 ## 0. Prepare Multi-Symbol Feed & Gates
 - Sanitize fresh parquet pulls before training so duplicate (timestamp, symbol) rows and price outliers do not blow up `hl_spread`/`rvol`:

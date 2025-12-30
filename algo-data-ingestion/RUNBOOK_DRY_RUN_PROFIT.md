@@ -1,10 +1,10 @@
 # Dry-run profit workflow (evidence → forensics → alignment)
 
-_Last updated: 2025-12-19 00:11 UTC_
+_Last updated: 2025-12-30 22:59 UTC_
 
 ## Start stack (dry-run)
 - Ensure `.env` present, then: `docker compose up -d trading scheduler ingestion-api redis`
-- Trading uses `configs/runtime_overrides/risk_limits_stage_0.yaml` (capital 100, equity-fraction sizing) and `configs/runtime_overrides/deadlock_policy_stage_0.yaml`.
+- Trading uses `configs/runtime_overrides/risk_limits_stage_0.yaml` (capital 200, equity-fraction sizing) and `configs/runtime_overrides/deadlock_policy_stage_0.yaml`.
 
 ## Extract evidence bundle (real container logs/configs)
 ```bash
@@ -38,8 +38,8 @@ python3 -m analysis.market_trade_alignment \
 - Outputs `alignment_summary.md/json` and `market_alignment.csv` (MFE/MAE, post-exit drift by exit_reason).
 
 ## Sizing config (bounded compounding)
-- Risk limits: capital/initial_capital_usd=100, sizing_mode=equity_fraction, equity_fraction=0.2, max_equity_fraction=0.3, compounding_step_usd=5.
-- Per-symbol base order notionals (scaled with equity): ETH 20, BTC 15, SOL 12; caps: ETH 45, BTC 40, SOL 30; max_total_notional=80.
+- Risk limits: capital/initial_capital_usd=200, sizing_mode=equity_fraction, equity_fraction=0.33, max_equity_fraction=0.35, compounding_step_usd=5, max_total_notional=80.
+- Stop shaping: min_stop_loss_pct=0.005, hard_stop_loss_pct=0.012, vol_stop_rvol_mult=3.0 (scales stops with realized vol when present).
 - Cooldowns: 2 min after exit, 5 min after loss; daily_loss_limit_pct=5%, max_drawdown_pct=20%.
 
 ## Evaluate changes
