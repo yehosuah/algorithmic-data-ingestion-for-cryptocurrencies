@@ -1,0 +1,13 @@
+{
+  "results_path": "experiments/expectancy_fix/sweeps_btc_quick_net2/results.csv",
+  "best": {
+    "entry_threshold": 0.49,
+    "exit_threshold": 0.48,
+    "exit_prob_drop": 0.15,
+    "min_hold_bars": 3,
+    "max_hold_seconds": null,
+    "stop_loss_pct": 0.004,
+    "take_profit_pct": null,
+    "max_spread_bps": 8
+  }
+}

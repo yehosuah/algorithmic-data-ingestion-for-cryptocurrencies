@@ -1,0 +1,178 @@
+{
+  "symbols": [
+    "ETH/USDT",
+    "SOL/USDT"
+  ],
+  "per_symbol": {
+    "ETH/USDT": {
+      "trades": 1,
+      "executed": 1,
+      "pnl": 0.0,
+      "win_rate": 0.0,
+      "avg_win": null,
+      "avg_loss": null,
+      "payoff_ratio": null,
+      "profit_factor": null,
+      "median_hold_min": null,
+      "mean_hold_min": null,
+      "exit_reasons": [
+        [
+          "dry_run",
+          1
+        ]
+      ],
+      "skip_reasons": [
+        [
+          "dry_run",
+          1
+        ]
+      ],
+      "gate_failures": 0,
+      "p95_loss": null,
+      "p99_loss": null,
+      "cvar_95": null,
+      "max_loss": null,
+      "max_win": null
+    },
+    "SOL/USDT": {
+      "trades": 4,
+      "executed": 2,
+      "pnl": -0.015531619007070596,
+      "win_rate": 0.0,
+      "avg_win": null,
+      "avg_loss": -0.005177206335690199,
+      "payoff_ratio": null,
+      "profit_factor": 0.0,
+      "median_hold_min": 4.0,
+      "mean_hold_min": 4.333333333333333,
+      "exit_reasons": [
+        [
+          "gate_close",
+          2
+        ],
+        [
+          "dry_run",
+          1
+        ],
+        [
+          "prob_floor",
+          1
+        ]
+      ],
+      "skip_reasons": [
+        [
+          "dry_run",
+          2
+        ],
+        [
+          "min_hold",
+          2
+        ]
+      ],
+      "gate_failures": 3,
+      "p95_loss": -0.004457223598898244,
+      "p99_loss": -0.004393218417970811,
+      "cvar_95": -0.005577200942165822,
+      "max_loss": -0.0059771199999997734,
+      "max_win": null
+    }
+  },
+  "portfolio": {
+    "trades": 5,
+    "executed": 3,
+    "pnl": -0.015531619007070596,
+    "win_rate": 0.0,
+    "avg_win": null,
+    "avg_loss": -0.005177206335690199,
+    "payoff_ratio": null,
+    "profit_factor": 0.0,
+    "median_hold_min": 4.0,
+    "mean_hold_min": 4.333333333333333,
+    "exit_reasons": [
+      [
+        "dry_run",
+        2
+      ],
+      [
+        "gate_close",
+        2
+      ],
+      [
+        "prob_floor",
+        1
+      ]
+    ],
+    "skip_reasons": [
+      [
+        "dry_run",
+        3
+      ],
+      [
+        "min_hold",
+        2
+      ]
+    ],
+    "gate_failures": 3,
+    "p95_loss": -0.004457223598898244,
+    "p99_loss": -0.004393218417970811,
+    "cvar_95": -0.005577200942165822,
+    "max_loss": -0.0059771199999997734,
+    "max_win": null,
+    "max_drawdown": 0.015531619007070596
+  },
+  "equity_curve": [
+    {
+      "ts": "2025-12-25T19:30:00+00:00",
+      "equity": 0.0,
+      "drawdown": 0.0
+    },
+    {
+      "ts": "2025-12-25T19:35:00+00:00",
+      "equity": 0.0,
+      "drawdown": 0.0
+    },
+    {
+      "ts": "2025-12-25T19:36:00+00:00",
+      "equity": -0.0051772818843318705,
+      "drawdown": 0.0051772818843318705
+    },
+    {
+      "ts": "2025-12-25T19:39:00+00:00",
+      "equity": -0.009554499007070822,
+      "drawdown": 0.009554499007070822
+    },
+    {
+      "ts": "2025-12-25T19:43:00+00:00",
+      "equity": -0.015531619007070596,
+      "drawdown": 0.015531619007070596
+    }
+  ],
+  "headline": [
+    {
+      "symbol": "ETH/USDT",
+      "trades": 1,
+      "win_rate": 0.0,
+      "avg_win": null,
+      "avg_loss": null,
+      "payoff_ratio": null,
+      "profit_factor": null,
+      "cvar_95": null,
+      "p95_loss": null,
+      "max_loss": null,
+      "pnl": 0.0
+    },
+    {
+      "symbol": "SOL/USDT",
+      "trades": 4,
+      "win_rate": 0.0,
+      "avg_win": null,
+      "avg_loss": -0.005177206335690199,
+      "payoff_ratio": null,
+      "profit_factor": 0.0,
+      "cvar_95": -0.005577200942165822,
+      "p95_loss": -0.004457223598898244,
+      "max_loss": -0.0059771199999997734,
+      "pnl": -0.015531619007070596
+    }
+  ]
+}

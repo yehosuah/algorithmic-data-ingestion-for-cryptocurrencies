@@ -1,0 +1,198 @@
+{
+  "generated_at": "2025-12-29T03:02:10.443044Z",
+  "evidence_bundle": "reports/log_forensics/evidence/20251229T030135Z",
+  "audit_log": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/reports/log_forensics/evidence/20251229T030135Z/trading_audit/audit.log",
+  "window": {
+    "start_ts": "2025-12-29T02:00:00+00:00",
+    "end_ts": "2025-12-29T03:01:35+00:00"
+  },
+  "trade_universe": "executed exits (trade side=sell, executed=true, entry_ts present)",
+  "portfolio": {
+    "metrics": {
+      "trades": 10,
+      "pnl": 0.04759975700000689,
+      "win_rate": 0.5,
+      "avg_win": 0.022497232520000708,
+      "avg_loss": -0.012977281119999328,
+      "payoff_ratio": 1.7335859732074503,
+      "profit_factor": 1.7335859732074506,
+      "max_drawdown_pnl": 0.047547179999999856,
+      "p95_loss": -0.0008083580799979565,
+      "p99_loss": -0.00044792889599744903,
+      "cvar_95": -0.01613214599999983,
+      "max_loss": -0.028405299999999682,
+      "max_win": 0.044809476000000986
+    },
+    "loss_attribution": [
+      {
+        "exit_reason_primary": "gate_close",
+        "count": 3,
+        "loss_sum_abs": 0.061918079999998835,
+        "loss_share": 0.9542535054523352
+      },
+      {
+        "exit_reason_primary": "prob_floor",
+        "count": 2,
+        "loss_sum_abs": 0.002968325599997814,
+        "loss_share": 0.045746494547664815
+      }
+    ],
+    "upside_starvation": {
+      "regret_fraction": 0.6,
+      "mean_regret_gap": 0.003010557743729103,
+      "short_hold_fraction_lt_5m": 0.2,
+      "take_profit_trades": 0,
+      "take_profit_avg_exit_return": null,
+      "take_profit_avg_mfe": null,
+      "take_profit_regret_fraction": null
+    }
+  },
+  "per_symbol": {
+    "BTC/USDT": {
+      "metrics": {
+        "trades": 3,
+        "pnl": 0.014173387000002329,
+        "win_rate": 0.3333333333333333,
+        "avg_win": 0.033673088599999824,
+        "avg_loss": -0.009749850799998749,
+        "payoff_ratio": 3.4537029633319256,
+        "profit_factor": 1.7268514816659628,
+        "max_drawdown_pnl": 0.019499701599997497,
+        "p95_loss": -0.0012970245199974656,
+        "p99_loss": -0.0005456621839973508,
+        "cvar_95": -0.019141880000000173,
+        "max_loss": -0.019141880000000173,
+        "max_win": 0.033673088599999824
+      },
+      "loss_attribution": [
+        {
+          "exit_reason_primary": "gate_close",
+          "count": 1,
+          "loss_sum_abs": 0.019141880000000173,
+          "loss_share": 0.9816498935554291
+        },
+        {
+          "exit_reason_primary": "prob_floor",
+          "count": 1,
+          "loss_sum_abs": 0.00035782159999732215,
+          "loss_share": 0.018350106444570826
+        }
+      ],
+      "upside_starvation": {
+        "regret_fraction": 1.0,
+        "mean_regret_gap": 0.003786544790801057,
+        "short_hold_fraction_lt_5m": 0.3333333333333333,
+        "take_profit_trades": 0,
+        "take_profit_avg_exit_return": null,
+        "take_profit_avg_mfe": null,
+        "take_profit_regret_fraction": null
+      }
+    },
+    "ETH/USDT": {
+      "metrics": {
+        "trades": 4,
+        "pnl": 0.05350521000000162,
+        "win_rate": 0.75,
+        "avg_win": 0.018705238000000703,
+        "avg_loss": -0.002610504000000492,
+        "payoff_ratio": 7.165374195939627,
+        "profit_factor": 21.49612258781888,
+        "max_drawdown_pnl": 0.0026105040000004923,
+        "p95_loss": -0.002610504000000492,
+        "p99_loss": -0.002610504000000492,
+        "cvar_95": -0.002610504000000492,
+        "max_loss": -0.002610504000000492,
+        "max_win": 0.044809476000000986
+      },
+      "loss_attribution": [
+        {
+          "exit_reason_primary": "prob_floor",
+          "count": 1,
+          "loss_sum_abs": 0.002610504000000492,
+          "loss_share": 1.0
+        }
+      ],
+      "upside_starvation": {
+        "regret_fraction": 0.5,
+        "mean_regret_gap": 0.0034646123808467766,
+        "short_hold_fraction_lt_5m": 0.0,
+        "take_profit_trades": 0,
+        "take_profit_avg_exit_return": null,
+        "take_profit_avg_mfe": null,
+        "take_profit_regret_fraction": null
+      }
+    },
+    "SOL/USDT": {
+      "metrics": {
+        "trades": 3,
+        "pnl": -0.020078839999997065,
+        "win_rate": 0.3333333333333333,
+        "avg_win": 0.022697360000001592,
+        "avg_loss": -0.02138809999999933,
+        "payoff_ratio": 1.061214413622636,
+        "profit_factor": 0.530607206811318,
+        "max_drawdown_pnl": 0.028405299999999682,
+        "p95_loss": -0.015072619999999013,
+        "p99_loss": -0.014511243999998985,
+        "cvar_95": -0.028405299999999682,
+        "max_loss": -0.028405299999999682,
+        "max_win": 0.022697360000001592
+      },
+      "loss_attribution": [
+        {
+          "exit_reason_primary": "gate_close",
+          "count": 2,
+          "loss_sum_abs": 0.04277619999999866,
+          "loss_share": 1.0
+        }
+      ],
+      "upside_starvation": {
+        "regret_fraction": 0.3333333333333333,
+        "mean_regret_gap": 0.0016291645138335846,
+        "short_hold_fraction_lt_5m": 0.3333333333333333,
+        "take_profit_trades": 0,
+        "take_profit_avg_exit_return": null,
+        "take_profit_avg_mfe": null,
+        "take_profit_regret_fraction": null
+      }
+    }
+  },
+  "headline": [
+    {
+      "symbol": "BTC/USDT",
+      "trades": 3,
+      "win_rate": 0.3333333333333333,
+      "avg_win": 0.033673088599999824,
+      "avg_loss": -0.009749850799998749,
+      "payoff_ratio": 3.4537029633319256,
+      "profit_factor": 1.7268514816659628,
+      "cvar_95": -0.019141880000000173,
+      "max_loss": -0.019141880000000173,
+      "pnl": 0.014173387000002329
+    },
+    {
+      "symbol": "ETH/USDT",
+      "trades": 4,
+      "win_rate": 0.75,
+      "avg_win": 0.018705238000000703,
+      "avg_loss": -0.002610504000000492,
+      "payoff_ratio": 7.165374195939627,
+      "profit_factor": 21.49612258781888,
+      "cvar_95": -0.002610504000000492,
+      "max_loss": -0.002610504000000492,
+      "pnl": 0.05350521000000162
+    },
+    {
+      "symbol": "SOL/USDT",
+      "trades": 3,
+      "win_rate": 0.3333333333333333,
+      "avg_win": 0.022697360000001592,
+      "avg_loss": -0.02138809999999933,
+      "payoff_ratio": 1.061214413622636,
+      "profit_factor": 0.530607206811318,
+      "cvar_95": -0.028405299999999682,
+      "max_loss": -0.028405299999999682,
+      "pnl": -0.020078839999997065
+    }
+  ]
+}

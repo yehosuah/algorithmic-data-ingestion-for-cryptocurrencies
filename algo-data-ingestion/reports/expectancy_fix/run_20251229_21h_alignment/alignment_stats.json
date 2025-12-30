@@ -1,0 +1,62 @@
+{
+  "per_symbol": {
+    "BTC/USDT": {
+      "trades_aligned": 1,
+      "mfe_mean": 0.0011651205443705681,
+      "mae_mean": -0.0004778277606241055,
+      "exit_return_mean": -2.635500837977478e-05,
+      "post_exit_max_return_mean": 0.0010416232179533136,
+      "post_exit_min_return_mean": -0.0004514846511260995,
+      "regret_fraction": 0.0,
+      "short_hold_fraction": 0.0,
+      "exit_reason_stats": [
+        {
+          "exit_reason": "prob_floor",
+          "exit_return_pct": -2.635500837977478e-05,
+          "post_exit_max_return_pct": 0.0010416232179533136,
+          "post_exit_min_return_pct": -0.0004514846511260995
+        }
+      ]
+    },
+    "SOL/USDT": {
+      "trades_aligned": 1,
+      "mfe_mean": 0.00284021747950991,
+      "mae_mean": -0.00024344721252944623,
+      "exit_return_mean": -8.114907084322276e-05,
+      "post_exit_max_return_mean": 0.0029216036357733177,
+      "post_exit_min_return_mean": 0.0,
+      "regret_fraction": 1.0,
+      "short_hold_fraction": 0.0,
+      "exit_reason_stats": [
+        {
+          "exit_reason": "prob_floor",
+          "exit_return_pct": -8.114907084322276e-05,
+          "post_exit_max_return_pct": 0.0029216036357733177,
+          "post_exit_min_return_pct": 0.0
+        }
+      ]
+    },
+    "ETH/USDT": {
+      "trades_aligned": 1,
+      "mfe_mean": 0.002612854150890742,
+      "mae_mean": -0.0005184775860774815,
+      "exit_return_mean": 0.00038544715280774966,
+      "post_exit_max_return_mean": 0.0022265487811947704,
+      "post_exit_min_return_mean": -0.00024550001875345284,
+      "regret_fraction": 1.0,
+      "short_hold_fraction": 0.0,
+      "exit_reason_stats": [
+        {
+          "exit_reason": "prob_floor",
+          "exit_return_pct": 0.00038544715280774966,
+          "post_exit_max_return_pct": 0.0022265487811947704,
+          "post_exit_min_return_pct": -0.00024550001875345284
+        }
+      ]
+    }
+  },
+  "recommendations": [
+    "BTC/USDT exit_reason=prob_floor shows negative exit return but positive post-exit drift (0.0010); consider relaxing/retiming exits.",
+    "SOL/USDT exit_reason=prob_floor shows negative exit return but positive post-exit drift (0.0029); consider relaxing/retiming exits."
+  ]
+}

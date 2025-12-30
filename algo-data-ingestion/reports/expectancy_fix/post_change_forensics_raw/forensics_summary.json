@@ -1,0 +1,90 @@
+{
+  "symbols": [
+    "ETH/USDT"
+  ],
+  "per_symbol": {
+    "ETH/USDT": {
+      "trades": 1,
+      "executed": 1,
+      "pnl": 0.0,
+      "win_rate": 0.0,
+      "avg_win": null,
+      "avg_loss": null,
+      "payoff_ratio": null,
+      "profit_factor": null,
+      "median_hold_min": null,
+      "mean_hold_min": null,
+      "exit_reasons": [
+        [
+          "dry_run",
+          1
+        ]
+      ],
+      "skip_reasons": [
+        [
+          "dry_run",
+          1
+        ]
+      ],
+      "gate_failures": 0,
+      "p95_loss": null,
+      "p99_loss": null,
+      "cvar_95": null,
+      "max_loss": null,
+      "max_win": null
+    }
+  },
+  "portfolio": {
+    "trades": 1,
+    "executed": 1,
+    "pnl": 0.0,
+    "win_rate": 0.0,
+    "avg_win": null,
+    "avg_loss": null,
+    "payoff_ratio": null,
+    "profit_factor": null,
+    "median_hold_min": null,
+    "mean_hold_min": null,
+    "exit_reasons": [
+      [
+        "dry_run",
+        1
+      ]
+    ],
+    "skip_reasons": [
+      [
+        "dry_run",
+        1
+      ]
+    ],
+    "gate_failures": 0,
+    "p95_loss": null,
+    "p99_loss": null,
+    "cvar_95": null,
+    "max_loss": null,
+    "max_win": null,
+    "max_drawdown": 0.0
+  },
+  "equity_curve": [
+    {
+      "ts": "2025-12-25T19:30:00+00:00",
+      "equity": 0.0,
+      "drawdown": 0.0
+    }
+  ],
+  "headline": [
+    {
+      "symbol": "ETH/USDT",
+      "trades": 1,
+      "win_rate": 0.0,
+      "avg_win": null,
+      "avg_loss": null,
+      "payoff_ratio": null,
+      "profit_factor": null,
+      "cvar_95": null,
+      "p95_loss": null,
+      "max_loss": null,
+      "pnl": 0.0
+    }
+  ]
+}

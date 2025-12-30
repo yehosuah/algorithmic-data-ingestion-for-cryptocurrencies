@@ -1,0 +1,38 @@
+{
+  "per_symbol": {
+    "BTC/USDT": {
+      "trades_aligned": 2,
+      "mfe_mean": 0.005022652822313289,
+      "mae_mean": -0.0010623129181629443,
+      "exit_return_mean": 0.00048128913851919197,
+      "post_exit_max_return_mean": 0.004539327939590887,
+      "post_exit_min_return_mean": -0.0015427114834091205,
+      "regret_fraction": 1.0,
+      "short_hold_fraction": 0.0,
+      "exit_reason_stats": []
+    },
+    "SOL/USDT": {
+      "trades_aligned": 2,
+      "mfe_mean": 0.004433550576507739,
+      "mae_mean": -0.0011991399272246461,
+      "exit_return_mean": 0.002444071464822506,
+      "post_exit_max_return_mean": 0.001984135436302159,
+      "post_exit_min_return_mean": -0.003303815802085275,
+      "regret_fraction": 0.5,
+      "short_hold_fraction": 0.0,
+      "exit_reason_stats": []
+    },
+    "ETH/USDT": {
+      "trades_aligned": 2,
+      "mfe_mean": 0.01929179127205094,
+      "mae_mean": -0.15179907246197166,
+      "exit_return_mean": 0.0014190077899692843,
+      "post_exit_max_return_mean": 0.009886488912144276,
+      "post_exit_min_return_mean": -0.1530009236606436,
+      "regret_fraction": 1.0,
+      "short_hold_fraction": 0.0,
+      "exit_reason_stats": []
+    }
+  },
+  "recommendations": []
+}
