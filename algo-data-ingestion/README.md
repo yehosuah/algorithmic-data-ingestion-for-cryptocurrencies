@@ -1,7 +1,8 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2025-12-30 22:59 UTC_
+_Last updated: 2026-01-01 04:19 UTC_
 
+> Update 2026-01-01: Extended the trigger optimizer sweeps with `--disable-prob-exits` + entry filters (`--entry-rsi-min`/`--entry-macd-min`), added profit-fix search-space presets + the latest 48h docker alignment/forensics bundles, and refreshed stage-0/compose defaults.
 > Update 2025-12-30: Added price-monitor exits (stop/take-profit/profit-trailing/max-hold) so positions can close even when decision payloads stall, introduced optional entry filters (`entry_rsi_min`/`entry_macd_min`) + `disable_prob_exits` to reduce churn, and refreshed stage-0 sizing/risk limits (capital 200, equity_fraction 0.33, vol-scaled stops with a hard cap).
 > Update 2025-12-19: Added a dry-run profit forensics loop (`scripts/extract_container_logs.py` → `analysis/trading_log_forensics.py` → `analysis/market_trade_alignment.py` with `RUNBOOK_DRY_RUN_PROFIT.md`), tightened stage-0 sizing to equity-fraction compounding (capital 100 USDT, base notionals 20/15/12, `max_total_notional=80`, compounding step 5) with per-symbol trigger overrides and longer holds, and refreshed compose/env defaults to mirror the new thresholds while keeping reports/logs out of Docker build context.
 > Update 2025-12-17: Added a single-command live-readiness check plus post-launch diagnostics (`analysis/live_readiness_check`, `analysis/acceptance_trade_proof`, `analysis/exit_attribution_report`, `analysis/project_stance_snapshot`) and hardened scheduler/trading with loss-guarding, queue-age pruning, quote-aware exits, and the `INFER_APPLY_CALIBRATION` override so experiments stay aligned with production.
@@ -67,6 +68,9 @@ docker compose up -d --build
      --promote-best
    ```
    This writes ranked results to `experiments/trigger_sweeps/eth_quick/results.csv` and exports primary/conservative/aggressive to `configs/final_trigger_policy.yaml` (with `meta.active_policy`).
+   - Optional runtime-alignment knobs: `--disable-prob-exits` and entry filters (`--entry-rsi-min`/`--entry-macd-min`) to match `TRADING_MODELS` churn-reduction settings.
+   - If you pass `--spread-column hl_spread`, the optimizer converts the ratio to bps automatically for spread guards.
+   - Search-space presets: `configs/trigger_search_space_profit_fix_*.yaml`, `configs/trigger_search_space_btc_probexits_recent.yaml`.
 2. Preflight coverage/trades before starting services:
    ```bash
    python3 scripts/trigger_preflight.py \
@@ -122,7 +126,7 @@ Quote-aware exits: the executor now fetches live bid/ask quotes (with order-book
 
 Trading also clears stale dedupe timestamps after restarts when downtime exceeds `TRADING_LAST_TS_GRACE_BARS` bars (default 3) so fresh decisions are not dropped due to old state; increase the grace if using long bar intervals.
 
-The default dry-run compose now loads `configs/dry_run/infer_jobs_portfolio_policy.yaml` and scores the baked-in `xgb_primary` bundle (`models/base_xgb_h120_calmon_spread0` → `/opt/models/base_xgb_h120_calmon_spread0` inside containers). Trading runs BTC/ETH/SOL as primary entries with tight spreads (`max_spread_bps=8`), `stop_loss_pct=0.005`, and optional churn-reduction knobs (`disable_prob_exits`, `entry_rsi_min`/`entry_macd_min`). Stage-0 risk limits live in `configs/runtime_overrides/risk_limits_stage_0.yaml` (`capital=200`, `equity_fraction=0.33`, `max_total_notional=80`, cooldowns 2/5, vol-scaled stops), and compose keeps `TRADING_SHADOW_SYMBOLS=[]` for ladder parity.
+The default dry-run compose now loads `configs/dry_run/infer_jobs_portfolio_policy.yaml` and scores the baked-in `xgb_primary` bundle (`models/base_xgb_h120_calmon_spread0` → `/opt/models/base_xgb_h120_calmon_spread0` inside containers). Trading is configured for BTC/ETH/SOL with tight spreads (`max_spread_bps=8`), per-symbol stop-loss/profit-trailing/max-hold guards (see compose `TRADING_MODELS`), and optional churn-reduction knobs (`disable_prob_exits`, `entry_rsi_min`/`entry_macd_min`). Stage-0 risk limits live in `configs/runtime_overrides/risk_limits_stage_0.yaml` (`capital=200`, `equity_fraction=0.33`, `max_total_notional=80`, cooldowns 2/5, vol-scaled stops); note `symbols.BTC/USDT.trigger_overrides.entry_threshold=1.0` currently suppresses BTC entries unless you lower it.
 
 Trading trigger guards are centralized: `TRADING_MODELS` entries now accept `max_spread_bps`, `stop_loss_pct`, `take_profit_pct`, and `max_hold_minutes`, and the live loop shares `app/trading/decision.py::decide_bar` with the offline optimizer so spread/hold/SL/TP checks behave identically in sweeps and production.
 
@@ -244,7 +248,7 @@ TWITTER_BEARER_TOKEN=
 NEWS_API_KEY=
 # Trading service
 TRADING_DRY_RUN=1
-TRADING_MODELS=[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":25.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":240,"shadow_mode":false,"policy_id":"primary","min_hold_bars_override":15,"disable_prob_exits":true,"entry_rsi_min":50.0},{"model":"xgb_primary","symbol":"BTC/USDT","exchange":"binance","timeframe":"1m","order_notional":25.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":15,"disable_prob_exits":true,"entry_macd_min":0.0},{"model":"xgb_primary","symbol":"SOL/USDT","exchange":"binance","timeframe":"1m","order_notional":30.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":15,"disable_prob_exits":true,"entry_rsi_min":45.0}]
+TRADING_MODELS=[{"model":"xgb_primary","symbol":"ETH/USDT","exchange":"binance","timeframe":"1m","order_notional":45.0,"max_spread_bps":8,"stop_loss_pct":0.008,"take_profit_pct":null,"profit_trailing_start_pct":0.004,"profit_trailing_stop_pct":0.002,"max_hold_minutes":240,"shadow_mode":false,"policy_id":"primary","min_hold_bars_override":15,"disable_prob_exits":true,"entry_rsi_min":50.0},{"model":"xgb_primary","symbol":"BTC/USDT","exchange":"binance","timeframe":"1m","order_notional":25.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":15,"disable_prob_exits":true,"entry_macd_min":0.0},{"model":"xgb_primary","symbol":"SOL/USDT","exchange":"binance","timeframe":"1m","order_notional":30.0,"max_spread_bps":8,"stop_loss_pct":0.005,"take_profit_pct":null,"profit_trailing_start_pct":null,"profit_trailing_stop_pct":null,"max_hold_minutes":90,"shadow_mode":false,"policy_id":"conservative","min_hold_bars_override":15,"disable_prob_exits":true,"entry_rsi_min":45.0}]
 TRADING_SHADOW_SYMBOLS=[]
 TRADING_AUDIT_HMAC_KEY=changeme_in_prod
 TRADING_INTENT_LEDGER_BACKEND=redis

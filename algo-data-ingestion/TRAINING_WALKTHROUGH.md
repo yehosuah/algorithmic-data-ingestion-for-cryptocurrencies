@@ -1,7 +1,8 @@
 # Training Walkthrough (Base · TCN · Blender)
 
-_Last updated: 2025-12-30 22:59 UTC_
+_Last updated: 2026-01-01 04:19 UTC_
 
+> Update 2026-01-01: Extended the trigger optimizer sweeps with `--disable-prob-exits` + entry filters (`--entry-rsi-min`/`--entry-macd-min`) and added profit-fix search-space presets under `configs/trigger_search_space_profit_fix_*.yaml`.
 > Update 2025-11-30: Documented the BTC/ETH/SOL rollout plus kill/safe switch enforcement, HMAC-signed trading audits, the Redis intent ledger + reconciliation loop, runtime risk/deadlock policies, and scheduler shadow-mode controls in this drop.
 
 > Update 2025-11-29: Added the trigger optimizer + preflight lane (analysis/trigger_optimizer.py, configs/trigger_search_space*.yaml, configs/final_trigger_policy.yaml, scripts/trigger_preflight.py), shared trading decision logic with spread/hold/SL/TP guards, enriched market ingest/backfill/scheduler to compute augmented features and attach prices for inference/Redis payloads, and aligned dry-run paths to MODELS_ROOT=/opt/models with guard-aware TRADING_MODELS defaults.
@@ -83,6 +84,8 @@ This guide walks through the refreshed modeling stack: relaxed-gate retrains for
     --promote-best
   ```
   This writes `results.csv` + `summary.json` under `experiments/trigger_sweeps/...` and promotes the winner to `configs/final_trigger_policy.yaml` (with `meta.active_policy`).
+  - Optional runtime-alignment knobs: add `--disable-prob-exits` and/or entry filters (`--entry-rsi-min`/`--entry-macd-min`) to mirror `TRADING_MODELS` settings in offline sweeps.
+  - Search-space presets: use `configs/trigger_search_space_quick.yaml` for fast iteration, and `configs/trigger_search_space_profit_fix_*.yaml` for the expectancy-fix lane.
 - Before starting the Docker stack, fail fast if coverage/trade proxy falls below the guardrail:
   ```bash
   python3 scripts/trigger_preflight.py \
