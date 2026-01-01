@@ -1,0 +1,56 @@
+{
+  "per_symbol": {
+    "ETH/USDT": {
+      "trades_aligned": 13,
+      "mfe_mean": 0.00565713467963586,
+      "mae_mean": -0.002096045664875329,
+      "exit_return_mean": 0.0005252304555559097,
+      "post_exit_max_return_mean": 0.005561374134564965,
+      "post_exit_min_return_mean": -0.00235568122608096,
+      "regret_fraction": 0.6153846153846154,
+      "short_hold_fraction": 0.0,
+      "exit_reason_stats": [
+        {
+          "exit_reason": "stop_loss",
+          "exit_return_pct": -0.005430405933776666,
+          "post_exit_max_return_pct": 0.009721360188699124,
+          "post_exit_min_return_pct": -0.0009475460235330302
+        },
+        {
+          "exit_reason": "time_limit",
+          "exit_return_pct": 0.0031721799619259436,
+          "post_exit_max_return_pct": 0.0037124914438386725,
+          "post_exit_min_return_pct": -0.0029815190938800398
+        }
+      ]
+    },
+    "BTC/USDT": {
+      "trades_aligned": 20,
+      "mfe_mean": 0.0023454579570450383,
+      "mae_mean": -0.0025241340154720515,
+      "exit_return_mean": -0.0007445330515521486,
+      "post_exit_max_return_mean": 0.0030713271745949735,
+      "post_exit_min_return_mean": -0.001955798812938303,
+      "regret_fraction": 0.5,
+      "short_hold_fraction": 0.0,
+      "exit_reason_stats": [
+        {
+          "exit_reason": "stop_loss",
+          "exit_return_pct": -0.005310903301195169,
+          "post_exit_max_return_pct": 0.0032228051603830467,
+          "post_exit_min_return_pct": -0.003755886427547317
+        },
+        {
+          "exit_reason": "time_limit",
+          "exit_return_pct": 0.0007775903649955248,
+          "post_exit_max_return_pct": 0.0030208345126656157,
+          "post_exit_min_return_pct": -0.0013557696080686318
+        }
+      ]
+    }
+  },
+  "recommendations": [
+    "ETH/USDT exit_reason=stop_loss shows negative exit return but positive post-exit drift (0.0097); consider relaxing/retiming exits.",
+    "BTC/USDT exit_reason=stop_loss shows negative exit return but positive post-exit drift (0.0032); consider relaxing/retiming exits."
+  ]
+}

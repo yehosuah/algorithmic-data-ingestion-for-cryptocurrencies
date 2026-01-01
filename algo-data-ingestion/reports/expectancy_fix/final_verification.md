@@ -1,5 +1,7 @@
 # Expectancy Fix — Final Verification
 
+_Last updated: 2026-01-01 04:19 UTC_
+
 ## Evidence bundles (source-of-truth snapshots)
 
 - Baseline (pre-change): `reports/log_forensics/evidence/20251225T181022Z`
@@ -27,7 +29,7 @@
 - Risk sizing avoids qty-step rounding-to-zero deadlocks: `app/trading/risk.py`
 - Take-profit disabled (remove winner clipping); tighter entry spread cap; min-hold tuned: `docker-compose.yml`, `configs/runtime_overrides/stage_0.yaml`
 - Risk limits tuned for live prob distribution + tighter trigger band: `configs/runtime_overrides/risk_limits_stage_0.yaml`
-- Final portfolio sizing adjustment: ETH order_notional reduced to 5 (improves portfolio PF while keeping ETH live): `docker-compose.yml`, `configs/runtime_overrides/stage_0.yaml`
+- Final compose defaults refreshed (profit trailing + sizing): `docker-compose.yml`
 
 ## Offline proof (fixed evaluation window, realistic costs)
 
@@ -220,12 +222,19 @@ baseline = Scenario(
 ### Deployed parameters (now in docker)
 
 - Risk thresholds: `configs/runtime_overrides/risk_limits_stage_0.yaml`
-  - BTC `entry_threshold=0.64`, SOL `entry_threshold=0.78`
+  - BTC `entry_threshold=1.0` (entries suppressed), `exit_threshold=0.59`
+  - ETH `entry_threshold=0.85`, `exit_threshold=0.8`
+  - SOL `entry_threshold=0.78`, `exit_threshold=0.73`
 - Trading runtime models: `docker-compose.yml`
-  - Order notionals: BTC=25, ETH=25, SOL=30 (total cap 80)
+  - Order notionals: BTC=25, ETH=45, SOL=30 (total cap 80)
   - Holds: BTC=90m, ETH=240m, SOL=90m
   - Filters: BTC `entry_macd_min=0.0`, ETH `entry_rsi_min=50.0`, SOL `entry_rsi_min=45.0`
-  - Exits: `disable_prob_exits=true` (removes `prob_floor` churn; exits via stop-loss + time-limit)
+  - Exits: `disable_prob_exits=true` (removes `prob_floor` churn; exits via stop-loss + time-limit; ETH also uses profit trailing)
+
+## 2026-01-01 follow-up (docker live 48h window)
+
+- Executed-exit forensics: `reports/expectancy_fix/docker_live_48h_forensics.md` (BTC/ETH) and `reports/expectancy_fix/docker_live_48h_all_forensics.md` (BTC/ETH/SOL).
+- Market alignment: `reports/expectancy_fix/docker_live_48h_alignment/alignment_summary.md` (BTC/ETH) and `reports/expectancy_fix/docker_live_48h_all_alignment/alignment_summary.md` (BTC/ETH/SOL).
 
 ### Live verification commands (Grafana/Prometheus)
 

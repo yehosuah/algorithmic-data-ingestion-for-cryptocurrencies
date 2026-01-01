@@ -1,0 +1,158 @@
+{
+  "generated_at": "2026-01-01T00:47:58.628051Z",
+  "evidence_bundle": null,
+  "audit_log": "/Users/yehosuahercules/Desktop/EcuacionesDiferenciales/CCXT_Testing/algo-data-ingestion/data_lake/trading/audit.log",
+  "window": {
+    "start_ts": "2025-12-30T00:46:53.678749+00:00",
+    "end_ts": "2026-01-01T00:46:53.678749+00:00"
+  },
+  "trade_universe": "executed exits (trade side=sell, executed=true, entry_ts present)",
+  "portfolio": {
+    "metrics": {
+      "trades": 33,
+      "pnl": -0.28093810279998743,
+      "win_rate": 0.5454545454545454,
+      "avg_win": 0.056470119377778065,
+      "avg_loss": -0.08649335010666617,
+      "payoff_ratio": 0.6528839420387513,
+      "profit_factor": 0.7834607304465017,
+      "max_drawdown_pnl": 0.6372662039999843,
+      "p95_loss": -0.01243974511999918,
+      "p99_loss": -0.010346392543998998,
+      "cvar_95": -0.09196979979999956,
+      "max_loss": -0.1643684480000022,
+      "max_win": 0.23496238399999664
+    },
+    "loss_attribution": [
+      {
+        "exit_reason_primary": "stop_loss",
+        "count": 9,
+        "loss_sum_abs": 1.0601119435999964,
+        "loss_share": 0.8171047772594732
+      },
+      {
+        "exit_reason_primary": "time_limit",
+        "count": 6,
+        "loss_sum_abs": 0.2372883079999964,
+        "loss_share": 0.182895222740527
+      }
+    ],
+    "upside_starvation": {
+      "regret_fraction": 0.5454545454545454,
+      "mean_regret_gap": 0.003894381063181306,
+      "short_hold_fraction_lt_5m": 0.0,
+      "take_profit_trades": 0,
+      "take_profit_avg_exit_return": null,
+      "take_profit_avg_mfe": null,
+      "take_profit_regret_fraction": null
+    }
+  },
+  "per_symbol": {
+    "BTC/USDT": {
+      "metrics": {
+        "trades": 20,
+        "pnl": -0.31861479879998694,
+        "win_rate": 0.55,
+        "avg_win": 0.03070027680000031,
+        "avg_loss": -0.07292420484444335,
+        "payoff_ratio": 0.4209888454113133,
+        "profit_factor": 0.5145419221693829,
+        "max_drawdown_pnl": 0.4794636919999889,
+        "p95_loss": -0.018517411039998353,
+        "p99_loss": -0.011561925727998832,
+        "cvar_95": -0.08081184864999892,
+        "max_loss": -0.10332059159999767,
+        "max_win": 0.06067110600000012
+      },
+      "loss_attribution": [
+        {
+          "exit_reason_primary": "stop_loss",
+          "count": 5,
+          "loss_sum_abs": 0.4798360955999928,
+          "loss_share": 0.7311032303617228
+        },
+        {
+          "exit_reason_primary": "time_limit",
+          "count": 4,
+          "loss_sum_abs": 0.17648174799999755,
+          "loss_share": 0.2688967696382774
+        }
+      ],
+      "upside_starvation": {
+        "regret_fraction": 0.5,
+        "mean_regret_gap": 0.003089991008597187,
+        "short_hold_fraction_lt_5m": 0.0,
+        "take_profit_trades": 0,
+        "take_profit_avg_exit_return": null,
+        "take_profit_avg_mfe": null,
+        "take_profit_regret_fraction": null
+      }
+    },
+    "ETH/USDT": {
+      "metrics": {
+        "trades": 13,
+        "pnl": 0.03767669599999948,
+        "win_rate": 0.5384615384615384,
+        "avg_win": 0.09696558628571454,
+        "avg_loss": -0.10684706800000042,
+        "payoff_ratio": 0.9075175210770796,
+        "profit_factor": 1.058770441256593,
+        "max_drawdown_pnl": 0.18783009600000045,
+        "p95_loss": -0.021982231999999345,
+        "p99_loss": -0.01524539359999928,
+        "cvar_95": -0.12550424480000064,
+        "max_loss": -0.1643684480000022,
+        "max_win": 0.23496238399999664
+      },
+      "loss_attribution": [
+        {
+          "exit_reason_primary": "stop_loss",
+          "count": 4,
+          "loss_sum_abs": 0.5802758480000036,
+          "loss_share": 0.9051501659674327
+        },
+        {
+          "exit_reason_primary": "time_limit",
+          "count": 2,
+          "loss_sum_abs": 0.060806559999998844,
+          "loss_share": 0.09484983403256732
+        }
+      ],
+      "upside_starvation": {
+        "regret_fraction": 0.6153846153846154,
+        "mean_regret_gap": 0.00513190422407995,
+        "short_hold_fraction_lt_5m": 0.0,
+        "take_profit_trades": 0,
+        "take_profit_avg_exit_return": null,
+        "take_profit_avg_mfe": null,
+        "take_profit_regret_fraction": null
+      }
+    }
+  },
+  "headline": [
+    {
+      "symbol": "BTC/USDT",
+      "trades": 20,
+      "win_rate": 0.55,
+      "avg_win": 0.03070027680000031,
+      "avg_loss": -0.07292420484444335,
+      "payoff_ratio": 0.4209888454113133,
+      "profit_factor": 0.5145419221693829,
+      "cvar_95": -0.08081184864999892,
+      "max_loss": -0.10332059159999767,
+      "pnl": -0.31861479879998694
+    },
+    {
+      "symbol": "ETH/USDT",
+      "trades": 13,
+      "win_rate": 0.5384615384615384,
+      "avg_win": 0.09696558628571454,
+      "avg_loss": -0.10684706800000042,
+      "payoff_ratio": 0.9075175210770796,
+      "profit_factor": 1.058770441256593,
+      "cvar_95": -0.12550424480000064,
+      "max_loss": -0.1643684480000022,
+      "pnl": 0.03767669599999948
+    }
+  ]
+}
