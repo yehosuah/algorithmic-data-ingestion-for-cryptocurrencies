@@ -1,0 +1,18 @@
+{
+  "results_path": "experiments/expectancy_fix/sol_profit_fix_recent90d_thrgrid/results.csv",
+  "best": {
+    "entry_threshold": 0.7866,
+    "exit_threshold": 0.7866,
+    "exit_prob_drop": 0.15,
+    "min_hold_bars": 1,
+    "max_hold_seconds": 5400,
+    "stop_loss_pct": 0.012,
+    "take_profit_pct": null,
+    "profit_trailing_start_pct": 0.003,
+    "profit_trailing_stop_pct": 0.0015,
+    "max_spread_bps": 8,
+    "disable_prob_exits": true,
+    "entry_rsi_min": 45.0,
+    "entry_macd_min": null
+  }
+}

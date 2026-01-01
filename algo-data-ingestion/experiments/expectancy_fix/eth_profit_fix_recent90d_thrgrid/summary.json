@@ -1,0 +1,18 @@
+{
+  "results_path": "experiments/expectancy_fix/eth_profit_fix_recent90d_thrgrid/results.csv",
+  "best": {
+    "entry_threshold": 0.85,
+    "exit_threshold": 0.85,
+    "exit_prob_drop": 0.15,
+    "min_hold_bars": 1,
+    "max_hold_seconds": 14400,
+    "stop_loss_pct": 0.008,
+    "take_profit_pct": null,
+    "profit_trailing_start_pct": 0.005,
+    "profit_trailing_stop_pct": 0.0025,
+    "max_spread_bps": 8,
+    "disable_prob_exits": true,
+    "entry_rsi_min": 50.0,
+    "entry_macd_min": null
+  }
+}
