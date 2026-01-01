@@ -69,7 +69,7 @@ symbols:
     max_entry_slippage_bps: 25
     max_position_age_minutes: 360
     trigger_overrides:
-      entry_threshold: 0.64
+      entry_threshold: 1.0
       exit_threshold: 0.59
       exit_prob_drop: 0.15
   ETH/USDT:
@@ -82,8 +82,8 @@ symbols:
     max_entry_slippage_bps: 25
     max_position_age_minutes: 360
     trigger_overrides:
-      entry_threshold: 0.7
-      exit_threshold: 0.65
+      entry_threshold: 0.85
+      exit_threshold: 0.8
       exit_prob_drop: 0.15
   SOL/USDT:
     max_symbol_notional: 30

@@ -1,0 +1,13 @@
+entry_thresholds: [0.64, 0.70, 0.75, 0.77, 0.7835]
+exit_threshold_offsets: [0.0]
+exit_prob_drop: [0.15]
+min_hold_bars: [1]
+max_hold_minutes: [90, 180, 240, 360]
+stop_loss_pct: [0.005, 0.008, 0.012]
+take_profit_pct: [null]
+profit_trailing_start_pct: [null, 0.003, 0.005]
+profit_trailing_stop_pct: [null, 0.0015, 0.0025]
+max_spread_bps: [8]
+min_trades: 200
+max_drawdown_limit: null
+fraction_time_in_position_min: 0.01
