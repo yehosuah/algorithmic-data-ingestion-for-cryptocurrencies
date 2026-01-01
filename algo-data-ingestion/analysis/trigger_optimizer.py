@@ -131,6 +131,9 @@ def simulate_trades(
     order_notional: float = 100.0,
     transaction_cost_bps: float = 0.0,
     slippage_bps: float = 0.0,
+    disable_prob_exits: bool = False,
+    entry_rsi_min: Optional[float] = None,
+    entry_macd_min: Optional[float] = None,
 ) -> SweepResult:
     state = PositionState()
     equity = 0.0
@@ -162,6 +165,8 @@ def simulate_trades(
                 spread_bps = float(val) if val is not None else None
             except Exception:
                 spread_bps = None
+            if spread_bps is not None and spread_column == "hl_spread":
+                spread_bps *= 1e4
 
         coverage_total += 1
         if gate_pass and probability >= cfg.entry_threshold:
@@ -194,12 +199,37 @@ def simulate_trades(
             spread_bps=spread_bps,
             fee_estimate_bps=transaction_cost_bps,
             slippage_estimate_bps=slippage_bps,
+            disable_prob_exits=disable_prob_exits,
         )
 
         if state.in_position:
             in_position_time += 1
 
         if outcome.should_enter:
+            if entry_rsi_min is not None:
+                raw_rsi = row_dict.get("rsi_14")
+                try:
+                    rsi_val = float(raw_rsi) if raw_rsi is not None else None
+                except (TypeError, ValueError):
+                    rsi_val = None
+                if rsi_val is None:
+                    skipped_other += 1
+                    continue
+                if rsi_val < float(entry_rsi_min):
+                    skipped_other += 1
+                    continue
+            if entry_macd_min is not None:
+                raw_macd = row_dict.get("macd")
+                try:
+                    macd_val = float(raw_macd) if raw_macd is not None else None
+                except (TypeError, ValueError):
+                    macd_val = None
+                if macd_val is None:
+                    skipped_other += 1
+                    continue
+                if macd_val < float(entry_macd_min):
+                    skipped_other += 1
+                    continue
             if outcome.skip_execution:
                 skipped_spread += 1
                 state.metadata["last_entry_reason"] = outcome.skip_reason or ""
@@ -273,6 +303,9 @@ def simulate_trades(
             "profit_trailing_start_pct": cfg.profit_trailing_start_pct,
             "profit_trailing_stop_pct": cfg.profit_trailing_stop_pct,
             "max_spread_bps": cfg.max_spread_bps,
+            "disable_prob_exits": bool(disable_prob_exits),
+            "entry_rsi_min": float(entry_rsi_min) if entry_rsi_min is not None else None,
+            "entry_macd_min": float(entry_macd_min) if entry_macd_min is not None else None,
         },
         trades=trades,
         wins=wins,
@@ -347,6 +380,13 @@ def main() -> None:
     parser.add_argument("--price-column", type=str, default="close")
     parser.add_argument("--spread-column", type=str, default=None)
     parser.add_argument("--order-notional", type=float, default=100.0)
+    parser.add_argument("--entry-rsi-min", type=float, default=None, help="Optional RSI>= threshold entry filter.")
+    parser.add_argument("--entry-macd-min", type=float, default=None, help="Optional MACD>= threshold entry filter.")
+    parser.add_argument(
+        "--disable-prob-exits",
+        action="store_true",
+        help="Disable probability/gate exits (simulate only stop-loss, take-profit, profit-trailing, time-limit).",
+    )
     parser.add_argument(
         "--transaction-cost-bps",
         type=float,
@@ -402,6 +442,9 @@ def main() -> None:
             order_notional=args.order_notional,
             transaction_cost_bps=args.transaction_cost_bps,
             slippage_bps=args.slippage_bps,
+            disable_prob_exits=args.disable_prob_exits,
+            entry_rsi_min=args.entry_rsi_min,
+            entry_macd_min=args.entry_macd_min,
         )
         # Apply hard filters
         if res.trades < min_trades or res.fraction_time_in_position < frac_min:
