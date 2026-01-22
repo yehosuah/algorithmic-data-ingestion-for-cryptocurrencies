@@ -137,6 +137,8 @@ services:
       - TTL_SWEEP_CRON=*/15 * * * *
       - TTL_SWEEP_PATTERN=features:market:*
       - TTL_SWEEP_TTL=3600
+      - DATA_LAKE_RETENTION_DAYS=2
+      - 'DATA_LAKE_CLEANUP_CRON=30 2 * * *'
     ports:
       - "9002:9002"
     volumes:

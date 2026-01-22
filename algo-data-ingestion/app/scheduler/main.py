@@ -10,7 +10,7 @@ import errno
 import threading
 import math
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -177,6 +177,26 @@ TTL_SWEEP_CRON: str = os.getenv("TTL_SWEEP_CRON", "*/15 * * * *")
 TTL_SWEEP_PATTERN: str = os.getenv("TTL_SWEEP_PATTERN", "features:market:*")
 TTL_SWEEP_TTL: int = int(os.getenv("TTL_SWEEP_TTL", "3600"))
 TTL_SWEEP_MAX_KEYS: Optional[int] = int(os.getenv("TTL_SWEEP_MAX_KEYS", "0")) or None  # optional
+
+# Data lake cleanup config
+_DATA_LAKE_CLEANUP_DEFAULT_CRON = "30 2 * * *"
+def _sanitize_cron(expr: str, default: str) -> str:
+    expr = (expr or "").strip().strip('"').strip("'")
+    return expr or default
+
+DATA_LAKE_RETENTION_DAYS: int = max(0, int(os.getenv("DATA_LAKE_RETENTION_DAYS", "2")))
+DATA_LAKE_CLEANUP_CRON: str = _sanitize_cron(
+    os.getenv("DATA_LAKE_CLEANUP_CRON", _DATA_LAKE_CLEANUP_DEFAULT_CRON),
+    _DATA_LAKE_CLEANUP_DEFAULT_CRON,
+)
+DATA_LAKE_CLEANUP_ROOTS: List[Path] = [
+    Path(p.strip())
+    for p in os.getenv(
+        "DATA_LAKE_CLEANUP_ROOTS",
+        "/app/data_lake/market,/app/data_lake/news,/app/data_lake/onchain,/app/data_lake/social",
+    ).split(",")
+    if p.strip()
+]
 
 # ------------------------------------------------------------------------------
 # Prometheus metrics
@@ -1470,6 +1490,64 @@ async def run_market_ingest_job(exchange: str, symbol: str, timeframe: str, limi
     if out is not None:
         log.info("Market ingest ok %s -> %s", job_id, out)
 
+def _extract_partition_date(path: Path) -> Optional[date]:
+    name = path.name
+    if name.startswith("dt="):
+        try:
+            return datetime.strptime(name.split("=", 1)[1], "%Y-%m-%d").date()
+        except ValueError:
+            return None
+    year = month = day = None
+    for part in path.parts:
+        if part.startswith("year="):
+            year = part.split("=", 1)[1]
+        elif part.startswith("month="):
+            month = part.split("=", 1)[1]
+        elif part.startswith("day="):
+            day = part.split("=", 1)[1]
+    if year and month and day:
+        try:
+            return datetime(int(year), int(month), int(day)).date()
+        except ValueError:
+            return None
+    return None
+
+def _cleanup_data_lake(retention_days: int) -> int:
+    if retention_days < 0:
+        return 0
+    cutoff = datetime.utcnow().date() - timedelta(days=retention_days)
+    removed = 0
+    for root in DATA_LAKE_CLEANUP_ROOTS:
+        root = root.expanduser().resolve()
+        if not root.exists():
+            continue
+        for dirpath, dirnames, _ in os.walk(root, topdown=True):
+            for d in list(dirnames):
+                full = Path(dirpath) / d
+                dt = _extract_partition_date(full)
+                if dt is not None and dt < cutoff:
+                    shutil.rmtree(full, ignore_errors=True)
+                    removed += 1
+                    if d in dirnames:
+                        dirnames.remove(d)
+        for dirpath, dirnames, filenames in os.walk(root, topdown=False):
+            if not dirnames and not filenames:
+                try:
+                    Path(dirpath).rmdir()
+                except OSError:
+                    pass
+    return removed
+
+async def _data_lake_cleanup(retention_days: int) -> Dict[str, Any]:
+    removed = await asyncio.to_thread(_cleanup_data_lake, retention_days)
+    return {"removed_dirs": removed, "retention_days": retention_days}
+
+async def run_data_lake_cleanup_job(retention_days: int) -> None:
+    job_id = "data_lake_cleanup"
+    out = await _run_with_metrics(job_id, _data_lake_cleanup, retention_days)
+    if out is not None:
+        log.info("Data lake cleanup ok -> %s", out)
+
 
 async def _warm_start_inference_data(jobs: List[InferenceJob]) -> None:
     if not RUN_ON_START or not jobs:
@@ -1667,6 +1745,37 @@ def _add_ttl_sweep_job(sched: AsyncIOScheduler) -> None:
             replace_existing=True,
         )
 
+def _data_lake_cleanup_trigger() -> CronTrigger:
+    try:
+        return CronTrigger.from_crontab(DATA_LAKE_CLEANUP_CRON, timezone=_tz())
+    except Exception as exc:
+        log.warning(
+            "Invalid DATA_LAKE_CLEANUP_CRON=%r, falling back to %s (%s)",
+            DATA_LAKE_CLEANUP_CRON,
+            _DATA_LAKE_CLEANUP_DEFAULT_CRON,
+            exc,
+        )
+        return CronTrigger.from_crontab(_DATA_LAKE_CLEANUP_DEFAULT_CRON, timezone=_tz())
+
+def _add_data_lake_cleanup_job(sched: AsyncIOScheduler) -> None:
+    sched.add_job(
+        run_data_lake_cleanup_job,
+        trigger=_data_lake_cleanup_trigger(),
+        id="data_lake_cleanup",
+        kwargs={"retention_days": DATA_LAKE_RETENTION_DAYS},
+        max_instances=1,
+        replace_existing=True,
+    )
+    if RUN_ON_START:
+        sched.add_job(
+            run_data_lake_cleanup_job,
+            trigger="date",
+            run_date=None,
+            id="boot:data_lake_cleanup",
+            kwargs={"retention_days": DATA_LAKE_RETENTION_DAYS},
+            replace_existing=True,
+        )
+
 async def _amain() -> None:
     # Start metrics HTTP server
     start_http_server(SCHED_METRICS_PORT)
@@ -1696,6 +1805,7 @@ async def _amain() -> None:
     _add_market_jobs(sched, _get_market_jobs())
     _add_market_ingest_jobs(sched, _get_market_ingest_jobs())
     _add_ttl_sweep_job(sched)
+    _add_data_lake_cleanup_job(sched)
 
     # Park forever
     while True:
