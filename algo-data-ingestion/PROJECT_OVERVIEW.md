@@ -1,7 +1,8 @@
 # Algo Data Ingestion – Comprehensive Project Dossier
 
-_Last updated: 2025-12-30 22:59 UTC_
+_Last updated: 2026-01-22 17:38 UTC_
 
+> Update 2026-01-22: Documented the scheduler data lake cleanup job (retention-based partition pruning) with `DATA_LAKE_RETENTION_DAYS`, `DATA_LAKE_CLEANUP_CRON`, and `DATA_LAKE_CLEANUP_ROOTS`.
 > Update 2025-12-30: Added quote-based price monitoring for exits (`TRADING_PRICE_MONITOR_INTERVAL_SECONDS`), vol-aware stop shaping (`min_stop_loss_pct`/`hard_stop_loss_pct`/`vol_stop_rvol_mult`), and optional entry/exit churn controls (`entry_rsi_min`/`entry_macd_min`, `disable_prob_exits`); refreshed stage-0 sizing to capital 200 with `equity_fraction=0.33`.
 > Update 2025-12-19: Added a dry-run profit forensics workflow (`scripts/extract_container_logs.py` → `analysis/trading_log_forensics.py` → `analysis/market_trade_alignment.py` with `RUNBOOK_DRY_RUN_PROFIT.md`), switched stage-0 sizing to equity-fraction compounding (capital 100, base notionals 20/15/12, `max_total_notional=80`, `compounding_step_usd=5`) with per-symbol trigger overrides and longer holds, and refreshed compose/env defaults accordingly.
 > Update 2025-12-17: Added a live-readiness check, new audit diagnostics (`analysis/acceptance_trade_proof`, `analysis/exit_attribution_report`, `analysis/project_stance_snapshot`), and scheduler/trading hardening (loss guard, queue-aging, quote-aware exits, `INFER_APPLY_CALIBRATION` override) so the deployment contract stay aligned with production.
@@ -75,13 +76,13 @@ _Last updated: 2025-12-30 22:59 UTC_
 ### 3.1 Services (Docker Compose)
 - **ingestion-api**: FastAPI app (`app/ingestion_service/main.py`) that pre-warms CCXT/News/Social/Onchain clients, mounts a custom `/metrics`, and lazily loads HuggingFace sentiment models when `ML_SENTIMENT_ENABLED=1`.
 - **redis** + **redis-exporter**: Redis feature store with metrics exporter; persistent volumes include `redis-data` and the optional HuggingFace cache (`hf-cache`).
-- **scheduler**: APScheduler worker calling admin endpoints (`MARKET_JOBS`, `MARKET_INGEST_JOBS`, TTL sweeps) sourced from env vars; publishes metrics on port `9002` and now owns manifest-driven inference jobs that enqueue decisions to Redis.
+- **scheduler**: APScheduler worker calling admin endpoints (`MARKET_JOBS`, `MARKET_INGEST_JOBS`, TTL sweeps, data lake cleanup) sourced from env vars; publishes metrics on port `9002` and now owns manifest-driven inference jobs that enqueue decisions to Redis.
 - **trading**: Async consumer of the decision queue (`trading:decisions` by default) that enforces manifest gates, evaluates runtime risk controls, dedupes intents via Redis locks, reconciles state vs exchange, executes deadlock policies, persists HMAC-signed audit logs, and exports Prometheus metrics on `TRADING_METRICS_PORT`.
 - **prometheus** & **grafana**: Monitoring stack fronting the ingestion API, scheduler, Redis exporter, and custom dashboards under `monitoring/grafana`.
 
 ### 3.2 Configuration (`app/ingestion_service/config.py`)
 - Loads env via `.env`, covering exchange/news/social/on-chain keys, Redis connection info (`REDIS_URL`, `FEATURE_NAMESPACE`, TTL), scheduler cadence, and admin token defaults.
-- Data lake roots are configurable (`MARKET_PATH`, `ONCHAIN_PATH`, `SOCIAL_PATH`, `NEWS_PATH`) alongside toggles for `BACKFILL_*` loops and TTL sweeps (`TTL_SWEEP_*`).
+- Data lake roots are configurable (`MARKET_PATH`, `ONCHAIN_PATH`, `SOCIAL_PATH`, `NEWS_PATH`) alongside toggles for `BACKFILL_*` loops, TTL sweeps (`TTL_SWEEP_*`), and retention-based cleanup (`DATA_LAKE_RETENTION_DAYS`, `DATA_LAKE_CLEANUP_CRON`, `DATA_LAKE_CLEANUP_ROOTS`).
 - ML and storage extras: `ML_SENTIMENT_ENABLED`, `SENTIMENT_MODEL_ID`, `HF_HOME`, `ML_MAX_WORKERS`, and optional `FSSPEC_STORAGE_OPTIONS` for remote parquet targets.
 
 ### 3.3 Adapters & Features

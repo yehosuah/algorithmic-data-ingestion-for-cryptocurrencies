@@ -1,7 +1,8 @@
 # Algo Data Ingestion (Docker App)
 
-_Last updated: 2026-01-01 04:19 UTC_
+_Last updated: 2026-01-22 17:38 UTC_
 
+> Update 2026-01-22: Added a scheduled data lake cleanup job (retention-driven partition pruning) with `DATA_LAKE_RETENTION_DAYS`, `DATA_LAKE_CLEANUP_CRON`, and `DATA_LAKE_CLEANUP_ROOTS` defaults now reflected in compose/env docs.
 > Update 2026-01-01: Extended the trigger optimizer sweeps with `--disable-prob-exits` + entry filters (`--entry-rsi-min`/`--entry-macd-min`), added profit-fix search-space presets + the latest 48h docker alignment/forensics bundles, and refreshed stage-0/compose defaults.
 > Update 2025-12-30: Added price-monitor exits (stop/take-profit/profit-trailing/max-hold) so positions can close even when decision payloads stall, introduced optional entry filters (`entry_rsi_min`/`entry_macd_min`) + `disable_prob_exits` to reduce churn, and refreshed stage-0 sizing/risk limits (capital 200, equity_fraction 0.33, vol-scaled stops with a hard cap).
 > Update 2025-12-19: Added a dry-run profit forensics loop (`scripts/extract_container_logs.py` → `analysis/trading_log_forensics.py` → `analysis/market_trade_alignment.py` with `RUNBOOK_DRY_RUN_PROFIT.md`), tightened stage-0 sizing to equity-fraction compounding (capital 100 USDT, base notionals 20/15/12, `max_total_notional=80`, compounding step 5) with per-symbol trigger overrides and longer holds, and refreshed compose/env defaults to mirror the new thresholds while keeping reports/logs out of Docker build context.
@@ -241,6 +242,9 @@ MARKET_JOBS=[{"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookbac
 TTL_SWEEP_CRON=*/15 * * * *
 TTL_SWEEP_PATTERN=features:market:*
 TTL_SWEEP_TTL=3600
+DATA_LAKE_RETENTION_DAYS=2
+DATA_LAKE_CLEANUP_CRON=30 2 * * *
+DATA_LAKE_CLEANUP_ROOTS=/app/data_lake/market,/app/data_lake/news,/app/data_lake/onchain,/app/data_lake/social
 
 # External keys (Phase 3)
 GLASSNODE_API_KEY=
@@ -345,8 +349,8 @@ TRADING_SAFE_MODE_ALLOW_EXITS=1
 ## Scheduler
 
 **Behavior**
-- On boot (when `RUN_ON_START=1`): executes one backfill per `MARKET_JOBS` and a TTL sweep.
-- On schedule: runs backfills via cron in `MARKET_JOBS` and TTL sweeps via `TTL_SWEEP_CRON`.
+- On boot (when `RUN_ON_START=1`): executes one backfill per `MARKET_JOBS`, a TTL sweep, and a data lake cleanup pass.
+- On schedule: runs backfills via cron in `MARKET_JOBS`, TTL sweeps via `TTL_SWEEP_CRON`, and data lake cleanup via `DATA_LAKE_CLEANUP_CRON`.
 
 **Env (key vars)**
 - `API_BASE_URL` (default internal: `http://ingestion-api:8000`)
@@ -354,6 +358,7 @@ TRADING_SAFE_MODE_ALLOW_EXITS=1
 - `MARKET_JOBS` e.g.  
   `[{"exchange":"binance","symbol":"BTC/USDT","timeframe":"1m","lookback_minutes":15,"cron":"*/5 * * * *"}]`
 - `TTL_SWEEP_CRON`, `TTL_SWEEP_PATTERN`, `TTL_SWEEP_TTL`
+- `DATA_LAKE_RETENTION_DAYS`, `DATA_LAKE_CLEANUP_CRON`, `DATA_LAKE_CLEANUP_ROOTS`
 - `DECISION_PAYLOAD_ITEMS` caps the number of decision payloads pushed per job run (default 3); override per job with `max_decision_items` inside `INFER_JOBS` when queues get noisy.
 
 **Metrics**
