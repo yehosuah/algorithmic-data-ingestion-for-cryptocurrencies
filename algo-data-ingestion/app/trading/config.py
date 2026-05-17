@@ -174,6 +174,10 @@ class TradingConfig(BaseSettings):
                     max_spread_bps=10.0,
                 )
             ]
+        if self.decision_hmac_secret is not None:
+            self.decision_hmac_secret = self.decision_hmac_secret.strip() or None
+        if not self.dry_run and not self.decision_hmac_secret:
+            raise ValueError("TRADING_DECISION_HMAC_SECRET must be provided when TRADING_DRY_RUN=false")
         self._apply_shadow_overrides()
         # Normalize paths
         self.models_root = Path(self.models_root).expanduser().resolve()

@@ -45,6 +45,7 @@ from app.trading.audit import TradingAuditLogger
 from app.trading.config import TradingConfig, TradingModelConfig
 from app.trading.executor import IntentLedger, IntentStatus, OrderDecision, OrderExecutor
 from app.trading.deadlock import DeadlockMonitor, DeadlockPolicy
+from app.decision_auth import verify_decision_message
 from app.trading.decision import TriggerConfig, DecisionOutcome, SAFE_MODE_ENV, KILL_SWITCH_ENV, decide_bar
 from app.trading.risk import assess_and_adjust_order
 from app.trading.signing import verify_decision_payload
@@ -1891,6 +1892,13 @@ class TradingService:
             message = json.loads(raw)
         except json.JSONDecodeError:
             logger.warning("Discarding malformed payload: %s", raw[:80])
+            return
+        if not isinstance(message, dict):
+            logger.warning("Discarding non-object decision payload")
+            return
+        signature_ok, signature_reason = verify_decision_message(message, self.config.decision_hmac_secret)
+        if not signature_ok:
+            logger.warning("Discarding unauthenticated decision payload: %s", signature_reason)
             return
 
         if not self._verify_decision_message(message):
