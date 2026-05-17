@@ -1,5 +1,10 @@
 .git
 __pycache__/
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
 *.pyc
 *.pyo
 *.pyd
