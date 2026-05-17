@@ -12,12 +12,12 @@ import copy
 import shutil
 import tempfile
 import time
+import importlib
+import importlib.util
+
 import joblib
 import numpy as np
 import pandas as pd
-import torch
-
-from .tcn_model import TinyTCN
 from .calibration_store import load_calibrator
 from .calibration_utils import apply_posthoc_calibration
 
@@ -49,6 +49,21 @@ except Exception:  # pragma: no cover - allow training-only environments
 
 
 logger = logging.getLogger(__name__)
+
+
+def _require_optional_module(module_name: str, feature_name: str):
+    """Import an optional dependency only when the feature that needs it runs."""
+    if importlib.util.find_spec(module_name) is None:
+        raise RuntimeError(
+            f"{feature_name} requires optional dependency '{module_name}'. "
+            "Install the ML extras or use the Docker image that includes it."
+        )
+    return importlib.import_module(module_name)
+
+
+def _load_tiny_tcn_class():
+    module = importlib.import_module("training.tcn_model")
+    return module.TinyTCN
 
 
 def _attach_posthoc_calibrator(obj: object, model_dir: Path, prob_column: str) -> None:
@@ -605,7 +620,9 @@ def load_tcn_predictor(tcn_dir: Path, prob_column: str = "tcn_prob"):
     channels = tuple(int(x) for x in meta.get("channels", [32, 32]))
     kernel_size = int(meta.get("kernel_size", 3))
     window = int(meta.get("window", 32))
-    model = TinyTCN(n_inputs=len(series_cols), channels=channels, kernel_size=kernel_size)
+    torch = _require_optional_module("torch", "TCN inference")
+    tiny_tcn_cls = _load_tiny_tcn_class()
+    model = tiny_tcn_cls(n_inputs=len(series_cols), channels=channels, kernel_size=kernel_size)
     state = torch.load(tcn_dir / "tcn.pt", map_location="cpu")
     model.load_state_dict(state)
     model.eval()
@@ -613,7 +630,8 @@ def load_tcn_predictor(tcn_dir: Path, prob_column: str = "tcn_prob"):
     return model, calib, series_cols, scaler, window
 
 
-def predict_tcn(df: pd.DataFrame, model: TinyTCN, calib, series_cols: List[str], scaler, window: int, *, stride: int = 1) -> pd.DataFrame:
+def predict_tcn(df: pd.DataFrame, model: Any, calib, series_cols: List[str], scaler, window: int, *, stride: int = 1) -> pd.DataFrame:
+    torch = _require_optional_module("torch", "TCN inference")
     series_df = df[series_cols].astype(float).replace([np.inf, -np.inf], np.nan)
     series_df = series_df.ffill().bfill().fillna(0.0)
     vals = series_df.values

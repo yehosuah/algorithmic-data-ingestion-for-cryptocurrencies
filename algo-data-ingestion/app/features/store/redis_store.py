@@ -77,8 +77,12 @@ def _epoch_seconds(ts: Any) -> int:
     dt = to_utc_dt(ser)
     if dt.isna().iloc[0]:
         raise ValueError(f"Could not parse timestamp to UTC: {ts!r}")
-    ns = dt.astype("int64").iloc[0]  # ns since epoch
-    return int(ns // 1_000_000_000)
+    stamp = pd.Timestamp(dt.iloc[0])
+    if stamp.tzinfo is None:
+        stamp = stamp.tz_localize("UTC")
+    else:
+        stamp = stamp.tz_convert("UTC")
+    return int(stamp.timestamp())
 
 
 class RedisFeatureStore:

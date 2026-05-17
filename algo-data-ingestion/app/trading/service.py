@@ -285,7 +285,8 @@ class TradingService:
         audit_postgres_dsn = config.audit_postgres_dsn or config.state_postgres_dsn
         audit_file_path = config.audit_log_path if audit_backend == "file" else None
         audit_hmac_key = os.getenv("TRADING_AUDIT_HMAC_KEY")
-        if not config.dry_run and not audit_hmac_key:
+        live_order_routes = [model_cfg for model_cfg in config.trading_models if not model_cfg.shadow_mode]
+        if live_order_routes and not config.dry_run and not audit_hmac_key:
             raise ValueError("Live trading requires TRADING_AUDIT_HMAC_KEY for audit provenance.")
         self.audit_logger = TradingAuditLogger(
             backend=audit_backend,
@@ -299,7 +300,7 @@ class TradingService:
         )
         ledger_backend = config.intent_ledger_backend
         ledger_url = config.intent_ledger_redis_url
-        if not config.dry_run:
+        if live_order_routes and not config.dry_run:
             if ledger_backend != "redis":
                 raise ValueError("Live trading requires TRADING_INTENT_LEDGER_BACKEND=redis (no fallback).")
             if not ledger_url:
@@ -496,12 +497,14 @@ class TradingService:
         portfolio_metrics: Mapping[str, object],
         now: datetime,
     ) -> None:
-        await self.audit_logger.log_deadlock_status(
-            triggers=triggers,
-            portfolio=portfolio_metrics,
-            timestamp=now,
-            policy_hash=self._deadlock_config_hash(),
-        )
+        log_deadlock_status = getattr(self.audit_logger, "log_deadlock_status", None)
+        if log_deadlock_status is not None:
+            await log_deadlock_status(
+                triggers=triggers,
+                portfolio=portfolio_metrics,
+                timestamp=now,
+                policy_hash=self._deadlock_config_hash(),
+            )
         if not self._can_apply_deadlock_action(now):
             return
         action = self._next_deadlock_action()
@@ -531,12 +534,14 @@ class TradingService:
             return
         record_deadlock_action(action_name)
         if self.deadlock_policy.audit_every_action:
-            await self.audit_logger.log_deadlock_action(
-                action=action_name,
-                timestamp=now,
-                payload=changes,
-                policy_hash=self._deadlock_config_hash(),
-            )
+            log_deadlock_action = getattr(self.audit_logger, "log_deadlock_action", None)
+            if log_deadlock_action is not None:
+                await log_deadlock_action(
+                    action=action_name,
+                    timestamp=now,
+                    payload=changes,
+                    policy_hash=self._deadlock_config_hash(),
+                )
         self._deadlock_action_state["last_action_ts"] = now
         self._deadlock_action_state["actions_taken_today"] = int(
             self._deadlock_action_state.get("actions_taken_today", 0)
