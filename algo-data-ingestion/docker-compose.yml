@@ -2,8 +2,6 @@ services:
   redis:
     image: redis:7
     command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -114,6 +112,7 @@ services:
       - DATA_LAKE_ROOT=/app/data_lake/market
       - DECISION_QUEUE_URL=redis://redis:6379/0
       - DECISION_QUEUE_KEY=trading:decisions
+      - TRADING_DECISION_HMAC_SECRET=${TRADING_DECISION_HMAC_SECRET:?set a strong scheduler/trading decision HMAC secret}
       - EXCHANGE_SANDBOX_MODE=0
       - INFER_DEFAULT_STRIDE=1
       - INFER_HISTORY_MARGIN_MIN=30
@@ -165,6 +164,7 @@ services:
     environment:
       - DECISION_QUEUE_URL=redis://redis:6379/0
       - DECISION_QUEUE_KEY=trading:decisions
+      - TRADING_DECISION_HMAC_SECRET=${TRADING_DECISION_HMAC_SECRET:?set a strong scheduler/trading decision HMAC secret}
       - MODELS_ROOT=/opt/models
       - EXCHANGE_SANDBOX_MODE=0
       - EXCHANGE_API_KEY=
