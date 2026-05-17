@@ -532,6 +532,9 @@ async def ingest_news(req: NewsIngestRequest):
                     raise HTTPException(status_code=422, detail="feed_url is required when source_type='rss'")
                 try:
                     df = await fetch_news_rss_once(req.feed_url, limit=500)
+                except ValueError as e:
+                    span.set_status("error")
+                    raise HTTPException(status_code=400, detail=f"invalid rss feed_url: {e}")
                 except Exception as e:
                     span.set_status("error")
                     raise HTTPException(status_code=502, detail=f"rss fetch failed: {e}")

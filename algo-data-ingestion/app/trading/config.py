@@ -84,6 +84,8 @@ class TradingModelConfig(BaseModel):
 class TradingConfig(BaseSettings):
     decision_queue_url: str = Field("redis://localhost:6379/0", alias="DECISION_QUEUE_URL")
     decision_queue_key: str = Field("trading:decisions", alias="DECISION_QUEUE_KEY")
+    decision_hmac_secret: Optional[str] = Field(default=None, alias="TRADING_DECISION_HMAC_SECRET")
+    require_signed_decisions: Optional[bool] = Field(default=None, alias="TRADING_REQUIRE_SIGNED_DECISIONS")
     last_timestamp_hash: str = Field("trading:last_processed_ts", alias="TRADING_LAST_TS_HASH")
     redis_poll_timeout: int = Field(1, alias="TRADING_QUEUE_POLL_TIMEOUT")
     price_monitor_interval_seconds: int = Field(

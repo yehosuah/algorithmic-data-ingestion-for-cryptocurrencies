@@ -43,6 +43,7 @@ if "USE_INGEST_METRICS_REGISTRY" not in os.environ:
 
 from app.features.factory.market_factory import build_market_features
 from app.ingestion_service.manifests import get_manifest_registry, prepare_decision_payload
+from app.trading.signing import sign_decision_payload
 from training.feature_eng import augment_market_features
 from training.blender import build_blender_features
 from training.infer import (
@@ -132,6 +133,7 @@ DECISION_QUEUE_KEY: str = os.getenv("DECISION_QUEUE_KEY", "trading:decisions")
 DEFAULT_DECISION_PAYLOAD_ITEMS: int = max(1, int(os.getenv("DECISION_PAYLOAD_ITEMS", "3")))
 DEFAULT_INFER_STRIDE: int = max(1, int(os.getenv("INFER_DEFAULT_STRIDE", "30")))
 DEFAULT_HISTORY_MARGIN_MIN: int = max(0, int(os.getenv("INFER_HISTORY_MARGIN_MIN", "120")))
+DECISION_HMAC_SECRET: str = os.getenv("TRADING_DECISION_HMAC_SECRET") or os.getenv("DECISION_HMAC_SECRET", "")
 
 
 def _env_override_bool(name: str) -> Optional[bool]:
@@ -699,6 +701,8 @@ async def _enqueue_payload(job: InferenceJob, payload: Dict[str, Any], now: date
             message["policy_contract"] = policy_contract
         if job.include_features and "features" in item:
             message["features"] = item["features"]
+        if DECISION_HMAC_SECRET:
+            sign_decision_payload(message, DECISION_HMAC_SECRET)
         messages.append(json.dumps(message, default=str))
 
     if not messages:
