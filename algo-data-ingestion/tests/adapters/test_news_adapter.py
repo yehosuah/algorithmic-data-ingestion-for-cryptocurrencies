@@ -112,6 +112,10 @@ async def test_fetch_news_api_http_error(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_fetch_news_rss(monkeypatch):
+    monkeypatch.setattr(
+        "app.adapters.news_adapter.socket.getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 80))],
+    )
     # Fake RSS content
     xml = "<rss><channel><item><guid>1</guid><title>News 1</title><link>url1</link><description>Sum1</description><pubDate>Wed, 01 Aug 2025 12:00:00 GMT</pubDate></item></channel></rss>"
 
@@ -192,6 +196,10 @@ async def test_fetch_news_api_parse_error(monkeypatch):
 # 3. Test RSS parse error handling in fetch_news_rss
 @pytest.mark.asyncio
 async def test_fetch_news_rss_parse_error(monkeypatch):
+    monkeypatch.setattr(
+        "app.adapters.news_adapter.socket.getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 80))],
+    )
     # Simulate parse failure then KeyboardInterrupt
     xml = "<bad</xml>"
     async def fake_get(url):
@@ -245,6 +253,10 @@ async def test_news_api_calls_metric(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_news_rss_polls_metric(monkeypatch):
+    monkeypatch.setattr(
+        "app.adapters.news_adapter.socket.getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 80))],
+    )
     # Track NEWS_RSS_POLLS.inc calls
     import app.adapters.news_adapter as mod
     calls = {"n": 0}
@@ -264,3 +276,20 @@ async def test_news_rss_polls_metric(monkeypatch):
         await fetch_news_rss("http://fake", lambda x: None)
     # Should have incremented once before parsing
     assert calls["n"] == 1
+
+def test_validate_rss_url_blocks_private_literal():
+    from app.adapters.news_adapter import validate_rss_url
+
+    with pytest.raises(ValueError, match="non-public IP"):
+        validate_rss_url("http://127.0.0.1/latest.xml")
+
+
+def test_validate_rss_url_blocks_private_dns(monkeypatch):
+    from app.adapters.news_adapter import validate_rss_url
+
+    monkeypatch.setattr(
+        "app.adapters.news_adapter.socket.getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("10.0.0.5", 80))],
+    )
+    with pytest.raises(ValueError, match="non-public IP"):
+        validate_rss_url("https://feeds.example.test/rss")

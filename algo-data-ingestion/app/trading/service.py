@@ -47,6 +47,7 @@ from app.trading.executor import IntentLedger, IntentStatus, OrderDecision, Orde
 from app.trading.deadlock import DeadlockMonitor, DeadlockPolicy
 from app.trading.decision import TriggerConfig, DecisionOutcome, SAFE_MODE_ENV, KILL_SWITCH_ENV, decide_bar
 from app.trading.risk import assess_and_adjust_order
+from app.trading.signing import verify_decision_payload
 from app.trading.state import PositionState, TradingStateStore
 from training.infer import load_manifest_artifacts
 
@@ -1850,11 +1851,44 @@ class TradingService:
                 )
                 await self.state_store.flush()
 
+
+    def _signed_decisions_required(self) -> bool:
+        configured = self.config.require_signed_decisions
+        if configured is not None:
+            return bool(configured)
+        return not bool(self.config.dry_run)
+
+    def _verify_decision_message(self, message: Mapping[str, object]) -> bool:
+        secret = self.config.decision_hmac_secret or os.getenv("DECISION_HMAC_SECRET", "")
+        require_signature = self._signed_decisions_required()
+        if not secret:
+            if require_signature:
+                logger.error(
+                    "Rejecting decision payload because signed decisions are required but no HMAC secret is configured"
+                )
+                record_skip_reason("unknown", "unknown", "unsigned_decision")
+                return False
+            return True
+        if verify_decision_payload(message, secret):
+            return True
+        model = str(message.get("model") or "unknown")
+        symbol = str(message.get("symbol") or "unknown")
+        logger.warning(
+            "Rejecting decision payload with missing or invalid signature for model=%s symbol=%s",
+            model,
+            symbol,
+        )
+        record_skip_reason(model, symbol, "invalid_decision_signature")
+        return False
+
     async def _handle_payload(self, raw: str) -> None:
         try:
             message = json.loads(raw)
         except json.JSONDecodeError:
             logger.warning("Discarding malformed payload: %s", raw[:80])
+            return
+
+        if not self._verify_decision_message(message):
             return
 
         model_label = str(message.get("model") or "")
