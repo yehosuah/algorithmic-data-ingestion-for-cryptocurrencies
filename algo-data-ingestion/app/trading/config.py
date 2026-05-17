@@ -84,6 +84,7 @@ class TradingModelConfig(BaseModel):
 class TradingConfig(BaseSettings):
     decision_queue_url: str = Field("redis://localhost:6379/0", alias="DECISION_QUEUE_URL")
     decision_queue_key: str = Field("trading:decisions", alias="DECISION_QUEUE_KEY")
+    decision_hmac_secret: Optional[str] = Field(None, alias="TRADING_DECISION_HMAC_SECRET")
     last_timestamp_hash: str = Field("trading:last_processed_ts", alias="TRADING_LAST_TS_HASH")
     redis_poll_timeout: int = Field(1, alias="TRADING_QUEUE_POLL_TIMEOUT")
     price_monitor_interval_seconds: int = Field(
@@ -172,6 +173,10 @@ class TradingConfig(BaseSettings):
                     max_spread_bps=10.0,
                 )
             ]
+        if self.decision_hmac_secret is not None:
+            self.decision_hmac_secret = self.decision_hmac_secret.strip() or None
+        if not self.dry_run and not self.decision_hmac_secret:
+            raise ValueError("TRADING_DECISION_HMAC_SECRET must be provided when TRADING_DRY_RUN=false")
         self._apply_shadow_overrides()
         # Normalize paths
         self.models_root = Path(self.models_root).expanduser().resolve()

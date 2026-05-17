@@ -56,6 +56,7 @@ from training.calibration_store import load_calibrator, LoadedCalibrator
 from training.calibration_utils import apply_posthoc_calibration
 from app.monitoring.model_metrics import observe_gate_coverage, record_gate_coverage_sample
 from app.monitoring.probability_sampler import record_probability_samples
+from app.decision_auth import sign_decision_message
 from collections import defaultdict
 from features.feature_engineering import FEATURE_REGISTRY
 
@@ -129,6 +130,7 @@ MODELS_ROOT: Path = Path(os.getenv("MODELS_ROOT", "models")).expanduser().resolv
 DATA_LAKE_ROOT: Path = Path(os.getenv("DATA_LAKE_ROOT", "/app/data_lake/market")).expanduser().resolve()
 DECISION_QUEUE_URL: str = os.getenv("DECISION_QUEUE_URL") or os.getenv("REDIS_URL", "redis://redis:6379/0")
 DECISION_QUEUE_KEY: str = os.getenv("DECISION_QUEUE_KEY", "trading:decisions")
+DECISION_HMAC_SECRET: Optional[str] = (os.getenv("TRADING_DECISION_HMAC_SECRET") or "").strip() or None
 DEFAULT_DECISION_PAYLOAD_ITEMS: int = max(1, int(os.getenv("DECISION_PAYLOAD_ITEMS", "3")))
 DEFAULT_INFER_STRIDE: int = max(1, int(os.getenv("INFER_DEFAULT_STRIDE", "30")))
 DEFAULT_HISTORY_MARGIN_MIN: int = max(0, int(os.getenv("INFER_HISTORY_MARGIN_MIN", "120")))
@@ -699,7 +701,7 @@ async def _enqueue_payload(job: InferenceJob, payload: Dict[str, Any], now: date
             message["policy_contract"] = policy_contract
         if job.include_features and "features" in item:
             message["features"] = item["features"]
-        messages.append(json.dumps(message, default=str))
+        messages.append(json.dumps(sign_decision_message(message, DECISION_HMAC_SECRET), default=str))
 
     if not messages:
         log.info(

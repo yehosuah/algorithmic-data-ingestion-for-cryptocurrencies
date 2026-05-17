@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import pytest
 
+from app.decision_auth import sign_decision_message
 from app.trading.config import TradingConfig
 from app.trading.executor import IntentLedger, OrderDecision, OrderExecutor
 from app.trading.service import ManifestSnapshot, TradingService, _extract_price_from_item
@@ -216,6 +217,88 @@ def test_portfolio_state_counts_pending_intents(tmp_path: Path, monkeypatch):
 
     _run(_test())
 
+
+def test_live_trading_requires_decision_hmac_secret(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv(
+        "TRADING_MODELS",
+        json.dumps(
+            [
+                {
+                    "model": "xgb_primary",
+                    "exchange": "binance",
+                    "symbol": "BTC/USDT",
+                    "timeframe": "1m",
+                    "order_notional": 50.0,
+                    "max_spread_bps": 10.0,
+                }
+            ]
+        ),
+    )
+    _set_file_backends(monkeypatch)
+
+    with pytest.raises(ValueError, match="TRADING_DECISION_HMAC_SECRET"):
+        TradingConfig(
+            decision_queue_url="redis://example:6379/0",
+            decision_queue_key="queue",
+            state_path=tmp_path / "state.json",
+            models_root=tmp_path,
+            dry_run=False,
+            state_backend="file",
+        )
+
+
+def test_trading_service_rejects_unsigned_decision_when_secret_configured(tmp_path: Path, monkeypatch):
+    async def _test():
+        monkeypatch.setenv(
+            "TRADING_MODELS",
+            json.dumps(
+                [
+                    {
+                        "model": "xgb_primary",
+                        "exchange": "binance",
+                        "symbol": "BTC/USDT",
+                        "timeframe": "1m",
+                        "order_notional": 50.0,
+                        "max_spread_bps": 10.0,
+                    }
+                ]
+            ),
+        )
+        _set_file_backends(monkeypatch)
+        cfg = TradingConfig(
+            decision_queue_url="redis://example:6379/0",
+            decision_queue_key="queue",
+            state_path=tmp_path / "state.json",
+            models_root=tmp_path,
+            dry_run=True,
+            state_backend="file",
+            decision_hmac_secret="test-secret",
+        )
+        service = TradingService(cfg)
+        fake_executor = FakeExecutor()
+        service.executor = fake_executor
+        service._resolve_manifest = lambda payload, model_label, symbol_hint=None: ManifestSnapshot(
+            entry_threshold=0.5,
+            exit_threshold=0.5,
+            exit_prob_drop=0.1,
+            min_hold_bars=1,
+            long_only=True,
+        )
+
+        unsigned = {
+            "model": "xgb_primary",
+            "symbol": "BTC/USDT",
+            "items": [
+                {"timestamp": "2025-10-01T00:00:00+00:00", "probability": 0.9, "gate_pass": True}
+            ],
+        }
+        await service._handle_payload(json.dumps(unsigned))
+        assert fake_executor.calls == []
+
+        await service._handle_payload(json.dumps(sign_decision_message(unsigned, "test-secret")))
+        assert [call["side"] for call in fake_executor.calls] == ["buy"]
+
+    _run(_test())
 
 def test_extract_price_from_nested_features():
     item = {"features": {"close": 123.45}}
@@ -846,6 +929,7 @@ def test_shadow_mode_blocks_position_and_logs(tmp_path: Path, monkeypatch):
             state_path=tmp_path / "state.json",
             models_root=tmp_path,
             dry_run=False,
+            decision_hmac_secret="test-secret",
             state_backend="file",
             shadow_symbols=["BTC/USDT"],
         )
@@ -1024,6 +1108,7 @@ def test_reconciliation_mismatch_latches_safe_mode(tmp_path: Path, monkeypatch):
             state_path=tmp_path / "state.json",
             models_root=tmp_path,
             dry_run=False,
+            decision_hmac_secret="test-secret",
             state_backend="file",
             reconcile_healthy_streak=2,
         )
@@ -1082,6 +1167,7 @@ def test_reconciliation_clears_safe_mode_after_healthy_streak(tmp_path: Path, mo
             state_path=tmp_path / "state.json",
             models_root=tmp_path,
             dry_run=False,
+            decision_hmac_secret="test-secret",
             state_backend="file",
             reconcile_healthy_streak=2,
         )
