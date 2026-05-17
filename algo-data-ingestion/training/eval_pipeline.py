@@ -33,7 +33,6 @@ from .model import (
 from .thresholds import select_prob_threshold
 from .reporting import ensure_kpi_schema, social_signal_audit
 from .walkforward import time_folds
-from .tcn_model import TrainConfig, calibrate_logits, train_tcn
 
 
 @dataclass
@@ -594,6 +593,8 @@ def evaluate_tcn_oos(
     prob_raw_oof = np.zeros(n_rows, dtype=float)
     fold_assign = np.full(n_rows, -1, dtype=int)
     mask_oof = np.zeros(n_rows, dtype=bool)
+
+    from .tcn_model import TrainConfig, calibrate_logits, train_tcn
 
     train_cfg = TrainConfig(
         epochs=int(epochs),

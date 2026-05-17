@@ -48,6 +48,7 @@ from app.trading.deadlock import DeadlockMonitor, DeadlockPolicy
 from app.decision_auth import verify_decision_message
 from app.trading.decision import TriggerConfig, DecisionOutcome, SAFE_MODE_ENV, KILL_SWITCH_ENV, decide_bar
 from app.trading.risk import assess_and_adjust_order
+from app.trading.signing import verify_decision_payload
 from app.trading.state import PositionState, TradingStateStore
 from training.infer import load_manifest_artifacts
 
@@ -286,7 +287,8 @@ class TradingService:
         audit_postgres_dsn = config.audit_postgres_dsn or config.state_postgres_dsn
         audit_file_path = config.audit_log_path if audit_backend == "file" else None
         audit_hmac_key = os.getenv("TRADING_AUDIT_HMAC_KEY")
-        if not config.dry_run and not audit_hmac_key:
+        live_order_routes = [model_cfg for model_cfg in config.trading_models if not model_cfg.shadow_mode]
+        if live_order_routes and not config.dry_run and not audit_hmac_key:
             raise ValueError("Live trading requires TRADING_AUDIT_HMAC_KEY for audit provenance.")
         self.audit_logger = TradingAuditLogger(
             backend=audit_backend,
@@ -300,7 +302,7 @@ class TradingService:
         )
         ledger_backend = config.intent_ledger_backend
         ledger_url = config.intent_ledger_redis_url
-        if not config.dry_run:
+        if live_order_routes and not config.dry_run:
             if ledger_backend != "redis":
                 raise ValueError("Live trading requires TRADING_INTENT_LEDGER_BACKEND=redis (no fallback).")
             if not ledger_url:
@@ -497,12 +499,14 @@ class TradingService:
         portfolio_metrics: Mapping[str, object],
         now: datetime,
     ) -> None:
-        await self.audit_logger.log_deadlock_status(
-            triggers=triggers,
-            portfolio=portfolio_metrics,
-            timestamp=now,
-            policy_hash=self._deadlock_config_hash(),
-        )
+        log_deadlock_status = getattr(self.audit_logger, "log_deadlock_status", None)
+        if log_deadlock_status is not None:
+            await log_deadlock_status(
+                triggers=triggers,
+                portfolio=portfolio_metrics,
+                timestamp=now,
+                policy_hash=self._deadlock_config_hash(),
+            )
         if not self._can_apply_deadlock_action(now):
             return
         action = self._next_deadlock_action()
@@ -532,12 +536,14 @@ class TradingService:
             return
         record_deadlock_action(action_name)
         if self.deadlock_policy.audit_every_action:
-            await self.audit_logger.log_deadlock_action(
-                action=action_name,
-                timestamp=now,
-                payload=changes,
-                policy_hash=self._deadlock_config_hash(),
-            )
+            log_deadlock_action = getattr(self.audit_logger, "log_deadlock_action", None)
+            if log_deadlock_action is not None:
+                await log_deadlock_action(
+                    action=action_name,
+                    timestamp=now,
+                    payload=changes,
+                    policy_hash=self._deadlock_config_hash(),
+                )
         self._deadlock_action_state["last_action_ts"] = now
         self._deadlock_action_state["actions_taken_today"] = int(
             self._deadlock_action_state.get("actions_taken_today", 0)
@@ -1851,6 +1857,36 @@ class TradingService:
                 )
                 await self.state_store.flush()
 
+
+    def _signed_decisions_required(self) -> bool:
+        configured = self.config.require_signed_decisions
+        if configured is not None:
+            return bool(configured)
+        return not bool(self.config.dry_run)
+
+    def _verify_decision_message(self, message: Mapping[str, object]) -> bool:
+        secret = self.config.decision_hmac_secret or os.getenv("DECISION_HMAC_SECRET", "")
+        require_signature = self._signed_decisions_required()
+        if not secret:
+            if require_signature:
+                logger.error(
+                    "Rejecting decision payload because signed decisions are required but no HMAC secret is configured"
+                )
+                record_skip_reason("unknown", "unknown", "unsigned_decision")
+                return False
+            return True
+        if verify_decision_payload(message, secret):
+            return True
+        model = str(message.get("model") or "unknown")
+        symbol = str(message.get("symbol") or "unknown")
+        logger.warning(
+            "Rejecting decision payload with missing or invalid signature for model=%s symbol=%s",
+            model,
+            symbol,
+        )
+        record_skip_reason(model, symbol, "invalid_decision_signature")
+        return False
+
     async def _handle_payload(self, raw: str) -> None:
         try:
             message = json.loads(raw)
@@ -1863,6 +1899,9 @@ class TradingService:
         signature_ok, signature_reason = verify_decision_message(message, self.config.decision_hmac_secret)
         if not signature_ok:
             logger.warning("Discarding unauthenticated decision payload: %s", signature_reason)
+            return
+
+        if not self._verify_decision_message(message):
             return
 
         model_label = str(message.get("model") or "")

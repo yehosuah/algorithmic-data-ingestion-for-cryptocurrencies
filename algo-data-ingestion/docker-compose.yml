@@ -1,11 +1,15 @@
 services:
   redis:
     image: redis:7
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"]
+    expose:
+      - "6379"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a '$${REDIS_PASSWORD}' ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,7 +27,8 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - EXCHANGE_SANDBOX_MODE=0
       - EXCHANGE_API_KEY=
       - EXCHANGE_API_SECRET=
@@ -53,7 +58,7 @@ services:
   redis-exporter:
     image: oliver006/redis_exporter:v1.62.0
     command:
-      - "--redis.addr=redis://redis:6379"
+      - "--redis.addr=redis://:${REDIS_PASSWORD}@redis:6379"
     ports:
       - "9121:9121"
     depends_on:
@@ -110,9 +115,9 @@ services:
       - SCHED_METRICS_PORT=9002
       - MODELS_ROOT=/opt/models
       - DATA_LAKE_ROOT=/app/data_lake/market
-      - DECISION_QUEUE_URL=redis://redis:6379/0
+      - DECISION_QUEUE_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - DECISION_QUEUE_KEY=trading:decisions
-      - TRADING_DECISION_HMAC_SECRET=${TRADING_DECISION_HMAC_SECRET:?set a strong scheduler/trading decision HMAC secret}
+      - TRADING_DECISION_HMAC_SECRET=${TRADING_DECISION_HMAC_SECRET:?set TRADING_DECISION_HMAC_SECRET in .env}
       - EXCHANGE_SANDBOX_MODE=0
       - INFER_DEFAULT_STRIDE=1
       - INFER_HISTORY_MARGIN_MIN=30
@@ -162,9 +167,9 @@ services:
     env_file:
       - .env
     environment:
-      - DECISION_QUEUE_URL=redis://redis:6379/0
+      - DECISION_QUEUE_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - DECISION_QUEUE_KEY=trading:decisions
-      - TRADING_DECISION_HMAC_SECRET=${TRADING_DECISION_HMAC_SECRET:?set a strong scheduler/trading decision HMAC secret}
+      - TRADING_DECISION_HMAC_SECRET=${TRADING_DECISION_HMAC_SECRET:?set TRADING_DECISION_HMAC_SECRET in .env}
       - MODELS_ROOT=/opt/models
       - EXCHANGE_SANDBOX_MODE=0
       - EXCHANGE_API_KEY=
@@ -175,16 +180,16 @@ services:
       - TRADING_RISK_LIMITS_PATH=configs/runtime_overrides/risk_limits_stage_0.yaml
       - TRADING_DEADLOCK_POLICY_PATH=configs/runtime_overrides/deadlock_policy_stage_0.yaml
       - TRADING_INTENT_LEDGER_BACKEND=redis
-      - TRADING_INTENT_LEDGER_REDIS_URL=redis://redis:6379/0
+      - TRADING_INTENT_LEDGER_REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - TRADING_AUDIT_HMAC_KEY=${TRADING_AUDIT_HMAC_KEY}
       - TRADING_METRICS_PORT=9010
       - TRADING_STATE_PATH=/app/trading_state/state.json
       - TRADING_STATE_BACKEND=file
-      - TRADING_STATE_REDIS_URL=redis://redis:6379/0
+      - TRADING_STATE_REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - TRADING_AUDIT_BACKEND=file
       - TRADING_AUDIT_LOG_PATH=/app/data_lake/trading/audit.log
       - TRADING_PRICE_MONITOR_INTERVAL_SECONDS=10
-      - TRADING_AUDIT_REDIS_URL=redis://redis:6379/0
+      - TRADING_AUDIT_REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - TRADING_LAST_TS_GRACE_BARS=10
       - TRADING_DECISION_MAX_AGE_SECONDS=240
       - TRADING_LOG_LEVEL=DEBUG
