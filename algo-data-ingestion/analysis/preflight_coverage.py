@@ -22,7 +22,6 @@ from training.infer import (
     predict_base,
     predict_tcn,
 )
-from training.transformer_model import TransformerModel
 
 
 DEFAULT_FEATURE_CANDIDATES = (
@@ -137,6 +136,8 @@ def _predict_probabilities(df: pd.DataFrame, model_dir: Path, model_name: str) -
             raise KeyError(f"TCN predictor output missing probability column '{col}'")
         prob_series = prob_df[col]
     elif (model_dir / "transformer.pt").exists():
+        from training.transformer_model import TransformerModel
+
         transformer = TransformerModel.load(str(model_dir))
         prob_series = pd.Series(transformer.predict_proba(df.values), index=df.index, name=prob_col)
     else:
