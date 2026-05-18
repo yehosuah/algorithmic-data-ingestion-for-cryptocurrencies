@@ -93,7 +93,8 @@ class TradingAuditLogger:
         redis_stream: str = "trading:audit",
         redis_maxlen: int = 10000,
         postgres_dsn: Optional[str] = None,
-        postgres_table: str = "trading_audit_events",
+        postgres_table: str = "crypto_app.trading_audit_events",
+        auto_create_tables: bool = False,
         file_path: Optional[Path] = None,
         audit_source: str = "runtime",
         audit_run_id: Optional[str] = None,
@@ -106,6 +107,7 @@ class TradingAuditLogger:
         self.redis_maxlen = max(0, int(redis_maxlen))
         self.postgres_dsn = postgres_dsn
         self.postgres_table = postgres_table
+        self.auto_create_tables = bool(auto_create_tables)
         self.file_path = file_path
         self.audit_source = audit_source or "runtime"
         self.audit_run_id = audit_run_id or os.getenv("TRADING_AUDIT_RUN_ID") or str(uuid.uuid4())
@@ -137,6 +139,12 @@ class TradingAuditLogger:
             self._redis = Redis.from_url(self.redis_url, decode_responses=True)
         return self._redis
 
+    def _qualified_table_identifier(self):
+        parts = [p.strip() for p in str(self.postgres_table).split(".") if p.strip()]
+        if not parts:
+            raise ValueError("Invalid Postgres table name")
+        return sql.SQL(".").join([sql.Identifier(part) for part in parts])
+
     def _ensure_pg_conn(self):
         if psycopg is None or sql is None:  # pragma: no cover - optional dependency
             raise RuntimeError("psycopg is required for postgres-backed audit logging")
@@ -144,29 +152,31 @@ class TradingAuditLogger:
             assert self.postgres_dsn is not None
             self._pg_conn = psycopg.connect(self.postgres_dsn)
             self._pg_conn.autocommit = True
-            with self._pg_conn.cursor() as cur:
-                cur.execute(
-                    sql.SQL(
-                        """
-                        CREATE TABLE IF NOT EXISTS {table} (
-                            id BIGSERIAL PRIMARY KEY,
-                            occurred_at TIMESTAMPTZ NOT NULL,
-                            model TEXT NOT NULL,
-                            symbol TEXT NOT NULL,
-                            event_type TEXT NOT NULL,
-                            payload JSONB NOT NULL
-                        )
-                        """
-                    ).format(table=sql.Identifier(self.postgres_table))
-                )
-                cur.execute(
-                    sql.SQL(
-                        "CREATE INDEX IF NOT EXISTS {idx} ON {table} (occurred_at DESC, model, symbol)"
-                    ).format(
-                        idx=sql.Identifier(f"{self.postgres_table}_occurred_idx"),
-                        table=sql.Identifier(self.postgres_table),
+            if self.auto_create_tables:
+                index_name = f"{self.postgres_table.replace('.', '_')}_occurred_idx"
+                with self._pg_conn.cursor() as cur:
+                    cur.execute(
+                        sql.SQL(
+                            """
+                            CREATE TABLE IF NOT EXISTS {table} (
+                                id BIGSERIAL PRIMARY KEY,
+                                occurred_at TIMESTAMPTZ NOT NULL,
+                                model TEXT NOT NULL,
+                                symbol TEXT NOT NULL,
+                                event_type TEXT NOT NULL,
+                                payload JSONB NOT NULL
+                            )
+                            """
+                        ).format(table=self._qualified_table_identifier())
                     )
-                )
+                    cur.execute(
+                        sql.SQL(
+                            "CREATE INDEX IF NOT EXISTS {idx} ON {table} (occurred_at DESC, model, symbol)"
+                        ).format(
+                            idx=sql.Identifier(index_name),
+                            table=self._qualified_table_identifier(),
+                        )
+                    )
         return self._pg_conn
 
     # ------------------------------------------------------------------ #
@@ -385,7 +395,7 @@ class TradingAuditLogger:
                     INSERT INTO {table} (occurred_at, model, symbol, event_type, payload)
                     VALUES (%s, %s, %s, %s, %s::jsonb)
                     """
-                ).format(table=sql.Identifier(self.postgres_table)),
+                ).format(table=self._qualified_table_identifier()),
                 (ts, model, symbol, event_type, json.dumps(_json_ready(payload))),
             )
 
