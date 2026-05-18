@@ -281,6 +281,7 @@ class TradingService:
             redis_hash=config.state_redis_hash,
             postgres_dsn=config.state_postgres_dsn,
             postgres_table=config.state_postgres_table,
+            auto_create_tables=config.auto_create_db_tables,
         )
         audit_backend = config.audit_backend or config.state_backend
         audit_redis_url = config.audit_redis_url or config.state_redis_url
@@ -297,6 +298,7 @@ class TradingService:
             redis_maxlen=config.audit_maxlen,
             postgres_dsn=audit_postgres_dsn,
             postgres_table=config.audit_postgres_table,
+            auto_create_tables=config.auto_create_db_tables,
             file_path=audit_file_path,
             hmac_key=audit_hmac_key,
         )

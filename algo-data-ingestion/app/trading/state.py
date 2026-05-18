@@ -144,7 +144,8 @@ class TradingStateStore:
         redis_url: Optional[str] = None,
         redis_hash: str = "trading:positions",
         postgres_dsn: Optional[str] = None,
-        postgres_table: str = "trading_positions",
+        postgres_table: str = "crypto_app.trading_positions",
+        auto_create_tables: bool = False,
     ) -> None:
         self.path = path
         self.backend = backend
@@ -152,6 +153,7 @@ class TradingStateStore:
         self.redis_hash = redis_hash
         self.postgres_dsn = postgres_dsn
         self.postgres_table = postgres_table
+        self.auto_create_tables = bool(auto_create_tables)
 
         if self.backend not in {"file", "redis", "postgres"}:
             raise ValueError(f"Unsupported trading state backend '{self.backend}'")
@@ -178,6 +180,12 @@ class TradingStateStore:
             self._redis = Redis.from_url(self.redis_url, decode_responses=True)
         return self._redis
 
+    def _qualified_table_identifier(self):
+        parts = [p.strip() for p in str(self.postgres_table).split(".") if p.strip()]
+        if not parts:
+            raise ValueError("Invalid Postgres table name")
+        return sql.SQL(".").join([sql.Identifier(part) for part in parts])
+
     def _ensure_pg_conn(self):
         if psycopg is None or sql is None:  # pragma: no cover - optional dependency
             raise RuntimeError("psycopg is required for postgres-backed trading state persistence")
@@ -185,18 +193,19 @@ class TradingStateStore:
             assert self.postgres_dsn is not None
             self._pg_conn = psycopg.connect(self.postgres_dsn)
             self._pg_conn.autocommit = True
-            with self._pg_conn.cursor() as cur:
-                cur.execute(
-                    sql.SQL(
-                        """
-                        CREATE TABLE IF NOT EXISTS {table} (
-                            symbol TEXT PRIMARY KEY,
-                            state_json JSONB NOT NULL,
-                            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                        )
-                        """
-                    ).format(table=sql.Identifier(self.postgres_table))
-                )
+            if self.auto_create_tables:
+                with self._pg_conn.cursor() as cur:
+                    cur.execute(
+                        sql.SQL(
+                            """
+                            CREATE TABLE IF NOT EXISTS {table} (
+                                symbol TEXT PRIMARY KEY,
+                                state_json JSONB NOT NULL,
+                                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                            )
+                            """
+                        ).format(table=self._qualified_table_identifier())
+                    )
         return self._pg_conn
 
     # ------------------------------------------------------------------ #
@@ -239,7 +248,7 @@ class TradingStateStore:
         conn = self._ensure_pg_conn()
         with conn.cursor() as cur:
             cur.execute(
-                sql.SQL("SELECT symbol, state_json FROM {table}").format(table=sql.Identifier(self.postgres_table))
+                sql.SQL("SELECT symbol, state_json FROM {table}").format(table=self._qualified_table_identifier())
             )
             rows = cur.fetchall()
         for symbol, state_json in rows:
@@ -316,11 +325,11 @@ class TradingStateStore:
         symbols = [key for key, _ in rows]
         with conn.cursor() as cur:
             if not rows:
-                cur.execute(sql.SQL("TRUNCATE {table}").format(table=sql.Identifier(self.postgres_table)))
+                cur.execute(sql.SQL("TRUNCATE {table}").format(table=self._qualified_table_identifier()))
                 return
             cur.execute(
                 sql.SQL("DELETE FROM {table} WHERE symbol <> ALL(%s)").format(
-                    table=sql.Identifier(self.postgres_table)
+                    table=self._qualified_table_identifier()
                 ),
                 (symbols,),
             )
@@ -333,6 +342,6 @@ class TradingStateStore:
                     SET state_json = EXCLUDED.state_json,
                         updated_at = EXCLUDED.updated_at
                     """
-                ).format(table=sql.Identifier(self.postgres_table)),
+                ).format(table=self._qualified_table_identifier()),
                 rows,
             )
